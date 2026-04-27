@@ -3,6 +3,8 @@ export interface AuthUser {
   username: string
   email: string
   is_staff: boolean
+  company_id: string | null
+  role: string | null
 }
 
 export interface AuthTokens {

@@ -25,6 +25,7 @@ const ExpensesPage = lazy(() => import('./pages/finance/ExpensesPage'))
 const AccountsPayablePage = lazy(() => import('./pages/finance/AccountsPayablePage'))
 const AccountsReceivablePage = lazy(() => import('./pages/finance/AccountsReceivablePage'))
 const ReportsPage = lazy(() => import('./pages/finance/ReportsPage'))
+const MarketplaceSettingsPage = lazy(() => import('./pages/omnichannel/MarketplaceSettingsPage'))
 const ShopeeSettingsPage = lazy(() => import('./pages/shopee/ShopeeSettingsPage'))
 const ShopeeWebhookLogPage = lazy(() => import('./pages/shopee/ShopeeWebhookLogPage'))
 const TikTokSettingsPage = lazy(() => import('./pages/tiktok/TikTokSettingsPage'))
@@ -67,6 +68,7 @@ export default function App() {
                     <Route path="reports" element={<Suspense fallback={<Loading />}><ReportsPage /></Suspense>} />
                   </Route>
                   <Route path="omnichannel">
+                    <Route path="settings" element={<Suspense fallback={<Loading />}><MarketplaceSettingsPage /></Suspense>} />
                     <Route path="shopee/settings" element={<Suspense fallback={<Loading />}><ShopeeSettingsPage /></Suspense>} />
                     <Route path="shopee/webhook-logs" element={<Suspense fallback={<Loading />}><ShopeeWebhookLogPage /></Suspense>} />
                     <Route path="tiktok/settings" element={<Suspense fallback={<Loading />}><TikTokSettingsPage /></Suspense>} />

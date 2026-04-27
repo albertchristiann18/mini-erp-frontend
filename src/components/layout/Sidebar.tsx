@@ -46,6 +46,7 @@ const navItems: NavItem[] = [
   {
     label: 'Omnichannel', icon: <Store className="h-4 w-4" />,
     children: [
+      { label: 'Marketplace Settings', to: '/omnichannel/settings' },
       { label: 'Shopee Settings', to: '/omnichannel/shopee/settings' },
       { label: 'Shopee Webhook Logs', to: '/omnichannel/shopee/webhook-logs' },
       { label: 'TikTok Settings', to: '/omnichannel/tiktok/settings' },
