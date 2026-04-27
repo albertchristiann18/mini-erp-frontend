@@ -1,0 +1,57 @@
+import { useStockMovements } from '../../hooks/useInventory'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
+import { Badge } from '../../components/ui/badge'
+import { formatDate } from '../../lib/utils'
+import type { BadgeProps } from '../../components/ui/badge'
+import type { StockMovement } from '../../types/inventory'
+
+const movementVariant: Record<StockMovement['movement_type'], BadgeProps['variant']> = {
+  PURCHASE: 'info',
+  INBOUND: 'success',
+  OUTBOUND: 'destructive',
+  RETURN: 'warning',
+  ADJUSTMENT: 'secondary',
+  TRANSFER: 'secondary',
+}
+
+export default function StockPage() {
+  const { data, isLoading } = useStockMovements({ page_size: 20 })
+
+  return (
+    <div className="space-y-4">
+      <span className="text-sm text-muted-foreground">{data?.count ?? 0} movements</span>
+      <div className="rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Variant</TableHead>
+              <TableHead>Warehouse</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-right">Balance After</TableHead>
+              <TableHead>Reference</TableHead>
+              <TableHead>Date</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+            ) : data?.results.map(m => (
+              <TableRow key={m.id}>
+                <TableCell>{m.product_variant_name}</TableCell>
+                <TableCell>{m.warehouse_name}</TableCell>
+                <TableCell>
+                  <Badge variant={movementVariant[m.movement_type]}>{m.movement_type}</Badge>
+                </TableCell>
+                <TableCell className="text-right">{m.quantity}</TableCell>
+                <TableCell className="text-right">{m.balance_after}</TableCell>
+                <TableCell className="font-mono text-xs">{m.reference_number || '—'}</TableCell>
+                <TableCell className="text-muted-foreground text-xs">{formatDate(m.cdate)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  )
+}
