@@ -25,6 +25,8 @@ const ExpensesPage = lazy(() => import('./pages/finance/ExpensesPage'))
 const AccountsPayablePage = lazy(() => import('./pages/finance/AccountsPayablePage'))
 const AccountsReceivablePage = lazy(() => import('./pages/finance/AccountsReceivablePage'))
 const ReportsPage = lazy(() => import('./pages/finance/ReportsPage'))
+const ShopeeSettingsPage = lazy(() => import('./pages/shopee/ShopeeSettingsPage'))
+const ShopeeWebhookLogPage = lazy(() => import('./pages/shopee/ShopeeWebhookLogPage'))
 
 const Loading = () => (
   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -61,6 +63,10 @@ export default function App() {
                     <Route path="payable" element={<Suspense fallback={<Loading />}><AccountsPayablePage /></Suspense>} />
                     <Route path="receivable" element={<Suspense fallback={<Loading />}><AccountsReceivablePage /></Suspense>} />
                     <Route path="reports" element={<Suspense fallback={<Loading />}><ReportsPage /></Suspense>} />
+                  </Route>
+                  <Route path="shopee">
+                    <Route path="shops" element={<Suspense fallback={<Loading />}><ShopeeSettingsPage /></Suspense>} />
+                    <Route path="webhook-logs" element={<Suspense fallback={<Loading />}><ShopeeWebhookLogPage /></Suspense>} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>

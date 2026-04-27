@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Package, ShoppingCart,
-  DollarSign, ChevronDown, Boxes,
+  DollarSign, ChevronDown, Boxes, Store,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
@@ -41,6 +41,13 @@ const navItems: NavItem[] = [
       { label: 'Accounts Payable', to: '/finance/payable' },
       { label: 'Accounts Receivable', to: '/finance/receivable' },
       { label: 'Reports', to: '/finance/reports' },
+    ],
+  },
+  {
+    label: 'Shopee', icon: <Store className="h-4 w-4" />,
+    children: [
+      { label: 'Shops', to: '/shopee/shops' },
+      { label: 'Webhook Logs', to: '/shopee/webhook-logs' },
     ],
   },
 ]
