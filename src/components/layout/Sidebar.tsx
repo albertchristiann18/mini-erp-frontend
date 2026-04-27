@@ -44,10 +44,12 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    label: 'Shopee', icon: <Store className="h-4 w-4" />,
+    label: 'Omnichannel', icon: <Store className="h-4 w-4" />,
     children: [
-      { label: 'Shops', to: '/shopee/shops' },
-      { label: 'Webhook Logs', to: '/shopee/webhook-logs' },
+      { label: 'Shopee Settings', to: '/omnichannel/shopee/settings' },
+      { label: 'Shopee Webhook Logs', to: '/omnichannel/shopee/webhook-logs' },
+      { label: 'TikTok Settings', to: '/omnichannel/tiktok/settings' },
+      { label: 'TikTok Webhook Logs', to: '/omnichannel/tiktok/webhook-logs' },
     ],
   },
 ]

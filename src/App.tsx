@@ -27,6 +27,8 @@ const AccountsReceivablePage = lazy(() => import('./pages/finance/AccountsReceiv
 const ReportsPage = lazy(() => import('./pages/finance/ReportsPage'))
 const ShopeeSettingsPage = lazy(() => import('./pages/shopee/ShopeeSettingsPage'))
 const ShopeeWebhookLogPage = lazy(() => import('./pages/shopee/ShopeeWebhookLogPage'))
+const TikTokSettingsPage = lazy(() => import('./pages/tiktok/TikTokSettingsPage'))
+const TikTokWebhookLogPage = lazy(() => import('./pages/tiktok/TikTokWebhookLogPage'))
 
 const Loading = () => (
   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -64,9 +66,11 @@ export default function App() {
                     <Route path="receivable" element={<Suspense fallback={<Loading />}><AccountsReceivablePage /></Suspense>} />
                     <Route path="reports" element={<Suspense fallback={<Loading />}><ReportsPage /></Suspense>} />
                   </Route>
-                  <Route path="shopee">
-                    <Route path="shops" element={<Suspense fallback={<Loading />}><ShopeeSettingsPage /></Suspense>} />
-                    <Route path="webhook-logs" element={<Suspense fallback={<Loading />}><ShopeeWebhookLogPage /></Suspense>} />
+                  <Route path="omnichannel">
+                    <Route path="shopee/settings" element={<Suspense fallback={<Loading />}><ShopeeSettingsPage /></Suspense>} />
+                    <Route path="shopee/webhook-logs" element={<Suspense fallback={<Loading />}><ShopeeWebhookLogPage /></Suspense>} />
+                    <Route path="tiktok/settings" element={<Suspense fallback={<Loading />}><TikTokSettingsPage /></Suspense>} />
+                    <Route path="tiktok/webhook-logs" element={<Suspense fallback={<Loading />}><TikTokWebhookLogPage /></Suspense>} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
