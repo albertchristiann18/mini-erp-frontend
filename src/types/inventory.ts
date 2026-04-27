@@ -8,6 +8,16 @@ export interface Category {
   udate: string
 }
 
+export interface Category {
+  id: string
+  company: string
+  name: string
+  description: string
+  is_active: boolean
+  cdate: string
+  udate: string
+}
+
 export interface Product {
   id: string
   company: string

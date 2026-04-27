@@ -8,8 +8,17 @@ export const getSalesOrders = (params?: Record<string, string | number>) =>
 export const getSalesOrder = (id: string) =>
   client.get<SalesOrder>(`/sales-orders/${id}/`)
 
-export const updateSalesOrder = (id: string, data: Partial<SalesOrder>) =>
+export const createSalesOrder = (data: unknown) =>
+  client.post('/sales-orders/', data)
+
+export const updateSalesOrder = (id: string, data: unknown) =>
   client.patch<SalesOrder>(`/sales-orders/${id}/`, data)
 
-export const getReturns = (salesOrderId: string) =>
-  client.get<SalesReturn[]>(`/sales-orders/${salesOrderId}/returns/`)
+export const confirmSalesOrder = (id: string) =>
+  client.post(`/sales-orders/${id}/confirm/`)
+
+export const cancelSalesOrder = (id: string) =>
+  client.post(`/sales-orders/${id}/cancel/`)
+
+export const getReturns = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<SalesReturn>>('/sales-returns/', { params })

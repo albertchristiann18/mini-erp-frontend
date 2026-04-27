@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getExpenses, getExpenseCategories,
+  getExpenses, createExpense, updateExpense, deleteExpense,
+  getExpenseCategories,
   getAccountsPayable, recordPayment,
   getAccountsReceivable, settleReceivable,
   getDashboardKPIs, getIncomeStatement, getBalanceSheet, getCashFlow,
@@ -15,6 +16,30 @@ export const useExpenses = (params: Record<string, string | number> = {}) =>
     staleTime: 1000 * 60 * 2,
   })
 
+export const useCreateExpense = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: unknown) => createExpense(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+  })
+}
+
+export const useUpdateExpense = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) => updateExpense(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+  })
+}
+
+export const useDeleteExpense = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteExpense(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+  })
+}
+
 export const useExpenseCategories = () =>
   useQuery({
     queryKey: ['expense-categories'],
@@ -22,10 +47,10 @@ export const useExpenseCategories = () =>
     staleTime: 1000 * 60 * 10,
   })
 
-export const useAccountsPayable = () =>
+export const useAccountsPayable = (page = 1) =>
   useQuery({
-    queryKey: ['accounts-payable'],
-    queryFn: () => getAccountsPayable().then(r => r.data),
+    queryKey: ['accounts-payable', page],
+    queryFn: () => getAccountsPayable({ page, page_size: 20 }).then(r => r.data),
     staleTime: 1000 * 60 * 2,
   })
 
@@ -38,10 +63,10 @@ export const useRecordPayment = () => {
   })
 }
 
-export const useAccountsReceivable = () =>
+export const useAccountsReceivable = (page = 1) =>
   useQuery({
-    queryKey: ['accounts-receivable'],
-    queryFn: () => getAccountsReceivable().then(r => r.data),
+    queryKey: ['accounts-receivable', page],
+    queryFn: () => getAccountsReceivable({ page, page_size: 20 }).then(r => r.data),
     staleTime: 1000 * 60 * 2,
   })
 

@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Products', to: '/inventory/products' },
       { label: 'Stock', to: '/inventory/stock' },
+      { label: 'Warehouses', to: '/inventory/warehouses' },
     ],
   },
   {

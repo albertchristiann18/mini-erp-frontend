@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { useStockMovements } from '../../hooks/useInventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
+import { Pagination } from '../../components/Pagination'
 import { formatDate } from '../../lib/utils'
 import type { BadgeProps } from '../../components/ui/badge'
 import type { StockMovement } from '../../types/inventory'
@@ -15,7 +17,9 @@ const movementVariant: Record<StockMovement['movement_type'], BadgeProps['varian
 }
 
 export default function StockPage() {
-  const { data, isLoading } = useStockMovements({ page_size: 20 })
+  const [page, setPage] = useState(1)
+  const { data, isLoading } = useStockMovements({ page, page_size: 20 })
+  const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   return (
     <div className="space-y-4">
@@ -52,6 +56,7 @@ export default function StockPage() {
           </TableBody>
         </Table>
       </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
     </div>
   )
 }

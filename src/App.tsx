@@ -1,122 +1,74 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './contexts/ThemeContext'
+import { Toaster } from './components/ui/toaster'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { AppLayout } from './components/layout/AppLayout'
+import LoginPage from './pages/auth/LoginPage'
 
-function App() {
-  const [count, setCount] = useState(0)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 1000 * 60 * 2, gcTime: 1000 * 60 * 5 },
+  },
+})
 
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
+const ProductsPage = lazy(() => import('./pages/inventory/ProductsPage'))
+const StockPage = lazy(() => import('./pages/inventory/StockPage'))
+const WarehousesPage = lazy(() => import('./pages/inventory/WarehousesPage'))
+const PurchaseOrdersPage = lazy(() => import('./pages/purchasing/PurchaseOrdersPage'))
+const SalesOrdersPage = lazy(() => import('./pages/sales/SalesOrdersPage'))
+const ReturnsPage = lazy(() => import('./pages/sales/ReturnsPage'))
+const ExpensesPage = lazy(() => import('./pages/finance/ExpensesPage'))
+const AccountsPayablePage = lazy(() => import('./pages/finance/AccountsPayablePage'))
+const AccountsReceivablePage = lazy(() => import('./pages/finance/AccountsReceivablePage'))
+const ReportsPage = lazy(() => import('./pages/finance/ReportsPage'))
+
+const Loading = () => (
+  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+    Loading...
+  </div>
+)
+
+export default function App() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemeProvider>
+          <BrowserRouter>
+            <Toaster position="top-right" richColors />
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route element={<AppLayout />}>
+                  <Route index element={<Suspense fallback={<Loading />}><DashboardPage /></Suspense>} />
+                  <Route path="inventory">
+                    <Route path="products" element={<Suspense fallback={<Loading />}><ProductsPage /></Suspense>} />
+                    <Route path="stock" element={<Suspense fallback={<Loading />}><StockPage /></Suspense>} />
+                    <Route path="warehouses" element={<Suspense fallback={<Loading />}><WarehousesPage /></Suspense>} />
+                  </Route>
+                  <Route path="purchasing">
+                    <Route path="orders" element={<Suspense fallback={<Loading />}><PurchaseOrdersPage /></Suspense>} />
+                  </Route>
+                  <Route path="sales">
+                    <Route path="orders" element={<Suspense fallback={<Loading />}><SalesOrdersPage /></Suspense>} />
+                    <Route path="returns" element={<Suspense fallback={<Loading />}><ReturnsPage /></Suspense>} />
+                  </Route>
+                  <Route path="finance">
+                    <Route path="expenses" element={<Suspense fallback={<Loading />}><ExpensesPage /></Suspense>} />
+                    <Route path="payable" element={<Suspense fallback={<Loading />}><AccountsPayablePage /></Suspense>} />
+                    <Route path="receivable" element={<Suspense fallback={<Loading />}><AccountsReceivablePage /></Suspense>} />
+                    <Route path="reports" element={<Suspense fallback={<Loading />}><ReportsPage /></Suspense>} />
+                  </Route>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ThemeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   )
 }
-
-export default App

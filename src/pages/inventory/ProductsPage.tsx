@@ -1,13 +1,30 @@
+import { useState } from 'react'
 import { useProducts } from '../../hooks/useInventory'
+import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
+import { Button } from '../../components/ui/button'
+import { Pagination } from '../../components/Pagination'
+import { ProductFormModal } from '../../components/modals/ProductFormModal'
+import { Plus } from 'lucide-react'
 
 export default function ProductsPage() {
-  const { data, isLoading } = useProducts()
+  const { user } = useAuth()
+  const [page, setPage] = useState(1)
+  const [showModal, setShowModal] = useState(false)
+  const { data, isLoading } = useProducts(page)
+  const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   return (
     <div className="space-y-4">
-      <span className="text-sm text-muted-foreground">{data?.count ?? 0} products</span>
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">{data?.count ?? 0} products</span>
+        {user?.is_staff && (
+          <Button size="sm" onClick={() => setShowModal(true)}>
+            <Plus className="h-4 w-4 mr-1" /> New Product
+          </Button>
+        )}
+      </div>
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
@@ -36,6 +53,8 @@ export default function ProductsPage() {
           </TableBody>
         </Table>
       </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
+      <ProductFormModal open={showModal} onClose={() => setShowModal(false)} />
     </div>
   )
 }
