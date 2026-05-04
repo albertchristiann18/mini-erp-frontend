@@ -7,4 +7,4 @@ export const login = (username: string, password: string) =>
 export const refreshToken = (refresh: string) =>
   client.post<AuthTokens>('/api/token/refresh/', { refresh })
 
-export const getMe = () => client.get<AuthUser>('/api/me/')
+export const getMe = () => client.get<AuthUser>('/api/profile/')

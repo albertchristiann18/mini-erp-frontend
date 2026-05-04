@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getCategories, getProducts, createProduct, updateProduct,
   getProductVariants, getWarehouses, createWarehouse, updateWarehouse,
-  getStockMovements,
+  getStockMovements, getMasterCategories,
+  bulkCreateProducts, bulkUpdateInventory,
 } from '../api/inventory'
 
 export const useCategories = () =>
@@ -71,3 +72,26 @@ export const useStockMovements = (params: Record<string, string | number> = {}) 
     queryFn: () => getStockMovements(params).then(r => r.data),
     staleTime: 1000 * 60 * 1,
   })
+
+export const useMasterCategories = () =>
+  useQuery({
+    queryKey: ['master-categories'],
+    queryFn: () => getMasterCategories().then(r => r.data),
+    staleTime: Infinity,
+  })
+
+export const useBulkCreateProducts = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: unknown[]) => bulkCreateProducts(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+  })
+}
+
+export const useBulkUpdateInventory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (updates: Parameters<typeof bulkUpdateInventory>[0]) => bulkUpdateInventory(updates).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-movements'] }),
+  })
+}

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,13 +9,17 @@ import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { useCategories, useCreateProduct } from '../../hooks/useInventory'
+import { MASTER_CATEGORIES } from '../../constants/masterCategories'
 import { toast } from '../../lib/toast'
+import { PhotoUploadGrid } from '../inventory/PhotoUploadGrid'
+import type { ProductPhoto } from '../../types/inventory'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   sku: z.string().min(1, 'SKU is required'),
   category: z.string().min(1, 'Category is required'),
-  description: z.string().optional(),
+  master_category_key: z.string().min(1, 'Master category is required'),
+  description: z.string().min(25, 'Description must be at least 25 characters'),
   variant_name: z.string().min(1, 'Variant name is required'),
   variant_sku: z.string().min(1, 'Variant SKU is required'),
   selling_price: z.number().min(0),
@@ -29,24 +34,32 @@ interface Props {
 export function ProductFormModal({ open, onClose }: Props) {
   const { data: categoriesData } = useCategories()
   const createMutation = useCreateProduct()
+  const [photos, setPhotos] = useState<ProductPhoto[]>([])
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { selling_price: 0 },
   })
 
-  const handleClose = () => { reset(); onClose() }
+  const handleClose = () => {
+    reset()
+    setPhotos([])
+    setPendingFiles([])
+    onClose()
+  }
 
   const onSubmit = async (values: FormValues) => {
     const payload = {
       name: values.name,
       sku: values.sku,
       category: values.category,
-      description: values.description || '',
+      description: values.description,
       variants: [{
         name: values.variant_name,
         sku: `${values.sku}-${values.variant_sku}`,
-        selling_price: values.selling_price,
+        base_price: values.selling_price,
+        marketplace_listings: [],
       }],
     }
     try {
@@ -62,7 +75,7 @@ export function ProductFormModal({ open, onClose }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New Product</DialogTitle>
         </DialogHeader>
@@ -75,22 +88,47 @@ export function ProductFormModal({ open, onClose }: Props) {
               <Input {...register('sku')} placeholder="e.g. TSH-001" />
             </FormField>
           </div>
-          <FormField label="Category" error={errors.category?.message} required>
-            <Select
-              value={watch('category')}
-              onValueChange={(v) => setValue('category', v, { shouldValidate: true })}
-            >
-              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-              <SelectContent>
-                {categories.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Category" error={errors.category?.message} required>
+              <Select
+                value={watch('category')}
+                onValueChange={(v) => setValue('category', v, { shouldValidate: true })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Master Category" error={errors.master_category_key?.message} required>
+              <Select
+                value={watch('master_category_key')}
+                onValueChange={(v) => setValue('master_category_key', v, { shouldValidate: true })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select master category" /></SelectTrigger>
+                <SelectContent>
+                  {MASTER_CATEGORIES.map(c => (
+                    <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </div>
+          <FormField label="Description" error={errors.description?.message} required>
+            <Textarea {...register('description')} placeholder="Enter product description (min 25 characters)" />
+            <p className="text-xs text-muted-foreground mt-1">
+              {watch('description')?.length || 0}/25 minimum characters
+            </p>
           </FormField>
-          <FormField label="Description" error={errors.description?.message}>
-            <Textarea {...register('description')} placeholder="Optional description" />
-          </FormField>
+          <PhotoUploadGrid
+            productId={null}
+            photos={photos}
+            pendingFiles={pendingFiles}
+            onPhotosChange={setPhotos}
+            onPendingFilesChange={setPendingFiles}
+          />
           <div className="border-t pt-4">
             <p className="text-sm font-medium text-foreground mb-3">Initial Variant</p>
             <div className="grid grid-cols-3 gap-3">

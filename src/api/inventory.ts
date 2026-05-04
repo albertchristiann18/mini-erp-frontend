@@ -27,3 +27,33 @@ export const updateWarehouse = (id: string, data: unknown) =>
 
 export const getStockMovements = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<StockMovement>>('/stock-movements/', { params })
+
+export const getMasterCategories = () =>
+  client.get<Array<{key: string; label: string; shopee_id: number; tiktok_id: string}>>('/master-categories/')
+
+export const uploadProductPhoto = (productId: string, image: File) => {
+  const form = new FormData()
+  form.append('image', image)
+  return client.post<{id: string; image_url: string; order: number; is_primary: boolean}>(`/product/${productId}/photos/`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export const deleteProductPhoto = (productId: string, photoId: string) =>
+  client.delete(`/product/${productId}/photos/${photoId}/`)
+
+export const reorderProductPhotos = (productId: string, photoIds: string[]) =>
+  client.patch(`/product/${productId}/photos/${photoIds[0]}/reorder/`, { photo_ids: photoIds })
+
+export const bulkCreateProducts = (data: unknown[]) =>
+  client.post('/product/bulk_create/', data)
+
+export interface InventoryUpdate {
+  variant_id: string
+  warehouse_id: string
+  qty: number
+  type: 'replace' | 'add' | 'min'
+}
+
+export const bulkUpdateInventory = (updates: InventoryUpdate[]) =>
+  client.post('/inventory/bulk_update/', updates)

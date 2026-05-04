@@ -4,6 +4,7 @@ export interface Category {
   name: string
   description: string
   is_active: boolean
+  master_category_key?: string
   cdate: string
   udate: string
 }
@@ -14,8 +15,16 @@ export interface Category {
   name: string
   description: string
   is_active: boolean
+  master_category_key?: string
   cdate: string
   udate: string
+}
+
+export interface ProductPhoto {
+  id: string
+  image_url: string | null
+  order: number
+  is_primary: boolean
 }
 
 export interface Product {
@@ -31,6 +40,7 @@ export interface Product {
   height: number
   weight: number
   is_active: boolean
+  photos?: ProductPhoto[]
   cdate: string
   udate: string
 }

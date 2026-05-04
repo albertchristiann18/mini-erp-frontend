@@ -18,26 +18,31 @@ export interface SalesOrderItem {
 
 export interface SalesOrder {
   id: string
-  company: string
-  warehouse: string
-  marketplace: string | null
-  marketplace_name: string | null
   order_number: string
-  status: SOStatus
-  channel: string
+  marketplace: string
+  marketplace_order_id: string
+  marketplace_order_number: string
+  status: 'PENDING' | 'CONFIRMED' | 'SHIPPING' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED' | 'RETURNED'
+  source_platform: 'SHOPEE' | 'TIKTOK' | 'MANUAL'
+  warehouse: string
+  warehouse_name: string
+  customer_name: string
+  customer_phone: string
+  shipping_address: string
+  shipping_province: string
+  shipping_city: string
+  order_date: string
+  courier_name: string
+  tracking_number: string
+  shipping_fee: number
+  shipping_fee_seller: number
   subtotal: number
   total_discount: number
   total_marketplace_fee: number
-  shipping_fee_seller: number
   total_cogs: number
   net_revenue: number
   gross_profit: number
-  order_date: string
-  confirmed_date: string | null
-  shipped_date: string | null
-  delivered_date: string | null
-  completed_date: string | null
-  items: SalesOrderItem[]
+  note: string
   cdate: string
   udate: string
 }

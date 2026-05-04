@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { useStockMovements } from '../../hooks/useInventory'
+import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
+import { Button } from '../../components/ui/button'
 import { Pagination } from '../../components/Pagination'
+import { BulkStockModal } from '../../components/modals/BulkStockModal'
 import { formatDate } from '../../lib/utils'
 import type { BadgeProps } from '../../components/ui/badge'
 import type { StockMovement } from '../../types/inventory'
+import { Upload } from 'lucide-react'
 
 const movementVariant: Record<StockMovement['movement_type'], BadgeProps['variant']> = {
   PURCHASE: 'info',
@@ -18,12 +22,21 @@ const movementVariant: Record<StockMovement['movement_type'], BadgeProps['varian
 
 export default function StockPage() {
   const [page, setPage] = useState(1)
+  const [showBulkModal, setShowBulkModal] = useState(false)
+  const { user } = useAuth()
   const { data, isLoading } = useStockMovements({ page, page_size: 20 })
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   return (
     <div className="space-y-4">
-      <span className="text-sm text-muted-foreground">{data?.count ?? 0} movements</span>
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">{data?.count ?? 0} movements</span>
+        {user?.is_staff && (
+          <Button size="sm" variant="outline" onClick={() => setShowBulkModal(true)}>
+            <Upload className="h-4 w-4 mr-1" /> Bulk Stock Update
+          </Button>
+        )}
+      </div>
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
@@ -57,6 +70,7 @@ export default function StockPage() {
         </Table>
       </div>
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
+      <BulkStockModal open={showBulkModal} onClose={() => setShowBulkModal(false)} />
     </div>
   )
 }

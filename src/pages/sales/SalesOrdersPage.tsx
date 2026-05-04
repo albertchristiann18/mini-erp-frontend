@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
 import { SalesOrderFormModal } from '../../components/modals/SalesOrderFormModal'
+import { PlatformBadge } from '../../components/ui/PlatformBadge'
 import { formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import { Plus } from 'lucide-react'
@@ -80,6 +81,7 @@ export default function SalesOrdersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Order Number</TableHead>
+              <TableHead>Platform</TableHead>
               <TableHead>Channel</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Net Revenue</TableHead>
@@ -94,7 +96,8 @@ export default function SalesOrdersPage() {
             ) : data?.results.map(so => (
               <TableRow key={so.id}>
                 <TableCell className="font-mono text-xs">{so.order_number}</TableCell>
-                <TableCell>{so.marketplace_name ?? so.channel ?? '—'}</TableCell>
+                <TableCell><PlatformBadge platform={so.source_platform ?? 'MANUAL'} /></TableCell>
+                <TableCell>—</TableCell>
                 <TableCell><Badge variant={statusVariant[so.status]}>{so.status}</Badge></TableCell>
                 <TableCell className="text-right">{formatIDR(so.net_revenue)}</TableCell>
                 <TableCell className="text-right">{formatIDR(so.gross_profit)}</TableCell>
