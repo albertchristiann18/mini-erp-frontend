@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -8,39 +8,57 @@ import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useCategories, useCreateProduct } from '../../hooks/useInventory'
+import { useCategories, useCreateProduct, useUpdateProduct } from '../../hooks/useInventory'
 import { MASTER_CATEGORIES } from '../../constants/masterCategories'
 import { toast } from '../../lib/toast'
 import { PhotoUploadGrid } from '../inventory/PhotoUploadGrid'
-import type { ProductPhoto } from '../../types/inventory'
+import type { Product, ProductPhoto } from '../../types/inventory'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
-  sku: z.string().min(1, 'SKU is required'),
+  sku: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
-  master_category_key: z.string().min(1, 'Master category is required'),
+  master_category_key: z.string().optional(),
   description: z.string().min(25, 'Description must be at least 25 characters'),
-  variant_name: z.string().min(1, 'Variant name is required'),
-  variant_sku: z.string().min(1, 'Variant SKU is required'),
-  selling_price: z.number().min(0),
+  variant_name: z.string().optional(),
+  variant_sku: z.string().optional(),
+  selling_price: z.number().optional(),
+  is_active: z.boolean().optional(),
 })
 type FormValues = z.infer<typeof schema>
 
 interface Props {
   open: boolean
   onClose: () => void
+  product?: Product | null
 }
 
-export function ProductFormModal({ open, onClose }: Props) {
+export function ProductFormModal({ open, onClose, product }: Props) {
+  const isEditing = !!product
   const { data: categoriesData } = useCategories()
   const createMutation = useCreateProduct()
-  const [photos, setPhotos] = useState<ProductPhoto[]>([])
+  const updateMutation = useUpdateProduct()
+  const [photos, setPhotos] = useState<ProductPhoto[]>(product?.photos || [])
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { selling_price: 0 },
+    defaultValues: {
+      selling_price: 0,
+      is_active: true,
+    },
   })
+
+  useEffect(() => {
+    if (product && open) {
+      setValue('name', product.name)
+      setValue('sku', product.sku_code)
+      setValue('category', product.category)
+      setValue('description', product.description)
+      setValue('is_active', product.is_active)
+      setPhotos(product.photos || [])
+    }
+  }, [product, open, setValue])
 
   const handleClose = () => {
     reset()
@@ -50,6 +68,24 @@ export function ProductFormModal({ open, onClose }: Props) {
   }
 
   const onSubmit = async (values: FormValues) => {
+    if (isEditing && product) {
+      try {
+        await updateMutation.mutateAsync({
+          id: product.id,
+          data: {
+            name: values.name,
+            description: values.description,
+            category: values.category,
+            is_active: values.is_active,
+          },
+        })
+        toast.success('Product updated')
+        handleClose()
+      } catch {
+        toast.error('Failed to update product')
+      }
+      return
+    }
     const payload = {
       name: values.name,
       sku: values.sku,
@@ -77,7 +113,7 @@ export function ProductFormModal({ open, onClose }: Props) {
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Product</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Product' : 'New Product'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -122,31 +158,49 @@ export function ProductFormModal({ open, onClose }: Props) {
               {watch('description')?.length || 0}/25 minimum characters
             </p>
           </FormField>
-          <PhotoUploadGrid
-            productId={null}
-            photos={photos}
-            pendingFiles={pendingFiles}
-            onPhotosChange={setPhotos}
-            onPendingFilesChange={setPendingFiles}
-          />
-          <div className="border-t pt-4">
-            <p className="text-sm font-medium text-foreground mb-3">Initial Variant</p>
-            <div className="grid grid-cols-3 gap-3">
-              <FormField label="Variant Name" error={errors.variant_name?.message} required>
-                <Input {...register('variant_name')} placeholder="e.g. S / Red" />
-              </FormField>
-              <FormField label="Variant SKU Suffix" error={errors.variant_sku?.message} required>
-                <Input {...register('variant_sku')} placeholder="e.g. S-RED" />
-              </FormField>
-              <FormField label="Selling Price" error={errors.selling_price?.message} required>
-                <Input type="number" {...register('selling_price', { valueAsNumber: true })} placeholder="0" />
-              </FormField>
-            </div>
-          </div>
+          {isEditing && (
+            <FormField label="Status">
+              <Select
+                value={watch('is_active') ? 'true' : 'false'}
+                onValueChange={(v) => setValue('is_active', v === 'true', { shouldValidate: true })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Active</SelectItem>
+                  <SelectItem value="false">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+          )}
+          {!isEditing && (
+            <>
+              <PhotoUploadGrid
+                productId={null}
+                photos={photos}
+                pendingFiles={pendingFiles}
+                onPhotosChange={setPhotos}
+                onPendingFilesChange={setPendingFiles}
+              />
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-foreground mb-3">Initial Variant</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <FormField label="Variant Name" error={errors.variant_name?.message} required>
+                    <Input {...register('variant_name')} placeholder="e.g. S / Red" />
+                  </FormField>
+                  <FormField label="Variant SKU Suffix" error={errors.variant_sku?.message} required>
+                    <Input {...register('variant_sku')} placeholder="e.g. S-RED" />
+                  </FormField>
+                  <FormField label="Selling Price" error={errors.selling_price?.message} required>
+                    <Input type="number" {...register('selling_price', { valueAsNumber: true })} placeholder="0" />
+                  </FormField>
+                </div>
+              </div>
+            </>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Product'}
+              {isSubmitting ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Product')}
             </Button>
           </DialogFooter>
         </form>

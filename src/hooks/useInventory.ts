@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getCategories, getProducts, createProduct, updateProduct,
-  getProductVariants, getWarehouses, createWarehouse, updateWarehouse,
+  getProductVariants, getProductVariantStocks, getWarehouses, createWarehouse, updateWarehouse,
   getStockMovements, getMasterCategories,
-  bulkCreateProducts, bulkUpdateInventory,
+  bulkCreateProducts, bulkUpdateInventory, adjustStock,
 } from '../api/inventory'
+import client from '../api/client'
+import type { Product } from '../types/inventory'
 
 export const useCategories = () =>
   useQuery({
@@ -13,12 +15,15 @@ export const useCategories = () =>
     staleTime: 1000 * 60 * 10,
   })
 
-export const useProducts = (page = 1, pageSize = 20) =>
-  useQuery({
-    queryKey: ['products', page, pageSize],
-    queryFn: () => getProducts({ page, page_size: pageSize }).then(r => r.data),
+export const useProducts = (page = 1, pageSize = 20, search?: string) => {
+  const params: Record<string, string | number> = { page, page_size: pageSize }
+  if (search) params.search = search
+  return useQuery({
+    queryKey: ['products', page, pageSize, search],
+    queryFn: () => getProducts(params).then(r => r.data),
     staleTime: 1000 * 60 * 2,
   })
+}
 
 export const useCreateProduct = () => {
   const qc = useQueryClient()
@@ -95,3 +100,28 @@ export const useBulkUpdateInventory = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['stock-movements'] }),
   })
 }
+
+export const useProductVariantStocks = (params: Record<string, string | number> = {}) =>
+  useQuery({
+    queryKey: ['product-variant-stocks', params],
+    queryFn: () => getProductVariantStocks(params).then(r => r.data),
+    staleTime: 1000 * 30,
+  })
+
+export const useAdjustStock = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: Parameters<typeof adjustStock>[0]) => adjustStock(data).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product-variant-stocks'] })
+      qc.invalidateQueries({ queryKey: ['warehouses'] })
+    },
+  })
+}
+
+export const useProduct = (id: string) =>
+  useQuery({
+    queryKey: ['product', id],
+    queryFn: () => client.get<Product>(`/product/${id}/`).then(r => r.data),
+    enabled: !!id,
+  })

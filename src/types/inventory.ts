@@ -9,17 +9,6 @@ export interface Category {
   udate: string
 }
 
-export interface Category {
-  id: string
-  company: string
-  name: string
-  description: string
-  is_active: boolean
-  master_category_key?: string
-  cdate: string
-  udate: string
-}
-
 export interface ProductPhoto {
   id: string
   image_url: string | null
@@ -33,14 +22,17 @@ export interface Product {
   category: string
   category_name: string
   name: string
-  sku: string
+  sku_code: string
   description: string
+  total_qty: number
+  total_cogs: number
   length: number
   width: number
   height: number
   weight: number
   is_active: boolean
   photos?: ProductPhoto[]
+  variants?: ProductVariant[]
   cdate: string
   udate: string
 }
@@ -52,9 +44,17 @@ export interface ProductVariant {
   company: string
   name: string
   sku: string
+  sku_variant_code: string
+  base_price: number
   total_available_qty: number
   total_incoming_qty: number
   is_active: boolean
+  marketplace_listings?: Array<{
+    marketplace_id: string
+    selling_price: number
+    discounted_price?: number
+    is_active: boolean
+  }>
   cdate: string
   udate: string
 }
@@ -90,4 +90,18 @@ export interface PaginatedResponse<T> {
   next: string | null
   previous: string | null
   results: T[]
+}
+
+export interface ProductVariantStock {
+  id: string
+  name: string
+  sku_variant_code: string
+  product: string
+  product_name: string
+  product_sku: string
+  category_name: string
+  base_price: number
+  total_available_qty: number
+  physical_qty: number
+  is_active: boolean
 }

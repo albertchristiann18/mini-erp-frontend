@@ -16,6 +16,7 @@ const queryClient = new QueryClient({
 
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const ProductsPage = lazy(() => import('./pages/inventory/ProductsPage'))
+const ProductDetailPage = lazy(() => import('./pages/inventory/ProductDetailPage'))
 const StockPage = lazy(() => import('./pages/inventory/StockPage'))
 const WarehousesPage = lazy(() => import('./pages/inventory/WarehousesPage'))
 const PurchaseOrdersPage = lazy(() => import('./pages/purchasing/PurchaseOrdersPage'))
@@ -51,6 +52,7 @@ export default function App() {
                   <Route index element={<Suspense fallback={<Loading />}><DashboardPage /></Suspense>} />
                   <Route path="inventory">
                     <Route path="products" element={<Suspense fallback={<Loading />}><ProductsPage /></Suspense>} />
+                    <Route path="products/:id" element={<Suspense fallback={<Loading />}><ProductDetailPage /></Suspense>} />
                     <Route path="stock" element={<Suspense fallback={<Loading />}><StockPage /></Suspense>} />
                     <Route path="warehouses" element={<Suspense fallback={<Loading />}><WarehousesPage /></Suspense>} />
                   </Route>

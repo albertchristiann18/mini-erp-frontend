@@ -1,11 +1,14 @@
 import client from './client'
-import type { Product, ProductVariant, Warehouse, StockMovement, Category, PaginatedResponse } from '../types/inventory'
+import type { Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse } from '../types/inventory'
 
 export const getCategories = () =>
   client.get<PaginatedResponse<Category>>('/category/')
 
 export const getProducts = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Product>>('/product/', { params })
+
+export const getProductVariantStocks = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<ProductVariantStock>>('/product-variants/', { params })
 
 export const createProduct = (data: unknown) =>
   client.post('/product/', data)
@@ -57,3 +60,6 @@ export interface InventoryUpdate {
 
 export const bulkUpdateInventory = (updates: InventoryUpdate[]) =>
   client.post('/inventory/bulk_update/', updates)
+
+export const adjustStock = (data: { variant_id: string; warehouse_id: string; type: 'add' | 'min' | 'set'; qty: number }) =>
+  client.post('/inventory/adjust/', data)
