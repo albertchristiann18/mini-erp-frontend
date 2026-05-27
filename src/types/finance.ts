@@ -106,3 +106,37 @@ export interface ExpenseSummary {
   total_amount: number
   count: number
 }
+
+export type TransactionType = 'INFLOW' | 'OUTFLOW'
+
+export type TransactionCategory =
+  | 'SALES_SETTLEMENT'
+  | 'EQUITY_INJECTION'
+  | 'FOUNDER_LOAN'
+  | 'BANK_INTEREST'
+  | 'SUPPLIER_REFUND'
+  | 'OTHER_INCOME'
+  | 'OTHER_EXPENSE'
+
+export interface CashTransaction {
+  id: string
+  transaction_date: string
+  description: string
+  amount: number
+  transaction_type: TransactionType
+  category: TransactionCategory
+  reference_number: string
+  note: string
+  cdate: string
+  udate: string
+}
+
+export interface CashTransactionCreate {
+  transaction_date: string
+  description: string
+  amount: number
+  transaction_type: TransactionType
+  category: TransactionCategory
+  reference_number?: string
+  note?: string
+}

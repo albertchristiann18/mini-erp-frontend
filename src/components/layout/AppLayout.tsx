@@ -6,8 +6,10 @@ const titleMap: Record<string, string> = {
   '/': 'Dashboard',
   '/inventory/products': 'Products',
   '/inventory/stock': 'Stock Movements',
+  '/inventory/stock-closing': 'Stock Closing Report',
   '/inventory/warehouses': 'Warehouses',
   '/purchasing/orders': 'Purchase Orders',
+  '/purchasing/replenishment': 'Replenishment Planning',
   '/sales/dashboard': 'Sales Dashboard',
   '/sales/orders': 'Sales Orders',
   '/sales/returns': 'Returns',
@@ -15,6 +17,7 @@ const titleMap: Record<string, string> = {
   '/finance/payable': 'Accounts Payable',
   '/finance/receivable': 'Accounts Receivable',
   '/finance/reports': 'Financial Reports',
+  '/finance/cash-transactions': 'Cash Transactions',
 }
 
 export function AppLayout() {

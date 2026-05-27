@@ -20,12 +20,16 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Products', to: '/inventory/products' },
       { label: 'Stock', to: '/inventory/stock' },
+      { label: 'Stock Closing', to: '/inventory/stock-closing' },
       { label: 'Warehouses', to: '/inventory/warehouses' },
     ],
   },
   {
     label: 'Purchasing', icon: <Boxes className="h-4 w-4" />,
-    children: [{ label: 'Purchase Orders', to: '/purchasing/orders' }],
+    children: [
+      { label: 'Purchase Orders', to: '/purchasing/orders' },
+      { label: 'Replenishment', to: '/purchasing/replenishment' },
+    ],
   },
   {
     label: 'Sales', icon: <ShoppingCart className="h-4 w-4" />,
@@ -42,6 +46,7 @@ const navItems: NavItem[] = [
       { label: 'Accounts Payable', to: '/finance/payable' },
       { label: 'Accounts Receivable', to: '/finance/receivable' },
       { label: 'Reports', to: '/finance/reports' },
+      { label: 'Cash Transactions', to: '/finance/cash-transactions' },
     ],
   },
   {

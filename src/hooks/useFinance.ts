@@ -5,7 +5,9 @@ import {
   getAccountsPayable, recordPayment,
   getAccountsReceivable, settleReceivable,
   getDashboardKPIs, getIncomeStatement, getBalanceSheet, getCashFlow,
+  getCashTransactions, createCashTransaction, updateCashTransaction, deleteCashTransaction,
 } from '../api/finance'
+import type { CashTransactionCreate } from '../types/finance'
 import { useAuth } from '../contexts/AuthContext'
 
 const DEFAULT_COMPANY = import.meta.env.VITE_DEFAULT_COMPANY_ID || ''
@@ -133,5 +135,37 @@ export const useCashFlow = (startDate: string, endDate: string) => {
     queryFn: () => getCashFlow({ company_id: companyId, start_date: startDate, end_date: endDate }).then(r => r.data),
     staleTime: 1000 * 60 * 5,
     enabled: !!startDate && !!endDate && !!companyId,
+  })
+}
+
+export const useCashTransactions = (params: Record<string, string | number> = {}) =>
+  useQuery({
+    queryKey: ['cash-transactions', params],
+    queryFn: () => getCashTransactions({ page_size: 200, ...params }).then(r => r.data),
+    staleTime: 1000 * 60 * 2,
+  })
+
+export const useCreateCashTransaction = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: CashTransactionCreate) => createCashTransaction(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cash-transactions'] }),
+  })
+}
+
+export const useUpdateCashTransaction = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CashTransactionCreate> }) =>
+      updateCashTransaction(id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cash-transactions'] }),
+  })
+}
+
+export const useDeleteCashTransaction = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteCashTransaction(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cash-transactions'] }),
   })
 }

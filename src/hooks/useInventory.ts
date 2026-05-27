@@ -141,3 +141,25 @@ export const useAllVariants = () =>
       getProductVariants({ page_size: 500, is_active: 'true' }).then(r => r.data),
     staleTime: 1000 * 60 * 10,
   })
+
+export const useStockClosingReport = (month: string, warehouseId: string) => {
+  const [year, mon] = month.split("-")
+  const monthStart = `${year}-${mon}-01`
+  const lastDay = new Date(parseInt(year), parseInt(mon), 0).getDate()
+  const monthEnd = `${year}-${mon}-${String(lastDay).padStart(2, "0")}`
+
+  return useQuery({
+    queryKey: ["stock-closing", month, warehouseId],
+    queryFn: () => {
+      const params: Record<string, string | number> = {
+        page_size: 1000,
+        cdate_after: monthStart,
+        cdate_before: monthEnd,
+      }
+      if (warehouseId) params.warehouse = warehouseId
+      return getStockMovements(params).then(r => r.data)
+    },
+    enabled: !!month,
+    staleTime: 1000 * 60 * 5,
+  })
+}

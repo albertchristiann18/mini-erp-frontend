@@ -62,3 +62,14 @@ export interface PurchaseOrder {
   cdate: string
   udate: string
 }
+
+export interface ReplenishmentItem {
+  variant_id: string
+  sku_variant_code: string
+  variant_name: string
+  product_name: string
+  stock_on_hand: number
+  incoming_qty: number
+  avg_sales_7d: number
+  avg_sales_30d: number
+}
