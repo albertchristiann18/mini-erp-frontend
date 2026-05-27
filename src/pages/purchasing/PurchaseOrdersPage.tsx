@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import { usePurchaseOrders, useAdvancePOStatus } from '../../hooks/usePurchasing'
+import { useNavigate } from 'react-router-dom'
+import { usePurchaseOrdersFiltered } from '../../hooks/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
 import { PurchaseOrderFormModal } from '../../components/modals/PurchaseOrderFormModal'
 import { formatIDR, formatDate } from '../../lib/utils'
-import { toast } from '../../lib/toast'
 import { Plus } from 'lucide-react'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
@@ -22,41 +23,24 @@ const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   CANCELLED: 'destructive',
 }
 
-const PO_TRANSITIONS: Record<POStatus, POStatus | null> = {
-  DRAFT: 'ORDERED',
-  ORDERED: 'SHIPPED',
-  SHIPPED: 'DELIVERED',
-  DELIVERED: 'COMPLETED',
-  COMPLETED: null,
-  CANCELLED: null,
-}
-
 export default function PurchaseOrdersPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [status, setStatus] = useState<POStatus | 'ALL'>('ALL')
   const [page, setPage] = useState(1)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [forwarderFilter, setForwarderFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const { data, isLoading } = usePurchaseOrders(status === 'ALL' ? undefined : status, page)
-  const advanceMutation = useAdvancePOStatus()
+
+  const queryParams: Record<string, string | number> = { page, page_size: 20 }
+  if (status !== 'ALL') queryParams.status = status
+  if (dateFrom) queryParams.date_from = dateFrom
+  if (dateTo) queryParams.date_to = dateTo
+  if (forwarderFilter) queryParams.forwarder = forwarderFilter
+
+  const { data, isLoading } = usePurchaseOrdersFiltered(queryParams)
   const totalPages = data ? Math.ceil(data.count / 20) : 1
-
-  const handleAdvance = async (id: string, nextStatus: string) => {
-    try {
-      await advanceMutation.mutateAsync({ id, status: nextStatus })
-      toast.success(`Status updated to ${nextStatus}`)
-    } catch {
-      toast.error('Failed to update status')
-    }
-  }
-
-  const handleCancel = async (id: string) => {
-    try {
-      await advanceMutation.mutateAsync({ id, status: 'CANCELLED' })
-      toast.success('Purchase order cancelled')
-    } catch {
-      toast.error('Failed to cancel order')
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -73,6 +57,24 @@ export default function PurchaseOrdersPage() {
               ))}
             </SelectContent>
           </Select>
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+            className="w-40"
+          />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={e => { setDateTo(e.target.value); setPage(1) }}
+            className="w-40"
+          />
+          <Input
+            placeholder="Forwarder..."
+            value={forwarderFilter}
+            onChange={e => { setForwarderFilter(e.target.value); setPage(1) }}
+            className="w-40"
+          />
           <span className="text-sm text-muted-foreground">{data?.count ?? 0} orders</span>
         </div>
         {user?.is_staff && (
@@ -87,50 +89,47 @@ export default function PurchaseOrdersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>PO Number</TableHead>
-              <TableHead>Supplier</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Invoice Date</TableHead>
+              <TableHead>Delivery Date</TableHead>
+              <TableHead>Forecast Delivery</TableHead>
+              <TableHead>Forwarder</TableHead>
+              <TableHead className="text-right">Exchange Rate</TableHead>
+              <TableHead className="text-right">CBM</TableHead>
+              <TableHead className="text-right">QTY</TableHead>
               <TableHead className="text-right">Total Amount</TableHead>
-              <TableHead>Date</TableHead>
-              {user?.is_staff && <TableHead>Actions</TableHead>}
+              <TableHead className="text-right">COGS</TableHead>
+              <TableHead className="text-right">Ship/QTY</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-            ) : data?.results.map(po => {
-              const nextStatus = PO_TRANSITIONS[po.status]
-              return (
-                <TableRow key={po.id}>
-                  <TableCell className="font-mono text-xs">{po.purchase_order_number}</TableCell>
-                  <TableCell>{po.supplier_name || '—'}</TableCell>
-                  <TableCell><Badge variant={statusVariant[po.status]}>{po.status}</Badge></TableCell>
-                  <TableCell className="text-right">{formatIDR(po.total_amount)}</TableCell>
-                  <TableCell className="text-muted-foreground text-xs">{formatDate(po.cdate)}</TableCell>
-                  {user?.is_staff && (
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {nextStatus && (
-                          <Button size="sm" variant="outline" className="text-xs h-7 px-2"
-                            onClick={() => handleAdvance(po.id, nextStatus)}
-                            disabled={advanceMutation.isPending}
-                          >
-                            → {nextStatus}
-                          </Button>
-                        )}
-                        {po.status !== 'COMPLETED' && po.status !== 'CANCELLED' && (
-                          <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-red-500 hover:text-red-600"
-                            onClick={() => handleCancel(po.id)}
-                            disabled={advanceMutation.isPending}
-                          >
-                            Cancel
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              )
-            })}
+              <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+            ) : data?.results.map(po => (
+              <TableRow key={po.id}>
+                <TableCell>
+                  <button
+                    className="font-mono text-xs text-primary hover:underline cursor-pointer"
+                    onClick={() => navigate(`/purchasing/orders/${po.id}`)}
+                  >
+                    {po.purchase_order_number}
+                  </button>
+                </TableCell>
+                <TableCell><Badge variant={statusVariant[po.status]}>{po.status}</Badge></TableCell>
+                <TableCell className="text-xs">{po.invoice_date ? formatDate(po.invoice_date) : '—'}</TableCell>
+                <TableCell className="text-xs">{po.delivery_date ? formatDate(po.delivery_date) : '—'}</TableCell>
+                <TableCell className="text-xs">{po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : '—'}</TableCell>
+                <TableCell className="text-xs">{po.forwarder_name || '—'}</TableCell>
+                <TableCell className="text-right text-xs">{po.exchange_rate ?? '—'}</TableCell>
+                <TableCell className="text-right text-xs">
+                  {po.cbm ?? (po.forecast_cbm ? `${po.forecast_cbm} (est.)` : '—')}
+                </TableCell>
+                <TableCell className="text-right">{po.total_ordered_qty}</TableCell>
+                <TableCell className="text-right">{formatIDR(po.total_amount)}</TableCell>
+                <TableCell className="text-right">{po.cost_ratio_cogs.toFixed(1)}%</TableCell>
+                <TableCell className="text-right">{formatIDR(po.shipping_per_qty)}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>

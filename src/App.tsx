@@ -20,6 +20,7 @@ const ProductDetailPage = lazy(() => import('./pages/inventory/ProductDetailPage
 const StockPage = lazy(() => import('./pages/inventory/StockPage'))
 const WarehousesPage = lazy(() => import('./pages/inventory/WarehousesPage'))
 const PurchaseOrdersPage = lazy(() => import('./pages/purchasing/PurchaseOrdersPage'))
+const PurchaseOrderDetailPage = lazy(() => import('./pages/purchasing/PurchaseOrderDetailPage'))
 const SalesOrdersPage = lazy(() => import('./pages/sales/SalesOrdersPage'))
 const ReturnsPage = lazy(() => import('./pages/sales/ReturnsPage'))
 const ExpensesPage = lazy(() => import('./pages/finance/ExpensesPage'))
@@ -58,6 +59,7 @@ export default function App() {
                   </Route>
                   <Route path="purchasing">
                     <Route path="orders" element={<Suspense fallback={<Loading />}><PurchaseOrdersPage /></Suspense>} />
+                    <Route path="orders/:id" element={<Suspense fallback={<Loading />}><PurchaseOrderDetailPage /></Suspense>} />
                   </Route>
                   <Route path="sales">
                     <Route path="orders" element={<Suspense fallback={<Loading />}><SalesOrdersPage /></Suspense>} />

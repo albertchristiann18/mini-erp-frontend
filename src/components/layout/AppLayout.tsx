@@ -18,7 +18,8 @@ const titleMap: Record<string, string> = {
 
 export function AppLayout() {
   const { pathname } = useLocation()
-  const title = titleMap[pathname] ?? 'Mini ERP'
+  const title = titleMap[pathname]
+    ?? (pathname.startsWith('/purchasing/orders/') ? 'PO Detail' : 'Mini ERP')
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />

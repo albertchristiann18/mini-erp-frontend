@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getPurchaseOrders, getPurchaseOrder,
-  createPurchaseOrder, advancePOStatus,
+  createPurchaseOrder, updatePurchaseOrder, advancePOStatus,
 } from '../api/purchasing'
 import type { POStatus } from '../types/purchasing'
 
@@ -35,3 +35,22 @@ export const useAdvancePOStatus = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['purchase-orders'] }),
   })
 }
+
+export const useUpdatePurchaseOrder = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      updatePurchaseOrder(id, data),
+    onSuccess: (_: unknown, variables: { id: string; data: Record<string, unknown> }) => {
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      qc.invalidateQueries({ queryKey: ['purchase-order', variables.id] })
+    },
+  })
+}
+
+export const usePurchaseOrdersFiltered = (params: Record<string, string | number>) =>
+  useQuery({
+    queryKey: ['purchase-orders', params],
+    queryFn: () => getPurchaseOrders(params).then(r => r.data),
+    staleTime: 1000 * 60 * 2,
+  })
