@@ -3,7 +3,7 @@ import {
   getCategories, getProducts, createProduct, updateProduct,
   getProductVariants, getProductVariantStocks, getWarehouses, createWarehouse, updateWarehouse,
   getStockMovements, getMasterCategories,
-  bulkCreateProducts, bulkUpdateInventory, adjustStock,
+  bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales,
 } from '../api/inventory'
 import client from '../api/client'
 import type { Product } from '../types/inventory'
@@ -124,4 +124,20 @@ export const useProduct = (id: string) =>
     queryKey: ['product', id],
     queryFn: () => client.get<Product>(`/product/${id}/`).then(r => r.data),
     enabled: !!id,
+  })
+
+export const useAvgSales = (variantIds: string[], days: number) =>
+  useQuery({
+    queryKey: ['avg-sales', variantIds, days],
+    queryFn: () => getAvgSales(variantIds, days).then(r => r.data),
+    enabled: variantIds.length > 0,
+    staleTime: 1000 * 60 * 5,
+  })
+
+export const useAllVariants = () =>
+  useQuery({
+    queryKey: ['all-variants'],
+    queryFn: () =>
+      getProductVariants({ page_size: 500, is_active: 'true' }).then(r => r.data),
+    staleTime: 1000 * 60 * 10,
   })

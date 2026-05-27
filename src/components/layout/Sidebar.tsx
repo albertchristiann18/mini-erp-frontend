@@ -30,6 +30,7 @@ const navItems: NavItem[] = [
   {
     label: 'Sales', icon: <ShoppingCart className="h-4 w-4" />,
     children: [
+      { label: 'Sales Dashboard', to: '/sales/dashboard' },
       { label: 'Sales Orders', to: '/sales/orders' },
       { label: 'Returns', to: '/sales/returns' },
     ],

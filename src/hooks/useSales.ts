@@ -51,3 +51,10 @@ export const useSalesReturns = (page = 1) =>
     queryFn: () => getReturns({ page, page_size: 20 }).then(r => r.data),
     staleTime: 1000 * 60 * 2,
   })
+
+export const useSalesOrdersFiltered = (params: Record<string, string | number>) =>
+  useQuery({
+    queryKey: ['sales-orders-filtered', params],
+    queryFn: () => getSalesOrders(params).then(r => r.data),
+    staleTime: 1000 * 60 * 2,
+  })

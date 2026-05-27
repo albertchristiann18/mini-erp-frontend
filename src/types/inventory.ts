@@ -105,3 +105,18 @@ export interface ProductVariantStock {
   physical_qty: number
   is_active: boolean
 }
+
+export interface AvgSalesVariant {
+  variant_id: string
+  sku_variant_code: string
+  variant_name: string
+  avg_sales_per_day: number
+  total_qty_sold: number
+  days: number
+}
+
+export interface AvgSalesResult {
+  days: number
+  date_from: string
+  results: AvgSalesVariant[]
+}
