@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAllVariants, useWarehouses, useBulkUpdateInventory } from '../../hooks/useInventory'
+import { useWarehouses, useBulkUpdateInventory } from '../../hooks/useInventory'
+import { getProductVariantStocks } from '../../api/inventory'
+import type { ProductVariantStock } from '../../types/inventory'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
@@ -20,36 +22,38 @@ interface BulkRow {
 
 export default function BulkStockUpdatePage() {
   const navigate = useNavigate()
-  const { data: variantsData } = useAllVariants()
   const { data: warehousesData } = useWarehouses()
   const bulkMutation = useBulkUpdateInventory()
 
-  const variants = variantsData?.results ?? []
   const warehouses = warehousesData?.results ?? []
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<typeof variants>([])
+  const [searchResults, setSearchResults] = useState<ProductVariantStock[]>([])
   const [hasSearched, setHasSearched] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
   const [rows, setRows] = useState<BulkRow[]>([])
   const [result, setResult] = useState<{ successful: number; failed: number } | null>(null)
 
-  const handleSearch = () => {
-    const q = searchQuery.trim().toLowerCase()
+  const handleSearch = async () => {
+    const q = searchQuery.trim()
     if (!q) {
       setSearchResults([])
       setHasSearched(false)
       return
     }
-    const filtered = variants.filter(v =>
-      v.name.toLowerCase().includes(q) ||
-      v.product_name.toLowerCase().includes(q) ||
-      v.sku_variant_code.toLowerCase().includes(q)
-    )
-    setSearchResults(filtered)
-    setHasSearched(true)
+    setIsSearching(true)
+    try {
+      const res = await getProductVariantStocks({ search: q, page_size: 50 }).then(r => r.data)
+      setSearchResults(res.results)
+      setHasSearched(true)
+    } catch {
+      toast.error('Search failed')
+    } finally {
+      setIsSearching(false)
+    }
   }
 
-  const addRow = (v: typeof variants[0]) => {
+  const addRow = (v: ProductVariantStock) => {
     setRows(prev => [...prev, {
       id: Date.now(),
       variant_id: v.id,
@@ -108,7 +112,9 @@ export default function BulkStockUpdatePage() {
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
             className="w-[360px]"
           />
-          <Button variant="outline" onClick={handleSearch}>Search</Button>
+          <Button variant="outline" onClick={handleSearch} disabled={isSearching}>
+            {isSearching ? 'Searching...' : 'Search'}
+          </Button>
         </div>
 
         {hasSearched && (
