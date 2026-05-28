@@ -144,61 +144,56 @@ function submitSearch(term: string) {
 
 const hookResult = (data: unknown) => ({ data, isLoading: false }) as never
 
-it('shows empty-state prompt on mount before any search', () => {
+it('shows summary cards on mount without any search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
-  expect(screen.getByText('Search by product name or SKU to view inventory data.')).toBeInTheDocument()
-  expect(screen.queryByText('Total COGS Stock')).not.toBeInTheDocument()
-  expect(screen.queryByText('T-Shirt')).not.toBeInTheDocument()
-})
-
-it('renders summary cards and products after submitting a search', () => {
-  vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
-  vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
-  renderPage()
-  submitSearch('tshirt')
   expect(screen.getByText('Total COGS Stock')).toBeInTheDocument()
   expect(screen.getByText('Total Selling Price')).toBeInTheDocument()
   expect(screen.getByText('Products')).toBeInTheDocument()
   expect(screen.getByText('Variants')).toBeInTheDocument()
 })
 
-it('renders product name and sku_code in the product header row after search', () => {
+it('renders product name and sku_code on mount', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
-  submitSearch('s')
   expect(screen.getByText('T-Shirt')).toBeInTheDocument()
   expect(screen.getByText('TSH-001')).toBeInTheDocument()
   expect(screen.getByText('Jeans')).toBeInTheDocument()
   expect(screen.getByText('JNS-002')).toBeInTheDocument()
 })
 
-it('renders variant sku_variant_code in variant rows after search', () => {
+it('renders variant sku_variant_code on mount', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
-  submitSearch('s')
   expect(screen.getByText('TSH-001-BLK-M')).toBeInTheDocument()
   expect(screen.getByText('TSH-001-WHT-L')).toBeInTheDocument()
   expect(screen.getByText('JNS-002-BLU-32')).toBeInTheDocument()
 })
 
-it('shows OOS badge when total_qty is 0 after search', () => {
+it('products sorted by total qty descending on initial load', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
-  submitSearch('t-shirt')
+  const productNames = screen.getAllByText(/Jeans|T-Shirt/)
+  expect(productNames[0]).toHaveTextContent('Jeans')
+  expect(productNames[1]).toHaveTextContent('T-Shirt')
+})
+
+it('shows OOS badge on mount without needing to search', () => {
+  vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
+  vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
+  renderPage()
   const oosBadges = screen.getAllByText('OOS')
   expect(oosBadges.length).toBe(1)
 })
 
-it('shows Overstock badge when DOI > 90 after search', () => {
+it('shows Overstock badge on mount without needing to search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
-  submitSearch('jeans')
   const overstockBadges = screen.getAllByText('Overstock')
   expect(overstockBadges.length).toBe(1)
 })
@@ -247,7 +242,6 @@ it('shows pagination controls when there are more than 5 products', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryMany))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesMany))
   renderPage()
-  submitSearch('product')
   const nextButton = screen.getByText('Next')
   const prevButton = screen.getByText('Previous')
   expect(nextButton).toBeInTheDocument()
@@ -262,7 +256,6 @@ it('paginates to page 2 and shows remaining products', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryMany))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesMany))
   renderPage()
-  submitSearch('product')
   fireEvent.click(screen.getByText('Next'))
   expect(screen.getByText(/Page 2 of 2/)).toBeInTheDocument()
   expect(screen.queryByText('Product 1')).not.toBeInTheDocument()

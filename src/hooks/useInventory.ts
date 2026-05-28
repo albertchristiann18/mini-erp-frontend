@@ -142,12 +142,11 @@ export const useAllVariants = () =>
     staleTime: 1000 * 60 * 10,
   })
 
-export const useInventorySummary = (options?: { enabled?: boolean }) =>
+export const useInventorySummary = () =>
   useQuery({
     queryKey: ['inventory-summary'],
     queryFn: () => getInventorySummary().then(r => r.data),
     staleTime: 1000 * 60 * 2,
-    enabled: options?.enabled ?? true,
   })
 
 export const useStockClosingReport = (month: string, warehouseId: string) => {

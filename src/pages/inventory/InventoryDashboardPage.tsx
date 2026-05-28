@@ -28,12 +28,11 @@ function doiStatus(doi: number | null, qty: number): 'oos' | 'overstock' | 'ok' 
 export default function InventoryDashboardPage() {
   const [days, setDays] = useState<7 | 30>(30)
   const [searchInput, setSearchInput] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [hasSearched, setHasSearched] = useState(false)
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 5
 
-  const { data: summaryData, isLoading } = useInventorySummary({ enabled: hasSearched })
+  const { data: summaryData, isLoading } = useInventorySummary()
   const allVariantIds = useMemo(
     () => summaryData?.products.flatMap(p => p.variants.map(v => v.variant_id)) ?? [],
     [summaryData]
@@ -48,26 +47,31 @@ export default function InventoryDashboardPage() {
     return map
   }, [avgSalesData])
 
-  const handleSearch = () => {
-    if (!searchInput.trim()) return
-    setSearchQuery(searchInput.trim())
-    setHasSearched(true)
+  const commitSearch = () => {
+    setSearch(searchInput)
     setPage(1)
   }
 
   const filteredProducts = useMemo(() => {
     if (!summaryData) return []
-    const q = searchQuery.toLowerCase().trim()
-    if (!q) return summaryData.products
-    return summaryData.products.filter(p =>
-      p.product_name.toLowerCase().includes(q) ||
-      p.sku_code.toLowerCase().includes(q) ||
-      p.variants.some(v =>
-        v.sku_variant_code.toLowerCase().includes(q) ||
-        v.variant_name.toLowerCase().includes(q)
+    const q = search.toLowerCase().trim()
+    let products = summaryData.products
+    if (q) {
+      products = products.filter(p =>
+        p.product_name.toLowerCase().includes(q) ||
+        p.sku_code.toLowerCase().includes(q) ||
+        p.variants.some(v =>
+          v.sku_variant_code.toLowerCase().includes(q) ||
+          v.variant_name.toLowerCase().includes(q)
+        )
       )
-    )
-  }, [summaryData, searchQuery])
+    }
+    return [...products].sort((a, b) => {
+      const aQty = a.variants.reduce((s, v) => s + v.total_qty, 0)
+      const bQty = b.variants.reduce((s, v) => s + v.total_qty, 0)
+      return bQty - aQty
+    })
+  }, [summaryData, search])
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))
   const pagedProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -78,7 +82,7 @@ export default function InventoryDashboardPage() {
 
   return (
     <div className="space-y-4">
-      {hasSearched && summaryData && (
+      {summaryData && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Card className="p-4">
             <p className="text-xs text-muted-foreground">Total COGS Stock</p>
@@ -104,125 +108,113 @@ export default function InventoryDashboardPage() {
           placeholder="Search product or SKU..."
           value={searchInput}
           onChange={e => setSearchInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleSearch() }}
+          onKeyDown={e => { if (e.key === 'Enter') commitSearch() }}
           className="w-[280px]"
         />
-        <Button variant="default" size="sm" onClick={handleSearch}>Search</Button>
+        <Button variant="default" size="sm" onClick={commitSearch}>Search</Button>
         <div className="flex rounded-md border overflow-hidden">
           <button onClick={() => setDays(7)} className={days === 7 ? 'px-3 py-1.5 text-sm bg-primary text-primary-foreground' : 'px-3 py-1.5 text-sm bg-background hover:bg-muted'}>7d</button>
           <button onClick={() => setDays(30)} className={days === 30 ? 'px-3 py-1.5 text-sm bg-primary text-primary-foreground' : 'px-3 py-1.5 text-sm bg-background hover:bg-muted'}>30d</button>
         </div>
-        {hasSearched && <span className="text-sm text-muted-foreground">{filteredProducts.length} products</span>}
+        <span className="text-sm text-muted-foreground">{filteredProducts.length} products</span>
       </div>
 
-      {!hasSearched && (
-        <div className="rounded-lg border bg-card p-12 text-center">
-          <p className="text-sm text-muted-foreground">
-            Search by product name or SKU to view inventory data.
-          </p>
-        </div>
-      )}
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/50">
+            <tr>
+              <th className="w-12 p-2"></th>
+              <th className="text-left p-2 w-48">Product</th>
+              <th className="text-left p-2">Variant</th>
+              <th className="text-right p-2">Total QTY</th>
+              {warehouses.map(w => <th key={w.id} className="text-right p-2">{w.name}</th>)}
+              <th className="text-right p-2">AVG Sales</th>
+              <th className="text-right p-2">DOI</th>
+              <th className="text-right p-2">Status</th>
+              <th className="text-right p-2">COGS</th>
+              <th className="text-right p-2">Sell Price</th>
+              <th className="text-right p-2">Margin</th>
+              <th className="text-right p-2">COGS Total</th>
+              <th className="text-right p-2">SP Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pagedProducts.flatMap(product =>
+            product.variants.map((v, variantIndex) => {
+              const isFirst = variantIndex === 0
+              const avg = avgSalesMap[v.variant_id] ?? 0
+              const doi = computeDOI(v.total_qty, avg)
+              const status = doiStatus(doi, v.total_qty)
+              const margin = computeMargin(v.base_price, v.current_cogs)
 
-      {hasSearched && (
-        <div className="rounded-lg border bg-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/50">
-              <tr>
-                <th className="w-12 p-2"></th>
-                <th className="text-left p-2 w-48">Product</th>
-                <th className="text-left p-2">Variant</th>
-                <th className="text-right p-2">Total QTY</th>
-                {warehouses.map(w => <th key={w.id} className="text-right p-2">{w.name}</th>)}
-                <th className="text-right p-2">AVG Sales</th>
-                <th className="text-right p-2">DOI</th>
-                <th className="text-right p-2">Status</th>
-                <th className="text-right p-2">COGS</th>
-                <th className="text-right p-2">Sell Price</th>
-                <th className="text-right p-2">Margin</th>
-                <th className="text-right p-2">COGS Total</th>
-                <th className="text-right p-2">SP Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedProducts.flatMap(product =>
-              product.variants.map((v, variantIndex) => {
-                const isFirst = variantIndex === 0
-                const avg = avgSalesMap[v.variant_id] ?? 0
-                const doi = computeDOI(v.total_qty, avg)
-                const status = doiStatus(doi, v.total_qty)
-                const margin = computeMargin(v.base_price, v.current_cogs)
-
-                return (
-                  <tr key={v.variant_id} className={isFirst ? 'border-t-2 border-border hover:bg-muted/20' : 'hover:bg-muted/20'}>
-                    {isFirst && (
-                      <td className="p-2 align-top" rowSpan={product.variants.length}>
-                        {product.photo_url
-                          ? <img src={product.photo_url} alt="" className="h-8 w-8 rounded object-cover" />
-                          : <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-xs">?</div>
-                        }
-                      </td>
+              return (
+                <tr key={v.variant_id} className={isFirst ? 'border-t-2 border-border hover:bg-muted/20' : 'hover:bg-muted/20'}>
+                  {isFirst && (
+                    <td className="p-2 align-top" rowSpan={product.variants.length}>
+                      {product.photo_url
+                        ? <img src={product.photo_url} alt="" className="h-8 w-8 rounded object-cover" />
+                        : <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-muted-foreground text-xs">?</div>
+                      }
+                    </td>
+                  )}
+                  {isFirst && (
+                    <td className="p-2 font-medium align-top" rowSpan={product.variants.length}>
+                      <div>{product.product_name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{product.sku_code}</div>
+                    </td>
+                  )}
+                  <td className="p-2">
+                    <div className="text-muted-foreground text-sm">{v.variant_name}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{v.sku_variant_code}</div>
+                  </td>
+                  <td className="p-2 text-right tabular-nums">{v.total_qty.toLocaleString()}</td>
+                  {warehouses.map(w => (
+                    <td key={w.id} className="p-2 text-right tabular-nums text-muted-foreground">
+                      {(v.warehouse_stocks[w.id] ?? 0).toLocaleString()}
+                    </td>
+                  ))}
+                  <td className="p-2 text-right tabular-nums text-muted-foreground">
+                    {avg > 0 ? avg.toFixed(2) : '—'}
+                  </td>
+                  <td className="p-2 text-right tabular-nums">
+                    {doi !== null ? Math.round(doi).toLocaleString() : '—'}
+                  </td>
+                  <td className="p-2 text-right">
+                    {status === 'oos' && (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">OOS</span>
                     )}
-                    {isFirst && (
-                      <td className="p-2 font-medium align-top" rowSpan={product.variants.length}>
-                        <div>{product.product_name}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{product.sku_code}</div>
-                      </td>
+                    {status === 'overstock' && (
+                      <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Overstock</span>
                     )}
-                    <td className="p-2">
-                      <div className="text-muted-foreground text-sm">{v.variant_name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">{v.sku_variant_code}</div>
-                    </td>
-                    <td className="p-2 text-right tabular-nums">{v.total_qty.toLocaleString()}</td>
-                    {warehouses.map(w => (
-                      <td key={w.id} className="p-2 text-right tabular-nums text-muted-foreground">
-                        {(v.warehouse_stocks[w.id] ?? 0).toLocaleString()}
-                      </td>
-                    ))}
-                    <td className="p-2 text-right tabular-nums text-muted-foreground">
-                      {avg > 0 ? avg.toFixed(2) : '—'}
-                    </td>
-                    <td className="p-2 text-right tabular-nums">
-                      {doi !== null ? Math.round(doi).toLocaleString() : '—'}
-                    </td>
-                    <td className="p-2 text-right">
-                      {status === 'oos' && (
-                        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">OOS</span>
-                      )}
-                      {status === 'overstock' && (
-                        <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Overstock</span>
-                      )}
-                    </td>
-                    <td className="p-2 text-right tabular-nums">{v.current_cogs > 0 ? formatIDR(v.current_cogs) : '—'}</td>
-                    <td className="p-2 text-right tabular-nums">{v.base_price > 0 ? formatIDR(v.base_price) : '—'}</td>
-                    <td className={`p-2 text-right tabular-nums font-medium ${margin !== null && margin < 0.2 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                      {margin !== null ? `${(margin * 100).toFixed(1)}%` : '—'}
-                    </td>
-                    <td className="p-2 text-right tabular-nums text-muted-foreground">
-                      {v.current_cogs > 0 ? formatIDR(v.current_cogs * v.total_qty) : '—'}
-                    </td>
-                    <td className="p-2 text-right tabular-nums text-muted-foreground">
-                      {v.base_price > 0 ? formatIDR(v.base_price * v.total_qty) : '—'}
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-        {isLoading && <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>}
-        {!isLoading && hasSearched && filteredProducts.length === 0 && (
-          <div className="p-8 text-center text-sm text-muted-foreground">No products found</div>
-        )}
-      </div>
+                  </td>
+                  <td className="p-2 text-right tabular-nums">{v.current_cogs > 0 ? formatIDR(v.current_cogs) : '—'}</td>
+                  <td className="p-2 text-right tabular-nums">{v.base_price > 0 ? formatIDR(v.base_price) : '—'}</td>
+                  <td className={`p-2 text-right tabular-nums font-medium ${margin !== null && margin < 0.2 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                    {margin !== null ? `${(margin * 100).toFixed(1)}%` : '—'}
+                  </td>
+                  <td className="p-2 text-right tabular-nums text-muted-foreground">
+                    {v.current_cogs > 0 ? formatIDR(v.current_cogs * v.total_qty) : '—'}
+                  </td>
+                  <td className="p-2 text-right tabular-nums text-muted-foreground">
+                    {v.base_price > 0 ? formatIDR(v.base_price * v.total_qty) : '—'}
+                  </td>
+                </tr>
+              )
+            })
+          )}
+        </tbody>
+      </table>
+      {isLoading && <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>}
+      {!isLoading && filteredProducts.length === 0 && (
+        <div className="p-8 text-center text-sm text-muted-foreground">No products found</div>
       )}
-      {hasSearched && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPageChange={p => setPage(p)}
-          isLoading={isLoading}
-        />
-      )}
+    </div>
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        onPageChange={p => setPage(p)}
+        isLoading={isLoading}
+      />
     </div>
   )
 }
