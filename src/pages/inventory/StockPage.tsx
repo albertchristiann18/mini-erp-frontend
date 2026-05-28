@@ -42,6 +42,7 @@ interface BulkEditModalProps {
 function BulkEditModal({ open, onClose, selectedVariants, onApply }: BulkEditModalProps) {
   const [type, setType] = useState<AdjustType>('add')
   const [qty, setQty] = useState('')
+  const [showVariants, setShowVariants] = useState(false)
 
   const handleApply = () => {
     const parsed = parseInt(qty)
@@ -61,11 +62,49 @@ function BulkEditModal({ open, onClose, selectedVariants, onApply }: BulkEditMod
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Selected count */}
-          <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-            <Layers className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{selectedVariants.length} variant{selectedVariants.length !== 1 ? 's' : ''} selected</span>
-          </div>
+          {/* Selected count toggle */}
+          <button
+            type="button"
+            onClick={() => setShowVariants(v => !v)}
+            className="flex w-full items-center justify-between rounded-lg bg-muted px-3 py-2 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                {selectedVariants.length} variant{selectedVariants.length !== 1 ? 's' : ''} selected
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">{showVariants ? 'Hide ▲' : 'Show ▼'}</span>
+          </button>
+
+          {showVariants && (
+            <div className="max-h-48 overflow-y-auto rounded-md border divide-y text-sm">
+              {selectedVariants.map(v => {
+                const parsed = parseInt(qty)
+                const hasPreview = qty !== '' && !isNaN(parsed)
+                const newQty = hasPreview ? computePreview(v.physical_qty, type, parsed) : null
+                return (
+                  <div key={v.id} className="flex items-center justify-between px-3 py-1.5">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{v.product_name}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{v.sku_variant_code}</p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-3 shrink-0 tabular-nums">
+                      <span className="text-muted-foreground">{v.physical_qty}</span>
+                      {newQty !== null && (
+                        <>
+                          <span className="text-muted-foreground">→</span>
+                          <span className={`font-semibold ${newQty !== v.physical_qty ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                            {newQty}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {/* Adjustment type + qty */}
           <div className="space-y-2">
@@ -99,33 +138,6 @@ function BulkEditModal({ open, onClose, selectedVariants, onApply }: BulkEditMod
               autoFocus
             />
           </div>
-
-          {/* Preview list */}
-          {qty !== '' && !isNaN(parseInt(qty)) && (
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Preview</p>
-              <div className="max-h-48 overflow-y-auto rounded-md border divide-y text-sm">
-                {selectedVariants.map(v => {
-                  const newQty = computePreview(v.physical_qty, type, parseInt(qty))
-                  return (
-                    <div key={v.id} className="flex items-center justify-between px-3 py-1.5">
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{v.product_name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{v.sku_variant_code}</p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-3 shrink-0 tabular-nums">
-                        <span className="text-muted-foreground">{v.physical_qty}</span>
-                        <span className="text-muted-foreground">→</span>
-                        <span className={`font-semibold ${newQty !== v.physical_qty ? 'text-blue-600 dark:text-blue-400' : ''}`}>
-                          {newQty}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
 
         <DialogFooter>
@@ -165,8 +177,10 @@ export default function StockPage() {
 
   useEffect(() => {
     if (warehouses.length === 1 && !selectedWarehouse) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedWarehouse(warehouses[0].id)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [warehouses])
 
   const params: Record<string, string | number> = { page, page_size: 20 }
@@ -241,7 +255,7 @@ export default function StockPage() {
   // ── selection ─────────────────────────────────────────────────────────────────
 
   const toggleSelect = (id: string) =>
-    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
 
   const toggleSelectAll = () => {
     if (!data) return
@@ -249,7 +263,7 @@ export default function StockPage() {
     const allSel = ids.every(id => selected.has(id))
     setSelected(prev => {
       const n = new Set(prev)
-      allSel ? ids.forEach(id => n.delete(id)) : ids.forEach(id => n.add(id))
+      if (allSel) ids.forEach(id => n.delete(id)); else ids.forEach(id => n.add(id))
       return n
     })
   }
@@ -265,11 +279,12 @@ export default function StockPage() {
 
       {/* ── Top bar ── */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Select value={selectedWarehouse} onValueChange={v => { setSelectedWarehouse(v); clearAll() }}>
+        <Select value={selectedWarehouse || 'all'} onValueChange={v => { setSelectedWarehouse(v === 'all' ? '' : v); clearAll() }}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="All Warehouses" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">All Warehouses</SelectItem>
             {warehouses.map(w => (
               <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
             ))}
@@ -305,7 +320,7 @@ export default function StockPage() {
           )}
           {user?.is_staff && (
             <Button size="sm" variant="outline" onClick={() => setShowBulkImportModal(true)}>
-              <Upload className="h-4 w-4 mr-1" /> Bulk Import
+              <Upload className="h-4 w-4 mr-1" /> Bulk Update
             </Button>
           )}
         </div>

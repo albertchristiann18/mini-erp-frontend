@@ -24,7 +24,10 @@ export function BulkStockModal({ open, onClose }: Props) {
   const { data: warehousesData } = useWarehouses()
   const bulkMutation = useBulkUpdateInventory()
   const [rows, setRows] = useState<Row[]>([{ id: 1, variant_id: '', warehouse_id: '', qty: 0, type: 'replace' }])
+  const [variantSearches, setVariantSearches] = useState<Record<number, string>>({})
   const [result, setResult] = useState<{ successful: number; failed: number } | null>(null)
+  const [showPreview, setShowPreview] = useState(true)
+  const validRows = rows.filter(r => r.variant_id && r.warehouse_id && r.qty > 0)
 
   const variants = variantsData?.results ?? []
   const warehouses = warehousesData?.results ?? []
@@ -34,6 +37,10 @@ export function BulkStockModal({ open, onClose }: Props) {
     setResult(null)
     onClose()
   }
+
+  const getVariantSearch = (rowId: number) => variantSearches[rowId] ?? ''
+  const setVariantSearch = (rowId: number, val: string) =>
+    setVariantSearches(prev => ({ ...prev, [rowId]: val }))
 
   const addRow = () => {
     setRows([...rows, { id: Date.now(), variant_id: '', warehouse_id: '', qty: 0, type: 'replace' }])
@@ -90,12 +97,47 @@ export function BulkStockModal({ open, onClose }: Props) {
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b">
                     <td className="p-1">
-                      <Select value={row.variant_id} onValueChange={(v) => updateRow(row.id, 'variant_id', v)}>
-                        <SelectTrigger className="w-[180px]"><SelectValue placeholder="Select variant" /></SelectTrigger>
+                      <Select
+                        value={row.variant_id}
+                        onValueChange={(v) => updateRow(row.id, 'variant_id', v)}
+                        onOpenChange={(open) => { if (!open) setVariantSearch(row.id, '') }}
+                      >
+                        <SelectTrigger className="w-[240px]"><SelectValue placeholder="Select variant" /></SelectTrigger>
                         <SelectContent>
-                          {variants.map(v => (
-                            <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                          ))}
+                          <div className="p-1">
+                            <input
+                              className="w-full rounded border border-border bg-background px-2 py-1 text-sm mb-1"
+                              placeholder="Search by name or SKU..."
+                              value={getVariantSearch(row.id)}
+                              onChange={e => setVariantSearch(row.id, e.target.value)}
+                              onKeyDown={e => e.stopPropagation()}
+                              onClick={e => e.stopPropagation()}
+                              autoFocus
+                            />
+                          </div>
+                          <div className="max-h-60 overflow-y-auto">
+                            {(() => {
+                              const q = getVariantSearch(row.id).toLowerCase()
+                              const filtered = q
+                                ? variants.filter(v =>
+                                    v.name.toLowerCase().includes(q) ||
+                                    v.sku_variant_code.toLowerCase().includes(q)
+                                  )
+                                : variants
+                              if (filtered.length === 0) {
+                                return (
+                                  <div className="px-2 py-3 text-sm text-muted-foreground text-center">
+                                    No variants found
+                                  </div>
+                                )
+                              }
+                              return filtered.map(v => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  {v.sku_variant_code} — {v.name}
+                                </SelectItem>
+                              ))
+                            })()}
+                          </div>
                         </SelectContent>
                       </Select>
                     </td>
@@ -144,10 +186,46 @@ export function BulkStockModal({ open, onClose }: Props) {
               <p>Failed: {result.failed}</p>
             </div>
           )}
+          {validRows.length > 0 && (
+            <div className="rounded-md border">
+              <button
+                type="button"
+                onClick={() => setShowPreview(v => !v)}
+                className="flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-left"
+              >
+                <span>{validRows.length} change{validRows.length !== 1 ? 's' : ''} ready</span>
+                <span className="text-muted-foreground text-xs">{showPreview ? 'Hide ▲' : 'Show ▼'}</span>
+              </button>
+              {showPreview && (
+                <div className="border-t divide-y max-h-48 overflow-y-auto">
+                  {validRows.map(row => {
+                    const variant = variants.find(v => v.id === row.variant_id)
+                    const warehouse = warehouses.find(w => w.id === row.warehouse_id)
+                    const typeLabel = row.type === 'replace' ? 'Set' : row.type === 'add' ? 'Add' : 'Remove'
+                    return (
+                      <div key={row.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">
+                            {variant ? `${variant.sku_variant_code} — ${variant.name}` : row.variant_id}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{warehouse?.name ?? row.warehouse_id}</p>
+                        </div>
+                        <div className="ml-3 shrink-0 text-right tabular-nums">
+                          <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                            {typeLabel} {row.qty}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={bulkMutation.isPending}>
+          <Button onClick={handleSubmit} disabled={bulkMutation.isPending || validRows.length === 0}>
             {bulkMutation.isPending ? 'Updating...' : 'Update Stock'}
           </Button>
         </DialogFooter>
