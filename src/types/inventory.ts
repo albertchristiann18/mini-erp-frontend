@@ -120,3 +120,38 @@ export interface AvgSalesResult {
   date_from: string
   results: AvgSalesVariant[]
 }
+
+export interface InventorySummaryVariant {
+  variant_id: string
+  sku_variant_code: string
+  variant_name: string
+  variant_values: Record<string, string>
+  total_qty: number
+  warehouse_stocks: Record<string, number>
+  current_cogs: number
+  base_price: number
+}
+
+export interface InventorySummaryProduct {
+  product_id: string
+  product_name: string
+  sku_code: string
+  photo_url: string | null
+  variants: InventorySummaryVariant[]
+}
+
+export interface InventorySummaryWarehouse {
+  id: string
+  name: string
+}
+
+export interface InventorySummaryResponse {
+  warehouses: InventorySummaryWarehouse[]
+  products: InventorySummaryProduct[]
+  summary: {
+    total_cogs_stock: number
+    total_selling_price: number
+    total_products: number
+    total_variants: number
+  }
+}

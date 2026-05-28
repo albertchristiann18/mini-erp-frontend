@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useProductVariantStocks, useWarehouses, useAdjustStock } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
@@ -6,7 +7,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Badge } from '../../components/ui/badge'
 import { Pagination } from '../../components/Pagination'
-import { BulkStockModal } from '../../components/modals/BulkStockModal'
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { Upload, Save, X, RotateCcw, Layers } from 'lucide-react'
@@ -155,15 +156,16 @@ function BulkEditModal({ open, onClose, selectedVariants, onApply }: BulkEditMod
 
 export default function StockPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>('')
-  const [showBulkImportModal, setShowBulkImportModal] = useState(false)
   const [showBulkEditModal, setShowBulkEditModal] = useState(false)
 
   const [pending, setPending] = useState<Record<string, PendingChange>>({})
-  const [rowInputs, setRowInputs] = useState<Record<string, { type: AdjustType; qty: string }>>({})
+  const [rowInputs, setRowInputs] = useState<Record<string, string>>({})
+  const [rowTypes, setRowTypes] = useState<Record<string, AdjustType>>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const commitSearch = () => {
@@ -195,23 +197,17 @@ export default function StockPage() {
 
   // ── staging ──────────────────────────────────────────────────────────────────
 
-  const stageChange = (v: ProductVariantStock) => {
-    const input = rowInputs[v.id]
-    if (!input || !input.qty) return
-    const qty = parseInt(input.qty)
-    if (isNaN(qty) || qty < 0) return
-    setPending(prev => ({
-      ...prev,
-      [v.id]: { variantId: v.id, variantName: v.name, productName: v.product_name, currentQty: v.physical_qty, type: input.type, qty },
-    }))
+  const stageChange = (v: ProductVariantStock, type: AdjustType) => {
+    setRowTypes(prev => ({ ...prev, [v.id]: type }))
   }
 
   const unstage = (variantId: string) => {
     setPending(prev => { const n = { ...prev }; delete n[variantId]; return n })
     setRowInputs(prev => { const n = { ...prev }; delete n[variantId]; return n })
+    setRowTypes(prev => { const n = { ...prev }; delete n[variantId]; return n })
   }
 
-  const clearAll = () => { setPending({}); setRowInputs({}); setSelected(new Set()) }
+  const clearAll = () => { setPending({}); setRowInputs({}); setRowTypes({}); setSelected(new Set()) }
 
   // Apply bulk edit from modal — stages changes for all selected variants
   const applyBulkEdit = (type: AdjustType, qty: number) => {
@@ -231,14 +227,20 @@ export default function StockPage() {
 
   const saveChanges = async (variantIds: string[]) => {
     if (!selectedWarehouse) return
-    const toSave = variantIds.filter(id => pending[id])
+    const toSave = variantIds.filter(id => rowTypes[id] !== undefined || pending[id])
     if (toSave.length === 0) { toast.error('No staged changes to save'); return }
 
     let ok = 0, fail = 0
     for (const id of toSave) {
-      const c = pending[id]
       try {
-        await adjustMutation.mutateAsync({ variant_id: c.variantId, warehouse_id: selectedWarehouse, type: c.type, qty: c.qty })
+        if (rowTypes[id] !== undefined) {
+          const qty = parseInt(rowInputs[id] ?? '')
+          if (isNaN(qty) || qty < 0) { fail++; continue }
+          await adjustMutation.mutateAsync({ variant_id: id, warehouse_id: selectedWarehouse, type: rowTypes[id], qty })
+        } else if (pending[id]) {
+          const c = pending[id]
+          await adjustMutation.mutateAsync({ variant_id: c.variantId, warehouse_id: selectedWarehouse, type: c.type, qty: c.qty })
+        }
         ok++
       } catch { fail++ }
     }
@@ -246,6 +248,7 @@ export default function StockPage() {
     if (ok > 0) toast.success(`Saved ${ok} change${ok > 1 ? 's' : ''}`)
     if (fail > 0) toast.error(`${fail} change${fail > 1 ? 's' : ''} failed`)
 
+    setRowTypes(prev => { const n = { ...prev }; toSave.forEach(id => delete n[id]); return n })
     setPending(prev => { const n = { ...prev }; toSave.forEach(id => delete n[id]); return n })
     setRowInputs(prev => { const n = { ...prev }; toSave.forEach(id => delete n[id]); return n })
     setSelected(prev => { const n = new Set(prev); toSave.forEach(id => n.delete(id)); return n })
@@ -270,7 +273,11 @@ export default function StockPage() {
 
   const allOnPageSelected = (data?.results.length ?? 0) > 0 && (data?.results.every(v => selected.has(v.id)) ?? false)
   const selectedIds = [...selected]
-  const pendingIds = Object.keys(pending)
+  const rowTypePendingIds = Object.keys(rowTypes).filter(id => {
+    const qty = parseInt(rowInputs[id] ?? '')
+    return !isNaN(qty) && qty >= 0
+  })
+  const pendingIds = [...new Set([...Object.keys(pending), ...rowTypePendingIds])]
   const selectedPendingIds = selectedIds.filter(id => pending[id])
   const selectedVariants = data?.results.filter(v => selected.has(v.id)) ?? []
 
@@ -319,7 +326,7 @@ export default function StockPage() {
             </>
           )}
           {user?.is_staff && (
-            <Button size="sm" variant="outline" onClick={() => setShowBulkImportModal(true)}>
+            <Button size="sm" variant="outline" onClick={() => navigate('/inventory/bulk-stock-update')}>
               <Upload className="h-4 w-4 mr-1" /> Bulk Update
             </Button>
           )}
@@ -384,7 +391,7 @@ export default function StockPage() {
               <TableHead className="text-right">Current Stock</TableHead>
               {canEdit && (
                 <>
-                  <TableHead className="text-center w-44">Adjustment</TableHead>
+                  <TableHead className="text-center w-56">Change</TableHead>
                   <TableHead className="text-center w-24">Preview</TableHead>
                   <TableHead className="w-28" />
                 </>
@@ -401,20 +408,31 @@ export default function StockPage() {
                 <TableCell colSpan={canEdit ? 8 : 5} className="text-center text-muted-foreground py-10">No variants found</TableCell>
               </TableRow>
             ) : data?.results.map(v => {
+              const hasLockedType = rowTypes[v.id] !== undefined
+              const lockedType = rowTypes[v.id]
               const hasPending = !!pending[v.id]
               const isSelected = selected.has(v.id)
-              const input = rowInputs[v.id] ?? { type: 'add' as AdjustType, qty: '' }
-              const parsedQty = parseInt(input.qty)
-              const previewQty = hasPending
-                ? computePreview(v.physical_qty, pending[v.id].type, pending[v.id].qty)
-                : (!isNaN(parsedQty) && input.qty !== '')
-                  ? computePreview(v.physical_qty, input.type, parsedQty)
+
+              const previewQty = hasLockedType ? (() => {
+                const inputVal = rowInputs[v.id]
+                const inputNum = parseInt(inputVal ?? '')
+                return (!isNaN(inputNum) && inputNum >= 0)
+                  ? computePreview(v.physical_qty, lockedType, inputNum)
                   : null
+              })() : hasPending
+                ? computePreview(v.physical_qty, pending[v.id].type, pending[v.id].qty)
+                : null
 
               return (
                 <TableRow
                   key={v.id}
-                  className={hasPending ? 'bg-yellow-50 dark:bg-yellow-950/20' : isSelected ? 'bg-blue-50/50 dark:bg-blue-950/10' : ''}
+                  className={
+                    (hasLockedType || hasPending)
+                      ? 'bg-yellow-50 dark:bg-yellow-950/20'
+                      : isSelected
+                        ? 'bg-blue-50/50 dark:bg-blue-950/10'
+                        : ''
+                  }
                 >
                   {canEdit && (
                     <TableCell>
@@ -429,36 +447,67 @@ export default function StockPage() {
                   {canEdit && (
                     <>
                       <TableCell>
-                        {hasPending ? (
-                          <div className="flex justify-center">
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {pending[v.id].type === 'add' ? '+' : pending[v.id].type === 'min' ? '−' : '='}{pending[v.id].qty}
-                            </Badge>
-                          </div>
-                        ) : (
+                        {hasLockedType ? (
                           <div className="flex items-center gap-1">
-                            <Select
-                              value={input.type}
-                              onValueChange={val => setRowInputs(prev => ({ ...prev, [v.id]: { ...input, type: val as AdjustType } }))}
-                            >
-                              <SelectTrigger className="h-7 w-[70px] text-xs px-2">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="add">Add</SelectItem>
-                                <SelectItem value="min">Minus</SelectItem>
-                                <SelectItem value="set">Set</SelectItem>
-                              </SelectContent>
-                            </Select>
                             <Input
                               type="number"
                               min={0}
                               className="h-7 w-16 text-xs"
                               placeholder="Qty"
-                              value={input.qty}
-                              onChange={e => setRowInputs(prev => ({ ...prev, [v.id]: { ...input, qty: e.target.value } }))}
-                              onKeyDown={e => e.key === 'Enter' && stageChange(v)}
+                              value={rowInputs[v.id] ?? ''}
+                              onChange={e => setRowInputs(prev => ({ ...prev, [v.id]: e.target.value }))}
                             />
+                            {lockedType === 'min' && (
+                              <Button size="icon" variant="outline" className="h-7 w-7 text-red-600 dark:text-red-400"
+                                      onClick={() => stageChange(v, 'min')} title="Subtract">
+                                −
+                              </Button>
+                            )}
+                            {lockedType === 'set' && (
+                              <Button size="icon" variant="outline" className="h-7 w-7 text-muted-foreground"
+                                      onClick={() => stageChange(v, 'set')} title="Set to">
+                                =
+                              </Button>
+                            )}
+                            {lockedType === 'add' && (
+                              <Button size="icon" variant="outline" className="h-7 w-7 text-green-600 dark:text-green-400"
+                                      onClick={() => stageChange(v, 'add')} title="Add">
+                                +
+                              </Button>
+                            )}
+                          </div>
+                        ) : hasPending ? (
+                          <div className="flex justify-center">
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {pending[v.id].type === 'add' ? `+${pending[v.id].qty}` : pending[v.id].type === 'min' ? `−${pending[v.id].qty}` : `=${pending[v.id].qty}`}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              className="h-7 w-16 text-xs"
+                              placeholder="Qty"
+                              value={rowInputs[v.id] ?? ''}
+                              onChange={e => setRowInputs(prev => ({ ...prev, [v.id]: e.target.value }))}
+                              onKeyDown={e => e.key === 'Enter' && stageChange(v, 'add')}
+                            />
+                            <Button size="icon" variant="outline" className="h-7 w-7 text-red-600 dark:text-red-400"
+                                    disabled={!rowInputs[v.id] || isNaN(parseInt(rowInputs[v.id] ?? ''))}
+                                    onClick={() => stageChange(v, 'min')} title="Subtract">
+                              −
+                            </Button>
+                            <Button size="icon" variant="outline" className="h-7 w-7 text-muted-foreground"
+                                    disabled={!rowInputs[v.id] || isNaN(parseInt(rowInputs[v.id] ?? ''))}
+                                    onClick={() => stageChange(v, 'set')} title="Set to">
+                              =
+                            </Button>
+                            <Button size="icon" variant="outline" className="h-7 w-7 text-green-600 dark:text-green-400"
+                                    disabled={!rowInputs[v.id] || isNaN(parseInt(rowInputs[v.id] ?? ''))}
+                                    onClick={() => stageChange(v, 'add')} title="Add">
+                              +
+                            </Button>
                           </div>
                         )}
                       </TableCell>
@@ -475,26 +524,18 @@ export default function StockPage() {
 
                       <TableCell>
                         <div className="flex items-center gap-1 justify-end">
-                          {hasPending ? (
+                          {(hasLockedType || hasPending) ? (
                             <>
-                              <Button size="sm" className="h-7 text-xs" onClick={() => saveChanges([v.id])} disabled={adjustMutation.isPending}>
+                              <Button size="sm" className="h-7 text-xs"
+                                      onClick={() => saveChanges([v.id])}
+                                      disabled={adjustMutation.isPending || (hasLockedType && (isNaN(parseInt(rowInputs[v.id] ?? '')) || parseInt(rowInputs[v.id] ?? '') < 0))}>
                                 <Save className="h-3 w-3 mr-1" /> Save
                               </Button>
                               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => unstage(v.id)}>
                                 <X className="h-3 w-3" />
                               </Button>
                             </>
-                          ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-xs"
-                              disabled={!input.qty || isNaN(parseInt(input.qty))}
-                              onClick={() => stageChange(v)}
-                            >
-                              Stage
-                            </Button>
-                          )}
+                          ) : null}
                         </div>
                       </TableCell>
                     </>
@@ -509,7 +550,6 @@ export default function StockPage() {
       <Pagination page={page} totalPages={totalPages} onPageChange={p => { setPage(p); setSelected(new Set()) }} isLoading={isLoading} />
 
       {/* Modals */}
-      <BulkStockModal open={showBulkImportModal} onClose={() => setShowBulkImportModal(false)} />
       <BulkEditModal
         open={showBulkEditModal}
         onClose={() => setShowBulkEditModal(false)}

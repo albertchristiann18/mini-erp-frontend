@@ -1,5 +1,5 @@
 import client from './client'
-import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse } from '../types/inventory'
+import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse } from '../types/inventory'
 
 export const getCategories = () =>
   client.get<PaginatedResponse<Category>>('/category/')
@@ -68,3 +68,6 @@ export const getAvgSales = (variantIds: string[], days: number) =>
   client.get<AvgSalesResult>('/avg-sales/', {
     params: { variant_ids: variantIds.join(','), days },
   })
+
+export const getInventorySummary = () =>
+  client.get<InventorySummaryResponse>('/inventory-summary/')

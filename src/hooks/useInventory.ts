@@ -3,7 +3,7 @@ import {
   getCategories, getProducts, createProduct, updateProduct,
   getProductVariants, getProductVariantStocks, getWarehouses, createWarehouse, updateWarehouse,
   getStockMovements, getMasterCategories,
-  bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales,
+  bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary,
 } from '../api/inventory'
 import client from '../api/client'
 import type { Product } from '../types/inventory'
@@ -140,6 +140,13 @@ export const useAllVariants = () =>
     queryFn: () =>
       getProductVariants({ page_size: 500, is_active: 'true' }).then(r => r.data),
     staleTime: 1000 * 60 * 10,
+  })
+
+export const useInventorySummary = () =>
+  useQuery({
+    queryKey: ['inventory-summary'],
+    queryFn: () => getInventorySummary().then(r => r.data),
+    staleTime: 1000 * 60 * 2,
   })
 
 export const useStockClosingReport = (month: string, warehouseId: string) => {
