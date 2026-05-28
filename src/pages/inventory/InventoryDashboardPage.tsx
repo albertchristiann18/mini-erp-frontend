@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { Input } from '../../components/ui/input'
 import { Card } from '../../components/ui/card'
-import { useInventorySummary } from '../../hooks/useInventory'
-import { useAvgSales } from '../../hooks/useInventory'
+import { Button } from '../../components/ui/button'
+import { useInventorySummary, useAvgSales } from '../../hooks/useInventory'
+import { Pagination } from '../../components/Pagination'
 
 const formatIDR = (val: number) =>
   val.toLocaleString('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
@@ -26,9 +27,13 @@ function doiStatus(doi: number | null, qty: number): 'oos' | 'overstock' | 'ok' 
 
 export default function InventoryDashboardPage() {
   const [days, setDays] = useState<7 | 30>(30)
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [hasSearched, setHasSearched] = useState(false)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 5
 
-  const { data: summaryData, isLoading } = useInventorySummary()
+  const { data: summaryData, isLoading } = useInventorySummary({ enabled: hasSearched })
   const allVariantIds = useMemo(
     () => summaryData?.products.flatMap(p => p.variants.map(v => v.variant_id)) ?? [],
     [summaryData]
@@ -43,9 +48,16 @@ export default function InventoryDashboardPage() {
     return map
   }, [avgSalesData])
 
+  const handleSearch = () => {
+    if (!searchInput.trim()) return
+    setSearchQuery(searchInput.trim())
+    setHasSearched(true)
+    setPage(1)
+  }
+
   const filteredProducts = useMemo(() => {
     if (!summaryData) return []
-    const q = search.toLowerCase().trim()
+    const q = searchQuery.toLowerCase().trim()
     if (!q) return summaryData.products
     return summaryData.products.filter(p =>
       p.product_name.toLowerCase().includes(q) ||
@@ -55,7 +67,10 @@ export default function InventoryDashboardPage() {
         v.variant_name.toLowerCase().includes(q)
       )
     )
-  }, [summaryData, search])
+  }, [summaryData, searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))
+  const pagedProducts = filteredProducts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const totalCogsStock = summaryData?.summary.total_cogs_stock ?? 0
   const totalSellingPrice = summaryData?.summary.total_selling_price ?? 0
@@ -63,55 +78,73 @@ export default function InventoryDashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground">Total COGS Stock</p>
-          <p className="text-xl font-bold tabular-nums">{formatIDR(totalCogsStock)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground">Total Selling Price</p>
-          <p className="text-xl font-bold tabular-nums">{formatIDR(totalSellingPrice)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground">Products</p>
-          <p className="text-xl font-bold tabular-nums">{summaryData?.summary.total_products}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs text-muted-foreground">Variants</p>
-          <p className="text-xl font-bold tabular-nums">{summaryData?.summary.total_variants}</p>
-        </Card>
-      </div>
+      {hasSearched && summaryData && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Card className="p-4">
+            <p className="text-xs text-muted-foreground">Total COGS Stock</p>
+            <p className="text-xl font-bold tabular-nums">{formatIDR(totalCogsStock)}</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs text-muted-foreground">Total Selling Price</p>
+            <p className="text-xl font-bold tabular-nums">{formatIDR(totalSellingPrice)}</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs text-muted-foreground">Products</p>
+            <p className="text-xl font-bold tabular-nums">{summaryData?.summary.total_products}</p>
+          </Card>
+          <Card className="p-4">
+            <p className="text-xs text-muted-foreground">Variants</p>
+            <p className="text-xl font-bold tabular-nums">{summaryData?.summary.total_variants}</p>
+          </Card>
+        </div>
+      )}
 
       <div className="flex items-center gap-3 flex-wrap">
-        <Input placeholder="Search product or SKU..." value={search} onChange={e => setSearch(e.target.value)} className="w-[280px]" />
+        <Input
+          placeholder="Search product or SKU..."
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleSearch() }}
+          className="w-[280px]"
+        />
+        <Button variant="default" size="sm" onClick={handleSearch}>Search</Button>
         <div className="flex rounded-md border overflow-hidden">
           <button onClick={() => setDays(7)} className={days === 7 ? 'px-3 py-1.5 text-sm bg-primary text-primary-foreground' : 'px-3 py-1.5 text-sm bg-background hover:bg-muted'}>7d</button>
           <button onClick={() => setDays(30)} className={days === 30 ? 'px-3 py-1.5 text-sm bg-primary text-primary-foreground' : 'px-3 py-1.5 text-sm bg-background hover:bg-muted'}>30d</button>
         </div>
-        <span className="text-sm text-muted-foreground">{filteredProducts.length} products</span>
+        {hasSearched && <span className="text-sm text-muted-foreground">{filteredProducts.length} products</span>}
       </div>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/50">
-            <tr>
-              <th className="w-12 p-2"></th>
-              <th className="text-left p-2 w-48">Product</th>
-              <th className="text-left p-2">Variant</th>
-              <th className="text-right p-2">Total QTY</th>
-              {warehouses.map(w => <th key={w.id} className="text-right p-2">{w.name}</th>)}
-              <th className="text-right p-2">AVG Sales</th>
-              <th className="text-right p-2">DOI</th>
-              <th className="text-right p-2">Status</th>
-              <th className="text-right p-2">COGS</th>
-              <th className="text-right p-2">Sell Price</th>
-              <th className="text-right p-2">Margin</th>
-              <th className="text-right p-2">COGS Total</th>
-              <th className="text-right p-2">SP Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredProducts.flatMap(product =>
+      {!hasSearched && (
+        <div className="rounded-lg border bg-card p-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            Search by product name or SKU to view inventory data.
+          </p>
+        </div>
+      )}
+
+      {hasSearched && (
+        <div className="rounded-lg border bg-card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/50">
+              <tr>
+                <th className="w-12 p-2"></th>
+                <th className="text-left p-2 w-48">Product</th>
+                <th className="text-left p-2">Variant</th>
+                <th className="text-right p-2">Total QTY</th>
+                {warehouses.map(w => <th key={w.id} className="text-right p-2">{w.name}</th>)}
+                <th className="text-right p-2">AVG Sales</th>
+                <th className="text-right p-2">DOI</th>
+                <th className="text-right p-2">Status</th>
+                <th className="text-right p-2">COGS</th>
+                <th className="text-right p-2">Sell Price</th>
+                <th className="text-right p-2">Margin</th>
+                <th className="text-right p-2">COGS Total</th>
+                <th className="text-right p-2">SP Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pagedProducts.flatMap(product =>
               product.variants.map((v, variantIndex) => {
                 const isFirst = variantIndex === 0
                 const avg = avgSalesMap[v.variant_id] ?? 0
@@ -177,10 +210,19 @@ export default function InventoryDashboardPage() {
           </tbody>
         </table>
         {isLoading && <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>}
-        {!isLoading && filteredProducts.length === 0 && (
+        {!isLoading && hasSearched && filteredProducts.length === 0 && (
           <div className="p-8 text-center text-sm text-muted-foreground">No products found</div>
         )}
       </div>
+      )}
+      {hasSearched && (
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={p => setPage(p)}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   )
 }

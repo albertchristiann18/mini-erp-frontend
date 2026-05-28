@@ -64,6 +64,25 @@ const mockProducts = [
   },
 ]
 
+const manyProducts = Array.from({ length: 6 }, (_, i) => ({
+  product_id: `p${i + 1}`,
+  product_name: `Product ${i + 1}`,
+  sku_code: `SKU-${String(i + 1).padStart(3, '0')}`,
+  photo_url: null,
+  variants: [
+    {
+      variant_id: `v${i + 1}`,
+      sku_variant_code: `SKU-${String(i + 1).padStart(3, '0')}-VAR`,
+      variant_name: `Variant ${i + 1}`,
+      variant_values: {},
+      total_qty: 10,
+      warehouse_stocks: { w1: 5, w2: 5 },
+      current_cogs: 50000,
+      base_price: 100000,
+    },
+  ],
+}))
+
 const mockSummaryData = {
   warehouses: mockWarehouses,
   products: mockProducts,
@@ -72,6 +91,17 @@ const mockSummaryData = {
     total_selling_price: 40000000,
     total_products: 2,
     total_variants: 3,
+  },
+}
+
+const mockSummaryMany = {
+  warehouses: mockWarehouses,
+  products: manyProducts,
+  summary: {
+    total_cogs_stock: 3000000,
+    total_selling_price: 6000000,
+    total_products: 6,
+    total_variants: 6,
   },
 }
 
@@ -84,6 +114,19 @@ const mockAvgSalesData = {
   ],
 }
 
+const mockAvgSalesMany = {
+  days: 30,
+  date_from: '2026-04-28',
+  results: manyProducts.map((p) => ({
+    variant_id: p.variants[0].variant_id,
+    sku_variant_code: p.variants[0].sku_variant_code,
+    variant_name: p.variants[0].variant_name,
+    avg_sales_per_day: 0.1,
+    total_qty_sold: 3,
+    days: 30,
+  })),
+}
+
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -93,58 +136,95 @@ function renderPage() {
   )
 }
 
+function submitSearch(term: string) {
+  const input = screen.getByPlaceholderText('Search product or SKU...')
+  fireEvent.change(input, { target: { value: term } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+}
+
 const hookResult = (data: unknown) => ({ data, isLoading: false }) as never
-it('renders summary cards with formatted IDR values from mocked data', () => {
+
+it('shows empty-state prompt on mount before any search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
+  expect(screen.getByText('Search by product name or SKU to view inventory data.')).toBeInTheDocument()
+  expect(screen.queryByText('Total COGS Stock')).not.toBeInTheDocument()
+  expect(screen.queryByText('T-Shirt')).not.toBeInTheDocument()
+})
+
+it('renders summary cards and products after submitting a search', () => {
+  vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
+  vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
+  renderPage()
+  submitSearch('tshirt')
   expect(screen.getByText('Total COGS Stock')).toBeInTheDocument()
   expect(screen.getByText('Total Selling Price')).toBeInTheDocument()
   expect(screen.getByText('Products')).toBeInTheDocument()
   expect(screen.getByText('Variants')).toBeInTheDocument()
 })
 
-it('renders product name and sku_code in the product header row', () => {
+it('renders product name and sku_code in the product header row after search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
+  submitSearch('s')
   expect(screen.getByText('T-Shirt')).toBeInTheDocument()
   expect(screen.getByText('TSH-001')).toBeInTheDocument()
   expect(screen.getByText('Jeans')).toBeInTheDocument()
   expect(screen.getByText('JNS-002')).toBeInTheDocument()
 })
 
-it('renders variant sku_variant_code in variant rows', () => {
+it('renders variant sku_variant_code in variant rows after search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
+  submitSearch('s')
   expect(screen.getByText('TSH-001-BLK-M')).toBeInTheDocument()
   expect(screen.getByText('TSH-001-WHT-L')).toBeInTheDocument()
   expect(screen.getByText('JNS-002-BLU-32')).toBeInTheDocument()
 })
 
-it('shows OOS badge when total_qty is 0', () => {
+it('shows OOS badge when total_qty is 0 after search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
+  submitSearch('t-shirt')
   const oosBadges = screen.getAllByText('OOS')
   expect(oosBadges.length).toBe(1)
 })
 
-it('shows Overstock badge when DOI > 90', () => {
+it('shows Overstock badge when DOI > 90 after search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
+  submitSearch('jeans')
   const overstockBadges = screen.getAllByText('Overstock')
   expect(overstockBadges.length).toBe(1)
 })
 
-it('search filters products by name', () => {
+it('search filters products by name after submission', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
   vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
   renderPage()
-  const input = screen.getByPlaceholderText('Search product or SKU...')
-  fireEvent.change(input, { target: { value: 'jeans' } })
+  submitSearch('jeans')
+  expect(screen.getByText('Jeans')).toBeInTheDocument()
+  expect(screen.queryByText('T-Shirt')).not.toBeInTheDocument()
+})
+
+it('search is case-insensitive', () => {
+  vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
+  vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
+  renderPage()
+  submitSearch('JEANS')
+  expect(screen.getByText('Jeans')).toBeInTheDocument()
+})
+
+it('filters products by SKU code after submission', () => {
+  vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
+  vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesData))
+  renderPage()
+  submitSearch('JNS-002')
   expect(screen.getByText('Jeans')).toBeInTheDocument()
   expect(screen.queryByText('T-Shirt')).not.toBeInTheDocument()
 })
@@ -163,3 +243,28 @@ it('7d/30d toggle buttons are present and switch the active state', () => {
   expect(btn30d.className).toContain('bg-primary')
 })
 
+it('shows pagination controls when there are more than 5 products', () => {
+  vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryMany))
+  vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesMany))
+  renderPage()
+  submitSearch('product')
+  const nextButton = screen.getByText('Next')
+  const prevButton = screen.getByText('Previous')
+  expect(nextButton).toBeInTheDocument()
+  expect(prevButton).toBeInTheDocument()
+  expect(screen.getByText(/Page 1 of 2/)).toBeInTheDocument()
+  expect(screen.getByText('Product 1')).toBeInTheDocument()
+  expect(screen.getByText('Product 5')).toBeInTheDocument()
+  expect(screen.queryByText('Product 6')).not.toBeInTheDocument()
+})
+
+it('paginates to page 2 and shows remaining products', () => {
+  vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryMany))
+  vi.mocked(useAvgSales).mockReturnValue(hookResult(mockAvgSalesMany))
+  renderPage()
+  submitSearch('product')
+  fireEvent.click(screen.getByText('Next'))
+  expect(screen.getByText(/Page 2 of 2/)).toBeInTheDocument()
+  expect(screen.queryByText('Product 1')).not.toBeInTheDocument()
+  expect(screen.getByText('Product 6')).toBeInTheDocument()
+})
