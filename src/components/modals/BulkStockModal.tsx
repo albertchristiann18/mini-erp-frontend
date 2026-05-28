@@ -3,8 +3,83 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useProductVariants, useWarehouses, useBulkUpdateInventory } from '../../hooks/useInventory'
+import { useAllVariants, useWarehouses, useBulkUpdateInventory } from '../../hooks/useInventory'
 import { toast } from '../../lib/toast'
+
+interface VariantComboboxProps {
+  value: string
+  onChange: (id: string) => void
+  variants: Array<{ id: string; product_name: string; name: string; sku_variant_code: string }>
+}
+
+function VariantCombobox({ value, onChange, variants }: VariantComboboxProps) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const selected = variants.find(v => v.id === value) ?? null
+  const filtered = query.trim()
+    ? variants.filter(v =>
+        v.name.toLowerCase().includes(query.toLowerCase()) ||
+        v.product_name.toLowerCase().includes(query.toLowerCase()) ||
+        v.sku_variant_code.toLowerCase().includes(query.toLowerCase())
+      )
+    : variants
+
+  return (
+    <div className="relative">
+      <input
+        className="flex h-9 w-[260px] rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground"
+        placeholder="Search variant..."
+        value={open ? query : (selected ? `${selected.product_name} · ${selected.name}` : '')}
+        onFocus={() => { setOpen(true); setQuery('') }}
+        onChange={e => setQuery(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            if (filtered.length > 0) {
+              onChange(filtered[0].id)
+              setOpen(false)
+              setQuery('')
+            }
+          }
+          if (e.key === 'Escape') {
+            setOpen(false)
+            setQuery('')
+          }
+        }}
+        onBlur={() => {
+          setTimeout(() => setOpen(false), 150)
+        }}
+        autoComplete="off"
+      />
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-[320px] overflow-y-auto rounded-md border bg-card shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">No variants found</div>
+          ) : (
+            filtered.map(v => (
+              <button
+                key={v.id}
+                type="button"
+                onMouseDown={() => {
+                  onChange(v.id)
+                  setOpen(false)
+                  setQuery('')
+                }}
+                className={`flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${
+                  v.id === value ? 'bg-accent/50' : ''
+                }`}
+              >
+                <span className="font-medium">{v.product_name} · {v.name}</span>
+                <span className="text-xs text-muted-foreground font-mono">{v.sku_variant_code}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface Row {
   id: number
@@ -20,11 +95,10 @@ interface Props {
 }
 
 export function BulkStockModal({ open, onClose }: Props) {
-  const { data: variantsData } = useProductVariants()
+  const { data: variantsData } = useAllVariants()
   const { data: warehousesData } = useWarehouses()
   const bulkMutation = useBulkUpdateInventory()
   const [rows, setRows] = useState<Row[]>([{ id: 1, variant_id: '', warehouse_id: '', qty: 0, type: 'replace' }])
-  const [variantSearches, setVariantSearches] = useState<Record<number, string>>({})
   const [result, setResult] = useState<{ successful: number; failed: number } | null>(null)
   const [showPreview, setShowPreview] = useState(true)
   const validRows = rows.filter(r => r.variant_id && r.warehouse_id && r.qty > 0)
@@ -37,10 +111,6 @@ export function BulkStockModal({ open, onClose }: Props) {
     setResult(null)
     onClose()
   }
-
-  const getVariantSearch = (rowId: number) => variantSearches[rowId] ?? ''
-  const setVariantSearch = (rowId: number, val: string) =>
-    setVariantSearches(prev => ({ ...prev, [rowId]: val }))
 
   const addRow = () => {
     setRows([...rows, { id: Date.now(), variant_id: '', warehouse_id: '', qty: 0, type: 'replace' }])
@@ -97,49 +167,11 @@ export function BulkStockModal({ open, onClose }: Props) {
                 {rows.map((row) => (
                   <tr key={row.id} className="border-b">
                     <td className="p-1">
-                      <Select
+                      <VariantCombobox
                         value={row.variant_id}
-                        onValueChange={(v) => updateRow(row.id, 'variant_id', v)}
-                        onOpenChange={(open) => { if (!open) setVariantSearch(row.id, '') }}
-                      >
-                        <SelectTrigger className="w-[240px]"><SelectValue placeholder="Select variant" /></SelectTrigger>
-                        <SelectContent>
-                          <div className="p-1">
-                            <input
-                              className="w-full rounded border border-border bg-background px-2 py-1 text-sm mb-1"
-                              placeholder="Search by name or SKU..."
-                              value={getVariantSearch(row.id)}
-                              onChange={e => setVariantSearch(row.id, e.target.value)}
-                              onKeyDown={e => e.stopPropagation()}
-                              onClick={e => e.stopPropagation()}
-                              autoFocus
-                            />
-                          </div>
-                          <div className="max-h-60 overflow-y-auto">
-                            {(() => {
-                              const q = getVariantSearch(row.id).toLowerCase()
-                              const filtered = q
-                                ? variants.filter(v =>
-                                    v.name.toLowerCase().includes(q) ||
-                                    v.sku_variant_code.toLowerCase().includes(q)
-                                  )
-                                : variants
-                              if (filtered.length === 0) {
-                                return (
-                                  <div className="px-2 py-3 text-sm text-muted-foreground text-center">
-                                    No variants found
-                                  </div>
-                                )
-                              }
-                              return filtered.map(v => (
-                                <SelectItem key={v.id} value={v.id}>
-                                  {v.product_name} · {v.name}
-                                </SelectItem>
-                              ))
-                            })()}
-                          </div>
-                        </SelectContent>
-                      </Select>
+                        onChange={(v) => updateRow(row.id, 'variant_id', v)}
+                        variants={variants}
+                      />
                     </td>
                     <td className="p-1">
                       <Select value={row.warehouse_id} onValueChange={(v) => updateRow(row.id, 'warehouse_id', v)}>
