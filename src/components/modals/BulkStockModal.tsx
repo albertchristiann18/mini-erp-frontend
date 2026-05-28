@@ -133,7 +133,7 @@ export function BulkStockModal({ open, onClose }: Props) {
                               }
                               return filtered.map(v => (
                                 <SelectItem key={v.id} value={v.id}>
-                                  {v.sku_variant_code} — {v.name}
+                                  {v.product_name} · {v.name}
                                 </SelectItem>
                               ))
                             })()}
@@ -206,7 +206,7 @@ export function BulkStockModal({ open, onClose }: Props) {
                       <div key={row.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
                         <div className="min-w-0">
                           <p className="font-medium truncate">
-                            {variant ? `${variant.sku_variant_code} — ${variant.name}` : row.variant_id}
+                            {variant ? `${variant.product_name} · ${variant.name}` : row.variant_id}
                           </p>
                           <p className="text-xs text-muted-foreground">{warehouse?.name ?? row.warehouse_id}</p>
                         </div>
