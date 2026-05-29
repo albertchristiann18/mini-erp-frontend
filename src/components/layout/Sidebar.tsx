@@ -14,11 +14,16 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', to: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
+  {
+    label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />,
+    children: [
+      { label: 'Overview', to: '/' },
+      { label: 'Inventory Dashboard', to: '/inventory/inventory-dashboard' },
+    ],
+  },
   {
     label: 'Inventory', icon: <Package className="h-4 w-4" />,
     children: [
-      { label: 'Inv. Dashboard', to: '/inventory/inventory-dashboard' },
       { label: 'Products', to: '/inventory/products' },
       { label: 'Stock', to: '/inventory/stock' },
       { label: 'Stock Closing', to: '/inventory/stock-closing' },

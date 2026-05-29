@@ -10,7 +10,7 @@ import LoginPage from './pages/auth/LoginPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 1000 * 60 * 2, gcTime: 1000 * 60 * 5 },
+    queries: { staleTime: 0, gcTime: 1000 * 60 * 5 },
   },
 })
 
@@ -36,7 +36,7 @@ const ShopeeWebhookLogPage = lazy(() => import('./pages/shopee/ShopeeWebhookLogP
 const TikTokSettingsPage = lazy(() => import('./pages/tiktok/TikTokSettingsPage'))
 const TikTokWebhookLogPage = lazy(() => import('./pages/tiktok/TikTokWebhookLogPage'))
 const StockClosingPage = lazy(() => import('./pages/inventory/StockClosingPage'))
-const InventoryDashboardPage = lazy(() => import('./pages/inventory/InventoryDashboardPage'))
+const InventoryDashboardPage = lazy(() => import('./pages/dashboard/InventoryDashboardPage'))
 const BulkStockUpdatePage = lazy(() => import('./pages/inventory/BulkStockUpdatePage'))
 
 const Loading = () => (

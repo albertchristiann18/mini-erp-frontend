@@ -18,7 +18,6 @@ export const useExpenses = (params: Record<string, string | number> = {}) => {
   return useQuery({
     queryKey: ['expenses', params],
     queryFn: () => getExpenses({ company_id: companyId, page_size: 20, ...params }).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
     enabled: !!companyId,
   })
 }
@@ -60,7 +59,6 @@ export const useAccountsPayable = (page = 1) => {
   return useQuery({
     queryKey: ['accounts-payable', page],
     queryFn: () => getAccountsPayable({ company_id: companyId, page, page_size: 20 }).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
     enabled: !!companyId,
   })
 }
@@ -80,7 +78,6 @@ export const useAccountsReceivable = (page = 1) => {
   return useQuery({
     queryKey: ['accounts-receivable', page],
     queryFn: () => getAccountsReceivable({ company_id: companyId, page, page_size: 20 }).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
     enabled: !!companyId,
   })
 }
@@ -100,7 +97,6 @@ export const useDashboardKPIs = (startDate: string, endDate: string) => {
   return useQuery({
     queryKey: ['dashboard-kpis', startDate, endDate],
     queryFn: () => getDashboardKPIs({ company_id: companyId, start_date: startDate, end_date: endDate }).then(r => r.data),
-    staleTime: 1000 * 60 * 5,
     enabled: !!startDate && !!endDate && !!companyId,
   })
 }
@@ -111,7 +107,6 @@ export const useIncomeStatement = (startDate: string, endDate: string) => {
   return useQuery({
     queryKey: ['income-statement', startDate, endDate],
     queryFn: () => getIncomeStatement({ company_id: companyId, start_date: startDate, end_date: endDate }).then(r => r.data),
-    staleTime: 1000 * 60 * 5,
     enabled: !!startDate && !!endDate && !!companyId,
   })
 }
@@ -122,7 +117,6 @@ export const useBalanceSheet = (asOfDate: string) => {
   return useQuery({
     queryKey: ['balance-sheet', asOfDate],
     queryFn: () => getBalanceSheet({ company_id: companyId, as_of_date: asOfDate }).then(r => r.data),
-    staleTime: 1000 * 60 * 5,
     enabled: !!asOfDate && !!companyId,
   })
 }
@@ -133,7 +127,6 @@ export const useCashFlow = (startDate: string, endDate: string) => {
   return useQuery({
     queryKey: ['cash-flow', startDate, endDate],
     queryFn: () => getCashFlow({ company_id: companyId, start_date: startDate, end_date: endDate }).then(r => r.data),
-    staleTime: 1000 * 60 * 5,
     enabled: !!startDate && !!endDate && !!companyId,
   })
 }
@@ -142,7 +135,6 @@ export const useCashTransactions = (params: Record<string, string | number> = {}
   useQuery({
     queryKey: ['cash-transactions', params],
     queryFn: () => getCashTransactions({ page_size: 200, ...params }).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
   })
 
 export const useCreateCashTransaction = () => {

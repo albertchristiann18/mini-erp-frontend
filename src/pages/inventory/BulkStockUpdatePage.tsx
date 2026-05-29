@@ -18,6 +18,13 @@ interface BulkRow {
   warehouse_id: string
   qty: number
   type: 'replace' | 'add' | 'min'
+  current_stock: number
+}
+
+function computeAfter(type: BulkRow['type'], current: number, qty: number): number {
+  if (type === 'add') return current + qty
+  if (type === 'replace') return qty
+  return Math.max(0, current - qty)
 }
 
 export default function BulkStockUpdatePage() {
@@ -63,6 +70,7 @@ export default function BulkStockUpdatePage() {
       warehouse_id: '',
       qty: 0,
       type: 'add',
+      current_stock: v.total_available_qty,
     }])
   }
 
@@ -147,6 +155,8 @@ export default function BulkStockUpdatePage() {
                 <tr className="border-b text-left">
                   <th className="p-2">Product / Variant</th>
                   <th className="p-2">SKU</th>
+                  <th className="p-2 text-right">Current QTY</th>
+                  <th className="p-2 text-right">After</th>
                   <th className="p-2">Warehouse</th>
                   <th className="p-2">Type</th>
                   <th className="p-2">Qty</th>
@@ -161,6 +171,25 @@ export default function BulkStockUpdatePage() {
                       <p className="text-xs text-muted-foreground">{row.variant_name}</p>
                     </td>
                     <td className="p-2 font-mono text-xs text-muted-foreground">{row.sku_variant_code}</td>
+                    <td className="p-2 text-right tabular-nums text-muted-foreground">
+                      {row.current_stock.toLocaleString()}
+                    </td>
+                    <td className="p-2 text-right tabular-nums font-medium">
+                      {(() => {
+                        if (row.qty <= 0) return <span className="text-muted-foreground">&mdash;</span>
+                        const rawAfter = row.type === 'add'
+                          ? row.current_stock + row.qty
+                          : row.type === 'replace'
+                          ? row.qty
+                          : row.current_stock - row.qty
+                        const isNegative = rawAfter < 0
+                        return (
+                          <span className={isNegative ? 'text-red-600 dark:text-red-400' : ''}>
+                            {computeAfter(row.type, row.current_stock, row.qty).toLocaleString()}
+                          </span>
+                        )
+                      })()}
+                    </td>
                     <td className="p-2">
                       <Select value={row.warehouse_id} onValueChange={v => updateRow(row.id, 'warehouse_id', v)}>
                         <SelectTrigger className="w-[160px]"><SelectValue placeholder="Select warehouse" /></SelectTrigger>

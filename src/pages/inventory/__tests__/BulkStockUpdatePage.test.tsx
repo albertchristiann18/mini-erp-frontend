@@ -110,3 +110,90 @@ it('submit calls bulkMutation with correct data for a valid row', async () => {
     { variant_id: 'v1', warehouse_id: 'w1', qty: 10, type: 'add' },
   ])
 })
+
+it('shows current stock column after adding a variant', async () => {
+  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[0]], count: 1, next: null, previous: null } } as never)
+  vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
+  vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  renderPage()
+
+  const input = screen.getByPlaceholderText('Search by product name or SKU...')
+  await userEvent.type(input, 'Shirt')
+  await userEvent.keyboard('{Enter}')
+
+  await userEvent.click(screen.getAllByRole('button', { name: /\+ add/i })[0])
+
+  expect(screen.getByText('Current QTY')).toBeInTheDocument()
+  expect(screen.getByText('50')).toBeInTheDocument()
+})
+
+it('shows correct After value for Add type', async () => {
+  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[0]], count: 1, next: null, previous: null } } as never)
+  vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
+  vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  renderPage()
+
+  const input = screen.getByPlaceholderText('Search by product name or SKU...')
+  await userEvent.type(input, 'Shirt')
+  await userEvent.keyboard('{Enter}')
+  await userEvent.click(screen.getAllByRole('button', { name: /\+ add/i })[0])
+
+  const warehouseTriggers = screen.getAllByRole('combobox')
+  await userEvent.click(warehouseTriggers[0])
+  await userEvent.click(screen.getByRole('option', { name: /warehouse a/i }))
+
+  const qtyInput = screen.getByRole('spinbutton')
+  await userEvent.type(qtyInput, '10')
+
+  expect(screen.getByText('60')).toBeInTheDocument()
+})
+
+it('shows correct After value for Set type', async () => {
+  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[0]], count: 1, next: null, previous: null } } as never)
+  vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
+  vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  renderPage()
+
+  const input = screen.getByPlaceholderText('Search by product name or SKU...')
+  await userEvent.type(input, 'Shirt')
+  await userEvent.keyboard('{Enter}')
+  await userEvent.click(screen.getAllByRole('button', { name: /\+ add/i })[0])
+
+  const triggers = screen.getAllByRole('combobox')
+  await userEvent.click(triggers[0])
+  await userEvent.click(screen.getByRole('option', { name: /warehouse a/i }))
+
+  await userEvent.click(triggers[1])
+  await userEvent.click(screen.getByRole('option', { name: /set/i }))
+
+  const qtyInput = screen.getByRole('spinbutton')
+  await userEvent.type(qtyInput, '30')
+
+  expect(screen.getByText('30')).toBeInTheDocument()
+})
+
+it('shows correct After value for Remove type and highlights red when negative', async () => {
+  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[2]], count: 1, next: null, previous: null } } as never)
+  vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
+  vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  renderPage()
+
+  const input = screen.getByPlaceholderText('Search by product name or SKU...')
+  await userEvent.type(input, 'Pants')
+  await userEvent.keyboard('{Enter}')
+  await userEvent.click(screen.getAllByRole('button', { name: /\+ add/i })[0])
+
+  const triggers = screen.getAllByRole('combobox')
+  await userEvent.click(triggers[0])
+  await userEvent.click(screen.getByRole('option', { name: /warehouse a/i }))
+
+  await userEvent.click(triggers[1])
+  await userEvent.click(screen.getByRole('option', { name: /remove/i }))
+
+  const qtyInput = screen.getByRole('spinbutton')
+  await userEvent.type(qtyInput, '30')
+
+  const afterCell = screen.getByText('0')
+  expect(afterCell).toBeInTheDocument()
+  expect(afterCell).toHaveClass('text-red-600')
+})

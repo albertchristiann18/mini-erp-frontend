@@ -9,14 +9,12 @@ export const usePurchaseOrders = (status?: POStatus, page = 1) =>
   useQuery({
     queryKey: ['purchase-orders', status, page],
     queryFn: () => getPurchaseOrders({ ...(status ? { status } : {}), page, page_size: 20 }).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
   })
 
 export const usePurchaseOrder = (id: string) =>
   useQuery({
     queryKey: ['purchase-order', id],
     queryFn: () => getPurchaseOrder(id).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
     enabled: !!id,
   })
 
@@ -52,12 +50,10 @@ export const usePurchaseOrdersFiltered = (params: Record<string, string | number
   useQuery({
     queryKey: ['purchase-orders', params],
     queryFn: () => getPurchaseOrders(params).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
   })
 
 export const useReplenishment = (warehouseId?: string) =>
   useQuery({
     queryKey: ['replenishment', warehouseId],
     queryFn: () => getReplenishment(warehouseId ? { warehouse_id: warehouseId } : undefined).then(r => r.data),
-    staleTime: 1000 * 60 * 5,
   })

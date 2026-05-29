@@ -71,3 +71,9 @@ export const getAvgSales = (variantIds: string[], days: number) =>
 
 export const getInventorySummary = () =>
   client.get<InventorySummaryResponse>('/inventory-summary/')
+
+export const updateVariantPrice = (productId: string, variantId: string, basePrice: number) =>
+  client.patch<{ id: string; base_price: number }>(
+    `/product/${productId}/update_variant_price/${variantId}/`,
+    { base_price: basePrice }
+  )
