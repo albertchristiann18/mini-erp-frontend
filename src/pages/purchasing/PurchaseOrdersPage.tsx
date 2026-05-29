@@ -160,7 +160,7 @@ export default function PurchaseOrdersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>PO Number</TableHead>
+              <SortableHead field="purchase_order_number" label="PO Number" ordering={ordering} onSort={handleSort} />
               <TableHead>Status</TableHead>
               <SortableHead field="invoice_date" label="Invoice Date" ordering={ordering} onSort={handleSort} />
               <SortableHead field="delivery_date" label="Delivery Date" ordering={ordering} onSort={handleSort} />
