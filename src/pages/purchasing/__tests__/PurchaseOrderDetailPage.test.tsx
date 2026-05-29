@@ -4,6 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
 import PurchaseOrderDetailPage from '../PurchaseOrderDetailPage'
 
+vi.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { is_staff: true } }),
+}))
+
+vi.mock('../../../hooks/useInventory', () => ({
+  useProductVariants: () => ({ data: { results: [] } }),
+}))
+
 vi.mock('../../../hooks/usePurchasing', () => ({
   usePurchaseOrder: () => ({
     data: {
@@ -69,6 +77,9 @@ vi.mock('../../../hooks/usePurchasing', () => ({
       udate: '2026-05-01T00:00:00Z',
     },
     isLoading: false,
+  }),
+  useUpdatePurchaseOrder: () => ({
+    mutateAsync: vi.fn(),
   }),
 }))
 

@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder } from '../../hooks/usePurchasing'
+import { useAuth } from '../../contexts/AuthContext'
+import { PurchaseOrderEditModal } from '../../components/modals/PurchaseOrderEditModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
-import { ArrowLeft, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Pencil } from 'lucide-react'
 import { formatIDR, formatDate } from '../../lib/utils'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
@@ -17,6 +20,8 @@ export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: po, isLoading } = usePurchaseOrder(id!)
+  const { user } = useAuth()
+  const [showEdit, setShowEdit] = useState(false)
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -36,6 +41,11 @@ export default function PurchaseOrderDetailPage() {
         </Button>
         <h1 className="text-2xl font-semibold font-mono">{po.purchase_order_number}</h1>
         <Badge variant={statusVariant[po.status]}>{po.status}</Badge>
+        {user?.is_staff && !['COMPLETED', 'CANCELLED'].includes(po.status) && (
+          <Button size="sm" variant="outline" onClick={() => setShowEdit(true)}>
+            <Pencil className="h-4 w-4 mr-1" /> Edit
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-6">
@@ -125,6 +135,7 @@ export default function PurchaseOrderDetailPage() {
           </div>
         </div>
       </div>
+      {po && <PurchaseOrderEditModal open={showEdit} onClose={() => setShowEdit(false)} po={po} />}
     </div>
   )
 }
