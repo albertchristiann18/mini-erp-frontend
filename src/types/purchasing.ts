@@ -32,6 +32,7 @@ export interface PurchaseOrder {
   commission_fee: number | null
   commission_fee_rmb: string | null
   delivery_fee: string | null
+  delivery_fee_idr: number | null
   currency: string | null
   exchange_rate: string | null
   cbm: string | null

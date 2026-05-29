@@ -4,6 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect, beforeEach } from 'vitest'
 import PurchaseOrdersPage from '../PurchaseOrdersPage'
 
+const mockNavigate = vi.fn()
+
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  }
+})
+
 const mockUsePurchaseOrdersFiltered = vi.fn()
 const mockUsePurchaseOrderSummary = vi.fn()
 
@@ -41,6 +51,7 @@ function makeData(overrides: Record<string, unknown> = {}) {
         commission_fee: null,
         commission_fee_rmb: null,
         delivery_fee: null,
+        delivery_fee_idr: 675000,
         currency: 'CNY',
         exchange_rate: '2250.000',
         cbm: '1.500',
@@ -138,4 +149,15 @@ it('clicking Invoice Date column header toggles ordering', async () => {
   expect(mockUsePurchaseOrdersFiltered).toHaveBeenLastCalledWith(
     expect.objectContaining({ ordering: '-invoice_date' }),
   )
+})
+
+it('clicking a table row navigates to the PO detail page', async () => {
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
+  renderPage()
+
+  const row = await screen.findByText('PO-2026-001')
+  fireEvent.click(row)
+
+  expect(mockNavigate).toHaveBeenCalledWith('/purchasing/orders/po1')
 })

@@ -54,28 +54,35 @@ function SortableHead({
 export default function PurchaseOrdersPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [status, setStatus] = useState<POStatus | 'ALL'>('ALL')
+  const [pendingStatus, setPendingStatus] = useState<POStatus | 'ALL'>('ALL')
+  const [pendingDateFrom, setPendingDateFrom] = useState('')
+  const [pendingDateTo, setPendingDateTo] = useState('')
+  const [appliedStatus, setAppliedStatus] = useState<POStatus | 'ALL'>('ALL')
+  const [appliedDateFrom, setAppliedDateFrom] = useState('')
+  const [appliedDateTo, setAppliedDateTo] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [ordering, setOrdering] = useState('-cdate')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [forwarderFilter, setForwarderFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
 
+  const handleApply = () => {
+    setAppliedStatus(pendingStatus)
+    setAppliedDateFrom(pendingDateFrom)
+    setAppliedDateTo(pendingDateTo)
+    setPage(1)
+  }
+
   const queryParams: Record<string, string | number> = { page, page_size: pageSize, ordering }
-  if (status !== 'ALL') queryParams.status = status
-  if (dateFrom) queryParams.date_from = dateFrom
-  if (dateTo) queryParams.date_to = dateTo
-  if (forwarderFilter) queryParams.forwarder = forwarderFilter
+  if (appliedStatus !== 'ALL') queryParams.status = appliedStatus
+  if (appliedDateFrom) queryParams.date_from = appliedDateFrom
+  if (appliedDateTo) queryParams.date_to = appliedDateTo
 
   const { data, isLoading } = usePurchaseOrdersFiltered(queryParams)
   const totalPages = data ? Math.ceil(data.count / pageSize) : 1
 
   const summaryParams: Record<string, string> = {}
-  if (dateFrom) summaryParams.date_from = dateFrom
-  if (dateTo) summaryParams.date_to = dateTo
-  if (forwarderFilter) summaryParams.forwarder = forwarderFilter
+  if (appliedDateFrom) summaryParams.date_from = appliedDateFrom
+  if (appliedDateTo) summaryParams.date_to = appliedDateTo
   const { data: summary } = usePurchaseOrderSummary(summaryParams)
 
   const handleSort = (field: string) => {
@@ -87,9 +94,9 @@ export default function PurchaseOrdersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Select value={status} onValueChange={v => { setStatus(v as POStatus | 'ALL'); setPage(1) }}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter status" />
+          <Select value={pendingStatus} onValueChange={v => setPendingStatus(v as POStatus | 'ALL')}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Status</SelectItem>
@@ -100,22 +107,19 @@ export default function PurchaseOrdersPage() {
           </Select>
           <Input
             type="date"
-            value={dateFrom}
-            onChange={e => { setDateFrom(e.target.value); setPage(1) }}
-            className="w-40"
+            value={pendingDateFrom}
+            onChange={e => setPendingDateFrom(e.target.value)}
+            className="w-36"
           />
+          <span className="text-xs text-muted-foreground">to</span>
           <Input
             type="date"
-            value={dateTo}
-            onChange={e => { setDateTo(e.target.value); setPage(1) }}
-            className="w-40"
+            value={pendingDateTo}
+            onChange={e => setPendingDateTo(e.target.value)}
+            className="w-36"
           />
-          <Input
-            placeholder="Forwarder..."
-            value={forwarderFilter}
-            onChange={e => { setForwarderFilter(e.target.value); setPage(1) }}
-            className="w-40"
-          />
+          <Button size="sm" onClick={handleApply}>Apply</Button>
+          <span className="text-sm text-muted-foreground">{data?.count ?? 0} orders</span>
           <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setPage(1) }}>
             <SelectTrigger className="w-24">
               <SelectValue />
@@ -126,7 +130,6 @@ export default function PurchaseOrdersPage() {
               ))}
             </SelectContent>
           </Select>
-          <span className="text-sm text-muted-foreground">{data?.count ?? 0} orders</span>
         </div>
         {user?.is_staff && (
           <Button size="sm" onClick={() => setShowModal(true)}>
@@ -164,13 +167,13 @@ export default function PurchaseOrdersPage() {
               <TableHead>Status</TableHead>
               <SortableHead field="invoice_date" label="Invoice Date" ordering={ordering} onSort={handleSort} />
               <SortableHead field="delivery_date" label="Delivery Date" ordering={ordering} onSort={handleSort} />
-              <SortableHead field="forecast_delivery_date" label="Forecast Delivery" ordering={ordering} onSort={handleSort} />
-              <TableHead>Forwarder</TableHead>
-              <TableHead className="text-right">Exchange Rate</TableHead>
+              <TableHead className="text-right">Exch. Rate</TableHead>
               <TableHead className="text-right">CBM</TableHead>
               <SortableHead field="total_ordered_qty" label="QTY" ordering={ordering} onSort={handleSort} className="text-right" />
-              <SortableHead field="total_amount" label="Total Amount" ordering={ordering} onSort={handleSort} className="text-right" />
-              <TableHead className="text-right">COGS</TableHead>
+              <SortableHead field="total_item_amount" label="Goods" ordering={ordering} onSort={handleSort} className="text-right" />
+              <SortableHead field="commission_fee" label="Commission" ordering={ordering} onSort={handleSort} className="text-right" />
+              <TableHead className="text-right">Supplier Delivery</TableHead>
+              <SortableHead field="shipping_fee" label="Freight" ordering={ordering} onSort={handleSort} className="text-right" />
               <TableHead className="text-right">Ship/QTY</TableHead>
             </TableRow>
           </TableHeader>
@@ -178,28 +181,25 @@ export default function PurchaseOrdersPage() {
             {isLoading ? (
               <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
             ) : data?.results.map(po => (
-              <TableRow key={po.id}>
-                <TableCell>
-                  <button
-                    className="font-mono text-xs text-primary hover:underline cursor-pointer"
-                    onClick={() => navigate(`/purchasing/orders/${po.id}`)}
-                  >
-                    {po.purchase_order_number}
-                  </button>
-                </TableCell>
+              <TableRow
+                key={po.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => navigate(`/purchasing/orders/${po.id}`)}
+              >
+                <TableCell className="font-mono text-xs font-medium">{po.purchase_order_number}</TableCell>
                 <TableCell><Badge variant={statusVariant[po.status]}>{po.status}</Badge></TableCell>
                 <TableCell className="text-xs">{po.invoice_date ? formatDate(po.invoice_date) : '—'}</TableCell>
                 <TableCell className="text-xs">{po.delivery_date ? formatDate(po.delivery_date) : '—'}</TableCell>
-                <TableCell className="text-xs">{po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : '—'}</TableCell>
-                <TableCell className="text-xs">{po.forwarder_name || '—'}</TableCell>
                 <TableCell className="text-right text-xs">{po.exchange_rate ?? '—'}</TableCell>
                 <TableCell className="text-right text-xs">
-                  {po.cbm ?? (po.forecast_cbm ? `${po.forecast_cbm} (est.)` : '—')}
+                  {po.cbm ?? (po.forecast_cbm ? `${po.forecast_cbm}*` : '—')}
                 </TableCell>
                 <TableCell className="text-right">{po.total_ordered_qty}</TableCell>
-                <TableCell className="text-right">{formatIDR(po.total_amount)}</TableCell>
-                <TableCell className="text-right">{po.cost_ratio_cogs.toFixed(1)}%</TableCell>
-                <TableCell className="text-right">{formatIDR(po.shipping_per_qty)}</TableCell>
+                <TableCell className="text-right text-xs">{po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'}</TableCell>
+                <TableCell className="text-right text-xs">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</TableCell>
+                <TableCell className="text-right text-xs">{po.delivery_fee_idr != null ? formatIDR(po.delivery_fee_idr) : '—'}</TableCell>
+                <TableCell className="text-right text-xs">{po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'}</TableCell>
+                <TableCell className="text-right text-xs">{po.shipping_per_qty != null ? formatIDR(po.shipping_per_qty) : '—'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
