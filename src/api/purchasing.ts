@@ -1,5 +1,5 @@
 import client from './client'
-import type { PurchaseOrder, ReplenishmentItem } from '../types/purchasing'
+import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem } from '../types/purchasing'
 import type { PaginatedResponse } from '../types/inventory'
 
 export const getPurchaseOrders = (params?: Record<string, string | number>) =>
@@ -19,3 +19,6 @@ export const advancePOStatus = (id: string, status: string) =>
 
 export const getReplenishment = (params?: { warehouse_id?: string }) =>
   client.get<{ results: ReplenishmentItem[] }>('/replenishment/', { params })
+
+export const getPurchaseOrderSummary = (params?: Record<string, string>) =>
+  client.get<PurchaseOrderSummary>('/purchase-order/summary/', { params })

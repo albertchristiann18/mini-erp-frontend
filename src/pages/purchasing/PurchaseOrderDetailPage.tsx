@@ -61,7 +61,7 @@ export default function PurchaseOrderDetailPage() {
               <Field label="Forecast Shipping" value={po.forecast_shipping_fee != null ? formatIDR(po.forecast_shipping_fee) : null} />
               <Field label="Item Amount" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : null} />
               <Field label="Total Amount" value={formatIDR(po.total_amount)} />
-              <Field label="COGS Ratio" value={`${po.cost_ratio_cogs.toFixed(2)}%`} />
+              <Field label="COGS Ratio" value={po.cost_ratio_cogs != null ? `${po.cost_ratio_cogs.toFixed(2)}%` : null} />
               <Field label="Shipping / QTY" value={po.shipping_per_qty != null ? formatIDR(po.shipping_per_qty) : null} />
             </div>
           </div>

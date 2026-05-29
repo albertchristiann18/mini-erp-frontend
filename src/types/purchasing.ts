@@ -63,6 +63,13 @@ export interface PurchaseOrder {
   udate: string
 }
 
+export interface PurchaseOrderSummary {
+  upcoming_count: number
+  upcoming_total_amount: number
+  upcoming_total_item_amount: number
+  upcoming_procure_amount: number
+}
+
 export interface ReplenishmentItem {
   variant_id: string
   sku_variant_code: string

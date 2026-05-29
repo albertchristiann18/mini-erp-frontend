@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getPurchaseOrders, getPurchaseOrder,
-  createPurchaseOrder, updatePurchaseOrder, advancePOStatus, getReplenishment,
+  createPurchaseOrder, updatePurchaseOrder, advancePOStatus, getReplenishment, getPurchaseOrderSummary,
 } from '../api/purchasing'
 import type { POStatus } from '../types/purchasing'
 
@@ -56,4 +56,10 @@ export const useReplenishment = (warehouseId?: string) =>
   useQuery({
     queryKey: ['replenishment', warehouseId],
     queryFn: () => getReplenishment(warehouseId ? { warehouse_id: warehouseId } : undefined).then(r => r.data),
+  })
+
+export const usePurchaseOrderSummary = (params?: Record<string, string>) =>
+  useQuery({
+    queryKey: ['purchase-order-summary', params],
+    queryFn: () => getPurchaseOrderSummary(params).then(r => r.data),
   })

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePurchaseOrdersFiltered } from '../../hooks/usePurchasing'
+import { usePurchaseOrdersFiltered, usePurchaseOrderSummary } from '../../hooks/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
@@ -9,8 +9,8 @@ import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
 import { PurchaseOrderFormModal } from '../../components/modals/PurchaseOrderFormModal'
-import { formatIDR, formatDate } from '../../lib/utils'
-import { Plus } from 'lucide-react'
+import { cn, formatIDR, formatDate } from '../../lib/utils'
+import { Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
@@ -23,24 +23,65 @@ const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   CANCELLED: 'destructive',
 }
 
+function SortableHead({
+  field,
+  label,
+  ordering,
+  onSort,
+  className,
+}: {
+  field: string
+  label: string
+  ordering: string
+  onSort: (field: string) => void
+  className?: string
+}) {
+  const isActive = ordering === field || ordering === `-${field}`
+  const isDesc = ordering === `-${field}`
+  return (
+    <TableHead
+      className={cn('cursor-pointer select-none', className)}
+      onClick={() => onSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {isActive ? (isDesc ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />) : null}
+      </span>
+    </TableHead>
+  )
+}
+
 export default function PurchaseOrdersPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [status, setStatus] = useState<POStatus | 'ALL'>('ALL')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [ordering, setOrdering] = useState('-cdate')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [forwarderFilter, setForwarderFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
 
-  const queryParams: Record<string, string | number> = { page, page_size: 20 }
+  const queryParams: Record<string, string | number> = { page, page_size: pageSize, ordering }
   if (status !== 'ALL') queryParams.status = status
   if (dateFrom) queryParams.date_from = dateFrom
   if (dateTo) queryParams.date_to = dateTo
   if (forwarderFilter) queryParams.forwarder = forwarderFilter
 
   const { data, isLoading } = usePurchaseOrdersFiltered(queryParams)
-  const totalPages = data ? Math.ceil(data.count / 20) : 1
+  const totalPages = data ? Math.ceil(data.count / pageSize) : 1
+
+  const summaryParams: Record<string, string> = {}
+  if (dateFrom) summaryParams.date_from = dateFrom
+  if (dateTo) summaryParams.date_to = dateTo
+  if (forwarderFilter) summaryParams.forwarder = forwarderFilter
+  const { data: summary } = usePurchaseOrderSummary(summaryParams)
+
+  const handleSort = (field: string) => {
+    setOrdering(prev => prev === `-${field}` ? field : `-${field}`)
+    setPage(1)
+  }
 
   return (
     <div className="space-y-4">
@@ -75,6 +116,16 @@ export default function PurchaseOrdersPage() {
             onChange={e => { setForwarderFilter(e.target.value); setPage(1) }}
             className="w-40"
           />
+          <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setPage(1) }}>
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[10, 25, 50, 100].map(n => (
+                <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <span className="text-sm text-muted-foreground">{data?.count ?? 0} orders</span>
         </div>
         {user?.is_staff && (
@@ -84,20 +135,41 @@ export default function PurchaseOrdersPage() {
         )}
       </div>
 
+      {summary && summary.upcoming_count > 0 && (
+        <div className="rounded-lg border bg-card px-5 py-3 flex items-center gap-8">
+          <div>
+            <p className="text-xs text-muted-foreground">Upcoming POs</p>
+            <p className="text-lg font-semibold">{summary.upcoming_count}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Total Goods (IDR)</p>
+            <p className="text-lg font-semibold">{formatIDR(summary.upcoming_total_item_amount)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Procure Amount (IDR)</p>
+            <p className="text-lg font-semibold">{formatIDR(summary.upcoming_procure_amount)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Total Upcoming Value</p>
+            <p className="text-lg font-semibold text-primary">{formatIDR(summary.upcoming_total_amount)}</p>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>PO Number</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Invoice Date</TableHead>
-              <TableHead>Delivery Date</TableHead>
-              <TableHead>Forecast Delivery</TableHead>
+              <SortableHead field="invoice_date" label="Invoice Date" ordering={ordering} onSort={handleSort} />
+              <SortableHead field="delivery_date" label="Delivery Date" ordering={ordering} onSort={handleSort} />
+              <SortableHead field="forecast_delivery_date" label="Forecast Delivery" ordering={ordering} onSort={handleSort} />
               <TableHead>Forwarder</TableHead>
               <TableHead className="text-right">Exchange Rate</TableHead>
               <TableHead className="text-right">CBM</TableHead>
-              <TableHead className="text-right">QTY</TableHead>
-              <TableHead className="text-right">Total Amount</TableHead>
+              <SortableHead field="total_ordered_qty" label="QTY" ordering={ordering} onSort={handleSort} className="text-right" />
+              <SortableHead field="total_amount" label="Total Amount" ordering={ordering} onSort={handleSort} className="text-right" />
               <TableHead className="text-right">COGS</TableHead>
               <TableHead className="text-right">Ship/QTY</TableHead>
             </TableRow>
