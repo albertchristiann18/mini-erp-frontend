@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePurchaseOrder } from '../../hooks/usePurchasing'
+import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../hooks/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
-import { PurchaseOrderEditModal } from '../../components/modals/PurchaseOrderEditModal'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
+import { Input } from '../../components/ui/input'
+import { Textarea } from '../../components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
-import { ArrowLeft, ExternalLink, Pencil } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Pencil, Save, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
+import { toast } from '../../lib/toast'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
@@ -17,13 +19,48 @@ const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   DELIVERED: 'success', COMPLETED: 'success', CANCELLED: 'destructive',
 }
 
+type FieldInputConfig = {
+  label: string
+  inputType: 'text' | 'number' | 'date' | 'file'
+  step?: string
+  suffix?: string
+}
+
+const HEADER_FIELD_CONFIG: Record<string, FieldInputConfig> = {
+  supplier_name:               { label: 'Supplier',            inputType: 'text' },
+  forwarder_name:              { label: 'Forwarder',           inputType: 'text' },
+  shop_services:               { label: 'Jasa Belanja',        inputType: 'text' },
+  currency:                    { label: 'Currency',            inputType: 'text' },
+  exchange_rate:               { label: 'Exchange Rate',       inputType: 'number', step: '0.001' },
+  commission_fee_pct:          { label: 'Commission %',        inputType: 'number' },
+  delivery_fee:               { label: 'Delivery Fee (RMB)',  inputType: 'number', step: '0.001' },
+  commission_fee_rmb:          { label: 'Commission (RMB)',    inputType: 'number', step: '0.001' },
+  invoice_number:              { label: 'Invoice No.',         inputType: 'text' },
+  invoice_date:                { label: 'Invoice Date',        inputType: 'date' },
+  delivery_order_number:       { label: 'Delivery Order No.', inputType: 'text' },
+  delivery_date:               { label: 'Delivery Date',      inputType: 'date' },
+  forecast_delivery_date:      { label: 'Forecast Delivery',  inputType: 'date' },
+  cbm:                         { label: 'CBM',                inputType: 'number', step: '0.001' },
+  forecast_cbm:                { label: 'Forecast CBM',       inputType: 'number', step: '0.001' },
+  weight:                      { label: 'Weight (kg)',        inputType: 'number', step: '0.01' },
+  shipping_fee_per_cbm:        { label: 'Shipping Fee/CBM',  inputType: 'number' },
+  forecast_shipping_fee:       { label: 'Forecast Shipping', inputType: 'number' },
+  purchase_order_invoice_file: { label: 'PO Invoice File',   inputType: 'file' },
+  delivery_order_file:         { label: 'DO File',           inputType: 'file' },
+  delivery_order_invoice_file: { label: 'DO Invoice File',   inputType: 'file' },
+  packing_list_file:           { label: 'Packing List',      inputType: 'file' },
+}
+
 export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { data: po, isLoading } = usePurchaseOrder(id!)
   const { user } = useAuth()
-  const [showEdit, setShowEdit] = useState(false)
   const [showAdvanceModal, setShowAdvanceModal] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [headerValues, setHeaderValues] = useState<Record<string, string | File>>({})
+  const [detailValues, setDetailValues] = useState<Record<string, Record<string, string>>>({})
+  const updateMutation = useUpdatePurchaseOrder()
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -41,6 +78,68 @@ export default function PurchaseOrderDetailPage() {
 
   const getFilename = (url: string) =>
     decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? 'file')
+
+  const enterEditMode = () => {
+    const initial: Record<string, string | File> = {}
+    for (const field of po.editable_fields.header) {
+      if (field === 'note') {
+        initial[field] = po.note ?? ''
+        continue
+      }
+      if (['purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'].includes(field)) {
+        continue
+      }
+      const val = (po as unknown as Record<string, unknown>)[field]
+      if (val != null && val !== '') initial[field] = String(val)
+    }
+    const initDetails: Record<string, Record<string, string>> = {}
+    for (const item of po.order_details ?? []) {
+      const row: Record<string, string> = {}
+      for (const field of po.editable_fields.order_detail) {
+        const val = (item as unknown as Record<string, unknown>)[field]
+        if (val != null) row[field] = String(val)
+      }
+      if (Object.keys(row).length > 0) initDetails[item.id] = row
+    }
+    setHeaderValues(initial)
+    setDetailValues(initDetails)
+    setEditMode(true)
+  }
+
+  const cancelEditMode = () => {
+    setEditMode(false)
+    setHeaderValues({})
+    setDetailValues({})
+  }
+
+  const setHeaderField = (field: string, value: string | File) =>
+    setHeaderValues(prev => ({ ...prev, [field]: value }))
+
+  const setDetailField = (itemId: string, field: string, value: string) =>
+    setDetailValues(prev => ({
+      ...prev,
+      [itemId]: { ...(prev[itemId] ?? {}), [field]: value }
+    }))
+
+  const handleSave = async () => {
+    const payload: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(headerValues)) {
+      if (value !== '' && value !== null && value !== undefined) payload[key] = value
+    }
+    const changedDetails = Object.entries(detailValues)
+      .map(([itemId, changes]) => ({ id: itemId, ...changes }))
+      .filter(item => Object.keys(item).length > 1)
+    if (changedDetails.length > 0) payload.order_details = changedDetails
+    if (Object.keys(payload).length === 0) { cancelEditMode(); return }
+    try {
+      await updateMutation.mutateAsync({ id: po.id, data: payload })
+      toast.success('Purchase order updated')
+      cancelEditMode()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save'
+      toast.error(msg)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -61,15 +160,29 @@ export default function PurchaseOrderDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {user?.is_staff && !['COMPLETED', 'CANCELLED'].includes(po.status) && (
-            <Button size="sm" variant="outline" onClick={() => setShowEdit(true)}>
-              <Pencil className="h-4 w-4 mr-1" /> Edit
-            </Button>
-          )}
-          {user?.is_staff && po.next_status && (
-            <Button size="sm" onClick={() => setShowAdvanceModal(true)}>
-              → {po.next_status}
-            </Button>
+          {editMode ? (
+            <>
+              <Button size="sm" variant="outline" onClick={cancelEditMode} disabled={updateMutation.isPending}>
+                <XIcon className="h-4 w-4 mr-1" /> Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
+                <Save className="h-4 w-4 mr-1" />
+                {updateMutation.isPending ? 'Saving...' : 'Save'}
+              </Button>
+            </>
+          ) : (
+            <>
+              {user?.is_staff && po.status !== 'CANCELLED' && (
+                <Button size="sm" variant="outline" onClick={enterEditMode}>
+                  <Pencil className="h-4 w-4 mr-1" /> Edit
+                </Button>
+              )}
+              {user?.is_staff && po.next_status && (
+                <Button size="sm" onClick={() => setShowAdvanceModal(true)}>
+                  → {po.next_status}
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -82,27 +195,183 @@ export default function PurchaseOrderDetailPage() {
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Purchase Order Information</h2>
             <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-5">
-              <InfoItem label="Supplier" value={po.supplier_name} />
-              <InfoItem label="Forwarder" value={po.forwarder_name} />
-              <InfoItem label="Jasa Belanja" value={po.shop_services} />
-              <InfoItem label="Invoice No." value={po.invoice_number} />
-              <InfoItem label="Invoice Date" value={po.invoice_date ? formatDate(po.invoice_date) : null} />
-              <InfoItem label="Delivery Order No." value={po.delivery_order_number} />
-              <InfoItem label="Delivery Date" value={po.delivery_date ? formatDate(po.delivery_date) : null} />
-              <InfoItem label="Forecast Delivery" value={po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : null} />
+              <EditableInfoItem
+                field="supplier_name"
+                label="Supplier"
+                value={po.supplier_name}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('supplier_name')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forwarder_name"
+                label="Forwarder"
+                value={po.forwarder_name}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forwarder_name')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="shop_services"
+                label="Jasa Belanja"
+                value={po.shop_services}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('shop_services')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="invoice_number"
+                label="Invoice No."
+                value={po.invoice_number}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('invoice_number')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="invoice_date"
+                label="Invoice Date"
+                value={po.invoice_date ? formatDate(po.invoice_date) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('invoice_date')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="delivery_order_number"
+                label="Delivery Order No."
+                value={po.delivery_order_number}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('delivery_order_number')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="delivery_date"
+                label="Delivery Date"
+                value={po.delivery_date ? formatDate(po.delivery_date) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('delivery_date')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forecast_delivery_date"
+                label="Forecast Delivery"
+                value={po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forecast_delivery_date')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
             </div>
             <div className="border-t pt-4 grid grid-cols-2 gap-x-8 gap-y-4">
-              <InfoItem label="Currency" value={po.currency} />
-              <InfoItem label="Exchange Rate" value={po.exchange_rate} />
-              <InfoItem label="Commission %" value={po.commission_fee_pct != null ? `${po.commission_fee_pct}%` : null} />
-              <InfoItem label="Delivery Fee (RMB)" value={po.delivery_fee} />
-              <InfoItem label="Commission (IDR)" value={po.commission_fee != null ? formatIDR(po.commission_fee) : null} />
-              <InfoItem label="Commission (RMB)" value={po.commission_fee_rmb} />
-              <InfoItem label="CBM" value={po.cbm != null ? `${po.cbm} (actual)` : po.forecast_cbm != null ? `${po.forecast_cbm} (forecast)` : null} />
-              <InfoItem label="Weight (kg)" value={po.weight} />
-              <InfoItem label="Forecast CBM" value={po.forecast_cbm} />
-              <InfoItem label="Forecast Shipping" value={po.forecast_shipping_fee != null ? formatIDR(po.forecast_shipping_fee) : null} />
+              <EditableInfoItem
+                field="currency"
+                label="Currency"
+                value={po.currency}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('currency')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="exchange_rate"
+                label="Exchange Rate"
+                value={po.exchange_rate}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('exchange_rate')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="commission_fee_pct"
+                label="Commission %"
+                value={po.commission_fee_pct != null ? `${po.commission_fee_pct}%` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('commission_fee_pct')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="delivery_fee"
+                label="Delivery Fee (RMB)"
+                value={po.delivery_fee}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('delivery_fee')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Commission (IDR)</p>
+                <p className="text-sm font-semibold">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</p>
+              </div>
+              <EditableInfoItem
+                field="commission_fee_rmb"
+                label="Commission (RMB)"
+                value={po.commission_fee_rmb}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('commission_fee_rmb')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="cbm"
+                label="CBM"
+                value={po.cbm != null ? `${po.cbm} (actual)` : po.forecast_cbm != null ? `${po.forecast_cbm} (forecast)` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('cbm')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="weight"
+                label="Weight (kg)"
+                value={po.weight}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('weight')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forecast_cbm"
+                label="Forecast CBM"
+                value={po.forecast_cbm}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forecast_cbm')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forecast_shipping_fee"
+                label="Forecast Shipping"
+                value={po.forecast_shipping_fee != null ? formatIDR(po.forecast_shipping_fee) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forecast_shipping_fee')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
             </div>
+          </div>
+
+          {/* Notes card */}
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-base font-semibold mb-3">Notes</h2>
+            {editMode ? (
+              <Textarea
+                className="min-h-[80px] text-sm"
+                placeholder="Add notes..."
+                value={String(headerValues['note'] ?? '')}
+                onChange={e => setHeaderField('note', e.target.value)}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {po.note || 'No notes'}
+              </p>
+            )}
           </div>
 
           {/* Card 2 — Order Items + summary box */}
@@ -119,21 +388,60 @@ export default function PurchaseOrderDetailPage() {
                   <TableHead className="text-right">Unit Price (RMB)</TableHead>
                   <TableHead className="text-right">Disc. Price (RMB)</TableHead>
                   <TableHead className="text-right">Total (IDR)</TableHead>
+                  {po.editable_fields.order_detail.includes('remarks') && editMode && (
+                    <TableHead>Remarks</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(po.order_details ?? []).map(item => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-mono text-xs font-medium">{item.product_variant_name}</TableCell>
-                    <TableCell className="text-right">{item.ordered_qty}</TableCell>
-                    <TableCell className="text-right">{item.received_qty ?? '—'}</TableCell>
-                    <TableCell className="text-right text-xs">{item.unit_price_foreign ?? '—'}</TableCell>
-                    <TableCell className="text-right text-xs">{item.discounted_unit_price_foreign ?? '—'}</TableCell>
-                    <TableCell className="text-right text-xs">
-                      {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {(po.order_details ?? []).map(item => {
+                  const rowChanges = detailValues[item.id] ?? {}
+                  const isDetailEditable = (field: string) =>
+                    editMode && po.editable_fields.order_detail.includes(field)
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-mono text-xs font-medium">{item.product_variant_name}</TableCell>
+                      <TableCell className="text-right">
+                        {isDetailEditable('ordered_qty') ? (
+                          <Input type="number" className="h-7 w-16 text-xs text-right"
+                            value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
+                            onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
+                        ) : item.ordered_qty}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isDetailEditable('received_qty') ? (
+                          <Input type="number" className="h-7 w-16 text-xs text-right"
+                            value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
+                            onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
+                        ) : (item.received_qty ?? '—')}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {isDetailEditable('unit_price_foreign') ? (
+                          <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                            value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
+                            onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
+                        ) : (item.unit_price_foreign ?? '—')}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {isDetailEditable('discounted_unit_price_foreign') ? (
+                          <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                            value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
+                            onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
+                        ) : (item.discounted_unit_price_foreign ?? '—')}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
+                      </TableCell>
+                      {po.editable_fields.order_detail.includes('remarks') && editMode && (
+                        <TableCell>
+                          <Input className="h-7 text-xs" placeholder="Remarks..."
+                            value={rowChanges.remarks ?? String(item.remarks ?? '')}
+                            onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
             {/* Summary box — bottom right */}
@@ -278,7 +586,6 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
-      {po && <PurchaseOrderEditModal open={showEdit} onClose={() => setShowEdit(false)} po={po} />}
       {po.next_status && (
         <StatusAdvanceModal
           open={showAdvanceModal}
@@ -291,7 +598,56 @@ export default function PurchaseOrderDetailPage() {
   )
 }
 
-function InfoItem({ label, value }: { label: string; value: string | number | null | undefined }) {
+function EditableInfoItem({
+  field, label, value, editMode, editable, headerValues, setHeaderField,
+}: {
+  field: string
+  label: string
+  value: string | number | null | undefined
+  editMode: boolean
+  editable: boolean
+  headerValues: Record<string, string | File>
+  setHeaderField: (field: string, value: string | File) => void
+}) {
+  const cfg = HEADER_FIELD_CONFIG[field]
+  if (editMode && editable && cfg) {
+    if (cfg.inputType === 'file') {
+      const existingUrl = typeof value === 'string' && value ? value : null
+      return (
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+          <div className="space-y-1">
+            {existingUrl && (
+              <a href={existingUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                <ExternalLink className="h-3 w-3" /> View current
+              </a>
+            )}
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              className="text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-muted file:text-foreground"
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (file) setHeaderField(field, file)
+              }}
+            />
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div>
+        <p className="text-xs text-muted-foreground mb-1">{label}</p>
+        <Input
+          type={cfg.inputType}
+          step={cfg.step}
+          className="h-7 text-xs"
+          value={String(headerValues[field] ?? '')}
+          onChange={e => setHeaderField(field, e.target.value)}
+        />
+      </div>
+    )
+  }
   return (
     <div>
       <p className="text-xs text-muted-foreground mb-1">{label}</p>

@@ -68,6 +68,11 @@ export interface PurchaseOrder {
   delivery_order_file: string | null
   delivery_order_invoice_file: string | null
   packing_list_file: string | null
+  note: string | null
+  editable_fields: {
+    header: string[]
+    order_detail: string[]
+  }
   next_status: POStatus | null
   status_history: StatusHistoryItem[]
   order_details?: PurchaseOrderDetail[]
@@ -89,10 +94,17 @@ export interface TransitionMissingField {
   message: string
 }
 
+export interface TransitionWarning {
+  type: string
+  message: string
+  items?: { name: string; ordered_qty: number; received_qty: number }[]
+}
+
 export interface TransitionCheckResult {
   can_transition: boolean
   target_status: POStatus
   missing_fields: TransitionMissingField[]
+  warnings: TransitionWarning[]
   error?: string
 }
 

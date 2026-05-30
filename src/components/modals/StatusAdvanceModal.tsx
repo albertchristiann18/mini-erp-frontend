@@ -230,6 +230,27 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
               </div>
             </>
           )}
+
+          {checkMutation.data?.warnings && checkMutation.data.warnings.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-4">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">⚠ Warning</p>
+              {checkMutation.data.warnings.map((w, i) => (
+                <div key={i}>
+                  <p className="text-sm text-amber-700 dark:text-amber-400">{w.message}</p>
+                  {w.items && w.items.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {w.items.map(item => (
+                        <li key={item.name} className="text-xs text-amber-600 dark:text-amber-500">
+                          {item.name}: received {item.received_qty} of {item.ordered_qty}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">You can still confirm — this is a warning only.</p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

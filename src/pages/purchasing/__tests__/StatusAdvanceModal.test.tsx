@@ -63,6 +63,11 @@ const mockPO: PurchaseOrder = {
   delivery_order_file: null,
   delivery_order_invoice_file: null,
   packing_list_file: null,
+  note: null,
+  editable_fields: {
+    header: [],
+    order_detail: [],
+  },
   status_history: [],
   cdate: "2026-05-01T00:00:00Z",
   udate: "2026-05-01T00:00:00Z",

@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
@@ -47,6 +48,15 @@ vi.mock('../../../hooks/usePurchasing', () => ({
       delivery_order_file: null,
       delivery_order_invoice_file: null,
       packing_list_file: null,
+      note: null,
+      editable_fields: {
+        header: ['supplier_name', 'forwarder_name', 'shop_services', 'invoice_number', 'invoice_date',
+          'delivery_order_number', 'delivery_date', 'forecast_delivery_date', 'currency', 'exchange_rate',
+          'commission_fee_pct', 'delivery_fee', 'commission_fee_rmb', 'cbm', 'weight', 'forecast_cbm',
+          'forecast_shipping_fee', 'purchase_order_invoice_file', 'delivery_order_file',
+          'delivery_order_invoice_file', 'packing_list_file'],
+        order_detail: ['ordered_qty', 'unit_price_foreign', 'discounted_unit_price_foreign'],
+      },
       order_details: [
         {
           id: 'det1',
@@ -91,6 +101,7 @@ vi.mock('../../../hooks/usePurchasing', () => ({
   }),
   useUpdatePurchaseOrder: () => ({
     mutateAsync: vi.fn(),
+    isPending: false,
   }),
   useAdvancePOStatus: () => ({
     mutateAsync: vi.fn(),
@@ -98,7 +109,7 @@ vi.mock('../../../hooks/usePurchasing', () => ({
   }),
   useCheckPOTransition: () => ({
     mutate: vi.fn(),
-    data: { can_transition: true, target_status: 'SHIPPED', missing_fields: [] },
+    data: { can_transition: true, target_status: 'SHIPPED', missing_fields: [], warnings: [] },
     isPending: false,
   }),
 }))
@@ -160,4 +171,22 @@ it('renders status history timeline with correct status badge', async () => {
   const heading = await screen.findByText('Status History')
   const section = heading.closest('div')!
   expect(within(section).getByText('ORDERED')).toBeInTheDocument()
+})
+
+it('renders Edit button for staff (including COMPLETED status)', async () => {
+  renderPage()
+  expect(await screen.findByText('Edit')).toBeInTheDocument()
+})
+
+it('clicking Edit shows Save and Cancel buttons', async () => {
+  renderPage()
+  const editBtn = await screen.findByText('Edit')
+  await userEvent.click(editBtn)
+  expect(await screen.findByText('Save')).toBeInTheDocument()
+  expect(await screen.findByText('Cancel')).toBeInTheDocument()
+})
+
+it('renders Notes card showing No notes when note is null', async () => {
+  renderPage()
+  expect(await screen.findByText('No notes')).toBeInTheDocument()
 })
