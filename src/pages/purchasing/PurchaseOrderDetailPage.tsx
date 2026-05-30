@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePurchaseOrder, useAdvancePOStatus } from '../../hooks/usePurchasing'
+import { usePurchaseOrder } from '../../hooks/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
 import { PurchaseOrderEditModal } from '../../components/modals/PurchaseOrderEditModal'
+import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { ArrowLeft, ExternalLink, Pencil } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
-import { toast } from '../../lib/toast'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
@@ -23,17 +23,7 @@ export default function PurchaseOrderDetailPage() {
   const { data: po, isLoading } = usePurchaseOrder(id!)
   const { user } = useAuth()
   const [showEdit, setShowEdit] = useState(false)
-  const advanceStatusMutation = useAdvancePOStatus()
-
-  const handleAdvanceStatus = async () => {
-    if (!po?.next_status) return
-    try {
-      await advanceStatusMutation.mutateAsync({ id: po.id, status: po.next_status })
-      toast.success(`Status updated to ${po.next_status}`)
-    } catch {
-      toast.error('Failed to update status')
-    }
-  }
+  const [showAdvanceModal, setShowAdvanceModal] = useState(false)
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -77,12 +67,8 @@ export default function PurchaseOrderDetailPage() {
             </Button>
           )}
           {user?.is_staff && po.next_status && (
-            <Button
-              size="sm"
-              onClick={handleAdvanceStatus}
-              disabled={advanceStatusMutation.isPending}
-            >
-              {advanceStatusMutation.isPending ? 'Updating...' : `→ ${po.next_status}`}
+            <Button size="sm" onClick={() => setShowAdvanceModal(true)}>
+              → {po.next_status}
             </Button>
           )}
         </div>
@@ -293,6 +279,14 @@ export default function PurchaseOrderDetailPage() {
       </div>
 
       {po && <PurchaseOrderEditModal open={showEdit} onClose={() => setShowEdit(false)} po={po} />}
+      {po.next_status && (
+        <StatusAdvanceModal
+          open={showAdvanceModal}
+          onClose={() => setShowAdvanceModal(false)}
+          po={po}
+          targetStatus={po.next_status}
+        />
+      )}
     </div>
   )
 }

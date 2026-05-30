@@ -82,6 +82,20 @@ export interface PurchaseOrderSummary {
   upcoming_procure_amount: number
 }
 
+export interface TransitionMissingField {
+  field: string
+  label: string
+  section: string
+  message: string
+}
+
+export interface TransitionCheckResult {
+  can_transition: boolean
+  target_status: POStatus
+  missing_fields: TransitionMissingField[]
+  error?: string
+}
+
 export interface ReplenishmentItem {
   variant_id: string
   sku_variant_code: string

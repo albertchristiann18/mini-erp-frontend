@@ -96,6 +96,11 @@ vi.mock('../../../hooks/usePurchasing', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  useCheckPOTransition: () => ({
+    mutate: vi.fn(),
+    data: { can_transition: true, target_status: 'SHIPPED', missing_fields: [] },
+    isPending: false,
+  }),
 }))
 
 function renderPage() {

@@ -1,5 +1,5 @@
 import client from './client'
-import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem } from '../types/purchasing'
+import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult } from '../types/purchasing'
 import type { PaginatedResponse } from '../types/inventory'
 
 export const getPurchaseOrders = (params?: Record<string, string | number>) =>
@@ -30,6 +30,11 @@ export const updatePurchaseOrder = (id: string, data: Record<string, unknown>) =
 
 export const advancePOStatus = (id: string, status: string) =>
   client.post(`/purchase-order/${id}/advance_status/`, { status })
+
+export const checkPOTransition = (id: string, targetStatus: string) =>
+  client.post<TransitionCheckResult>(`/purchase-order/${id}/check_transition/`, {
+    status: targetStatus,
+  })
 
 export const getReplenishment = (params?: { warehouse_id?: string }) =>
   client.get<{ results: ReplenishmentItem[] }>('/replenishment/', { params })

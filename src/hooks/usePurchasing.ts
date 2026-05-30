@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getPurchaseOrders, getPurchaseOrder,
-  createPurchaseOrder, updatePurchaseOrder, advancePOStatus, getReplenishment, getPurchaseOrderSummary,
+  createPurchaseOrder, updatePurchaseOrder, advancePOStatus, checkPOTransition, getReplenishment, getPurchaseOrderSummary,
 } from '../api/purchasing'
 import type { POStatus } from '../types/purchasing'
 
@@ -25,6 +25,12 @@ export const useCreatePurchaseOrder = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['purchase-orders'] }),
   })
 }
+
+export const useCheckPOTransition = () =>
+  useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      checkPOTransition(id, status).then(r => r.data),
+  })
 
 export const useAdvancePOStatus = () => {
   const qc = useQueryClient()
