@@ -144,7 +144,11 @@ export default function PurchaseOrderDetailPage() {
             </div>
           </div>
 
-          {/* Card 3 — Attachments */}
+        </div>
+
+        {/* RIGHT SIDEBAR — 1 col */}
+        <div className="space-y-6">
+          {/* Sidebar Card 1 — Attachments */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Attachments</h2>
             <div className="space-y-3">
@@ -175,11 +179,8 @@ export default function PurchaseOrderDetailPage() {
               ))}
             </div>
           </div>
-        </div>
 
-        {/* RIGHT SIDEBAR — 1 col */}
-        <div className="space-y-6">
-          {/* Sidebar Card 1 — Supplier & Logistics */}
+          {/* Sidebar Card 2 — Supplier & Logistics */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Supplier & Logistics</h2>
             <div className="rounded-lg bg-muted/40 p-4 space-y-3">
@@ -202,7 +203,7 @@ export default function PurchaseOrderDetailPage() {
             </div>
           </div>
 
-          {/* Sidebar Card 2 — Financial Summary */}
+          {/* Sidebar Card 3 — Financial Summary */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Financial Summary</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -213,7 +214,7 @@ export default function PurchaseOrderDetailPage() {
             </div>
           </div>
 
-          {/* Sidebar Card 3 — Order Summary */}
+          {/* Sidebar Card 4 — Order Summary */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Order Summary</h2>
             <div className="space-y-3 text-sm">
