@@ -71,6 +71,8 @@ vi.mock("../../../hooks/usePurchasing", () => ({
       total_received_qty: 0,
       total_item_amount: 4950000,
       total_order_amount: 5200000,
+      next_status: null,
+      status_history: [],
       cdate: "2026-05-01T00:00:00Z",
       udate: "2026-05-01T00:00:00Z",
     },
@@ -78,6 +80,10 @@ vi.mock("../../../hooks/usePurchasing", () => ({
   }),
   useUpdatePurchaseOrder: () => ({
     mutateAsync: mockMutateAsync,
+  }),
+  useAdvancePOStatus: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
   }),
 }))
 

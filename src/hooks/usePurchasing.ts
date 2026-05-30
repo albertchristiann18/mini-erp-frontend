@@ -30,7 +30,10 @@ export const useAdvancePOStatus = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => advancePOStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchase-orders'] }),
+    onSuccess: (_: unknown, variables: { id: string; status: string }) => {
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      qc.invalidateQueries({ queryKey: ['purchase-order', variables.id] })
+    },
   })
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePurchaseOrder } from '../../hooks/usePurchasing'
+import { usePurchaseOrder, useAdvancePOStatus } from '../../hooks/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
 import { PurchaseOrderEditModal } from '../../components/modals/PurchaseOrderEditModal'
 import { Badge } from '../../components/ui/badge'
@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { ArrowLeft, ExternalLink, Pencil } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
+import { toast } from '../../lib/toast'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
@@ -22,6 +23,17 @@ export default function PurchaseOrderDetailPage() {
   const { data: po, isLoading } = usePurchaseOrder(id!)
   const { user } = useAuth()
   const [showEdit, setShowEdit] = useState(false)
+  const advanceStatusMutation = useAdvancePOStatus()
+
+  const handleAdvanceStatus = async () => {
+    if (!po?.next_status) return
+    try {
+      await advanceStatusMutation.mutateAsync({ id: po.id, status: po.next_status })
+      toast.success(`Status updated to ${po.next_status}`)
+    } catch {
+      toast.error('Failed to update status')
+    }
+  }
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -62,6 +74,15 @@ export default function PurchaseOrderDetailPage() {
           {user?.is_staff && !['COMPLETED', 'CANCELLED'].includes(po.status) && (
             <Button size="sm" variant="outline" onClick={() => setShowEdit(true)}>
               <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          )}
+          {user?.is_staff && po.next_status && (
+            <Button
+              size="sm"
+              onClick={handleAdvanceStatus}
+              disabled={advanceStatusMutation.isPending}
+            >
+              {advanceStatusMutation.isPending ? 'Updating...' : `→ ${po.next_status}`}
             </Button>
           )}
         </div>
@@ -238,6 +259,36 @@ export default function PurchaseOrderDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Sidebar Card 5 — Status History */}
+          {po.status_history && po.status_history.length > 0 && (
+            <div className="rounded-lg border bg-card p-6">
+              <h2 className="text-base font-semibold mb-4">Status History</h2>
+              <div className="space-y-4">
+                {po.status_history.map((entry, i) => (
+                  <div key={entry.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 shrink-0" />
+                      {i < po.status_history.length - 1 && (
+                        <div className="w-px flex-1 bg-border mt-1" />
+                      )}
+                    </div>
+                    <div className="pb-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
+                      </p>
+                      {entry.note && (
+                        <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

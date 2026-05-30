@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
@@ -18,6 +18,17 @@ vi.mock('../../../hooks/usePurchasing', () => ({
       id: '01ABC',
       purchase_order_number: 'PO-2026-001',
       status: 'ORDERED',
+      next_status: 'SHIPPED',
+      status_history: [
+        {
+          id: 'hist1',
+          from_status: 'DRAFT',
+          to_status: 'ORDERED',
+          changed_by_name: 'Albert',
+          note: null,
+          cdate: '2026-05-29T09:00:00Z',
+        },
+      ],
       supplier_name: 'Test Supplier',
       forwarder_name: 'Test Forwarder',
       total_amount: 5000000,
@@ -81,6 +92,10 @@ vi.mock('../../../hooks/usePurchasing', () => ({
   useUpdatePurchaseOrder: () => ({
     mutateAsync: vi.fn(),
   }),
+  useAdvancePOStatus: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }))
 
 function renderPage() {
@@ -103,12 +118,14 @@ it('renders the PO number (PO-2026-001) in the heading', async () => {
 
 it('renders the status badge (ORDERED)', async () => {
   renderPage()
-  expect(await screen.findByText('ORDERED')).toBeInTheDocument()
+  const badges = await screen.findAllByText('ORDERED')
+  expect(badges.length).toBeGreaterThanOrEqual(1)
 })
 
 it('renders the supplier name (Test Supplier)', async () => {
   renderPage()
-  expect(await screen.findByText('Test Supplier')).toBeInTheDocument()
+  const elements = await screen.findAllByText('Test Supplier')
+  expect(elements.length).toBeGreaterThan(0)
 })
 
 it('renders the line items table with Blue / M variant', async () => {
@@ -118,12 +135,24 @@ it('renders the line items table with Blue / M variant', async () => {
 
 it('renders the PO Invoice attachment link', async () => {
   renderPage()
-  const link = await screen.findByText('PO Invoice')
-  expect(link).toBeInTheDocument()
-  expect(link.closest('a')).toHaveAttribute('href', 'https://example.com/invoice.pdf')
+  expect(await screen.findByText('PO Invoice')).toBeInTheDocument()
+  const viewBtn = screen.getByText('View')
+  expect(viewBtn.closest('a')).toHaveAttribute('href', 'https://example.com/invoice.pdf')
 })
 
 it('renders the forecast delivery date (formatted)', async () => {
   renderPage()
   expect(await screen.findByText('01 Agu 2026')).toBeInTheDocument()
+})
+
+it('renders Advance Status button showing next status for staff', async () => {
+  renderPage()
+  expect(await screen.findByText('→ SHIPPED')).toBeInTheDocument()
+})
+
+it('renders status history timeline with correct status badge', async () => {
+  renderPage()
+  const heading = await screen.findByText('Status History')
+  const section = heading.closest('div')!
+  expect(within(section).getByText('ORDERED')).toBeInTheDocument()
 })

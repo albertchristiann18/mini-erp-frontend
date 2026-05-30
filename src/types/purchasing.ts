@@ -1,5 +1,14 @@
 export type POStatus = 'DRAFT' | 'ORDERED' | 'SHIPPED' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED'
 
+export interface StatusHistoryItem {
+  id: string
+  from_status: POStatus
+  to_status: POStatus
+  changed_by_name: string | null
+  note: string | null
+  cdate: string
+}
+
 export interface PurchaseOrderDetail {
   id: string
   product_variant: string
@@ -59,6 +68,8 @@ export interface PurchaseOrder {
   delivery_order_file: string | null
   delivery_order_invoice_file: string | null
   packing_list_file: string | null
+  next_status: POStatus | null
+  status_history: StatusHistoryItem[]
   order_details?: PurchaseOrderDetail[]
   cdate: string
   udate: string
