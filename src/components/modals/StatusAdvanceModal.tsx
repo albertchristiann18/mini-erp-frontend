@@ -57,7 +57,7 @@ interface Props {
 }
 
 function getCurrentValue(po: PurchaseOrder, field: string): string | null {
-  const val = (po as Record<string, unknown>)[field]
+  const val = (po as unknown as Record<string, unknown>)[field]
   if (val == null || val === "") return null
   if (field.endsWith("_file")) return "Uploaded"
   if (field === "invoice_date" || field === "delivery_date") return formatDate(String(val))
@@ -153,7 +153,7 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
 
               <div className="space-y-1">
                 {fieldsForTarget.map(cfg => {
-                  const isMissing = missingFieldSet.has(cfg.field)
+                  const isMissing = missingFieldSet.has(cfg.field) && !formValues[cfg.field]
                   const currentVal = getCurrentValue(po, cfg.field)
                   return (
                     <div key={cfg.field} className={cn(
