@@ -153,27 +153,31 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
 
               <div className="space-y-1">
                 {fieldsForTarget.map(cfg => {
-                  const isMissing = missingFieldSet.has(cfg.field) && !formValues[cfg.field]
+                  const originallyMissing = missingFieldSet.has(cfg.field)
+                  const isFilled = originallyMissing && !!formValues[cfg.field]
+                  // colour: red when missing + unfilled, green otherwise
+                  const showRed = originallyMissing && !isFilled
                   const currentVal = getCurrentValue(po, cfg.field)
                   return (
                     <div key={cfg.field} className={cn(
                       "flex items-start gap-2 text-sm px-2 py-1.5 rounded",
-                      isMissing && "bg-red-50 dark:bg-red-950/20"
+                      showRed && "bg-red-50 dark:bg-red-950/20"
                     )}>
-                      {isMissing
+                      {showRed
                         ? <X className="h-4 w-4 text-red-500 mt-0.5 shrink-0" data-testid="x-icon" />
                         : <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" data-testid="check-icon" />
                       }
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className={cn("font-medium", isMissing && "text-red-600 dark:text-red-400")}>
+                          <span className={cn("font-medium", showRed && "text-red-600 dark:text-red-400")}>
                             {cfg.label}
                           </span>
-                          {!isMissing && currentVal && (
+                          {!originallyMissing && currentVal && (
                             <span className="text-muted-foreground text-xs">{currentVal}</span>
                           )}
                         </div>
-                        {isMissing && cfg.field !== "order_details" && (
+                        {/* Always show input for originally-missing fields so typing doesn't unmount the field */}
+                        {originallyMissing && cfg.field !== "order_details" && (
                           cfg.inputType === "file" ? (
                             <input
                               type="file"
@@ -198,7 +202,7 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
                             </div>
                           )
                         )}
-                        {isMissing && cfg.field === "order_details" && (
+                        {originallyMissing && cfg.field === "order_details" && (
                           <p className="text-xs text-muted-foreground mt-0.5">Add order items via Edit before advancing.</p>
                         )}
                       </div>
