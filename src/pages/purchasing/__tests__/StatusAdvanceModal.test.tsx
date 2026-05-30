@@ -101,18 +101,18 @@ it("shows red indicator for missing fields with editable input", () => {
   mockCheckResult = {
     can_transition: false,
     target_status: "SHIPPED",
-    missing_fields: [{ field: "cbm", label: "CBM", section: "Logistics & Dates", message: "CBM is required when moving to SHIPPED." }],
+    missing_fields: [{ field: "delivery_order_number", label: "Delivery Order No.", section: "Logistics & Dates", message: "Delivery order no. is required when moving to SHIPPED." }],
   }
   renderModal()
-  expect(screen.getByText("CBM")).toBeInTheDocument()
-  expect(screen.getByPlaceholderText("CBM")).toBeInTheDocument()
+  expect(screen.getByText("Delivery Order No.")).toBeInTheDocument()
+  expect(screen.getByPlaceholderText("Delivery Order No.")).toBeInTheDocument()
 })
 
 it("Confirm button disabled when can_transition is false and no values filled", () => {
   mockCheckResult = {
     can_transition: false,
     target_status: "SHIPPED",
-    missing_fields: [{ field: "cbm", label: "CBM", section: "Logistics & Dates", message: "CBM is required." }],
+    missing_fields: [{ field: "delivery_order_number", label: "Delivery Order No.", section: "Logistics & Dates", message: "Delivery order no. is required." }],
   }
   renderModal()
   const confirmBtn = screen.getByRole("button", { name: /confirm/i })
@@ -130,24 +130,24 @@ it("renders editable input for missing field", () => {
   mockCheckResult = {
     can_transition: false,
     target_status: "SHIPPED",
-    missing_fields: [{ field: "cbm", label: "CBM", section: "Logistics & Dates", message: "CBM is required." }],
+    missing_fields: [{ field: "delivery_order_number", label: "Delivery Order No.", section: "Logistics & Dates", message: "Delivery order no. is required." }],
   }
   renderModal()
-  const input = screen.getByPlaceholderText("CBM")
+  const input = screen.getByPlaceholderText("Delivery Order No.")
   expect(input).toBeInTheDocument()
-  expect(input).toHaveAttribute("type", "number")
+  expect(input).toHaveAttribute("type", "text")
 })
 
 it("Confirm button enabled after filling missing fields", () => {
   mockCheckResult = {
     can_transition: false,
     target_status: "SHIPPED",
-    missing_fields: [{ field: "cbm", label: "CBM", section: "Logistics & Dates", message: "CBM is required." }],
+    missing_fields: [{ field: "delivery_order_number", label: "Delivery Order No.", section: "Logistics & Dates", message: "Delivery order no. is required." }],
   }
   renderModal()
   const confirmBtn = screen.getByRole("button", { name: /confirm/i })
   expect(confirmBtn).toBeDisabled()
-  const input = screen.getByPlaceholderText("CBM")
-  fireEvent.change(input, { target: { value: "1.5" } })
+  const input = screen.getByPlaceholderText("Delivery Order No.")
+  fireEvent.change(input, { target: { value: "DO-001" } })
   expect(confirmBtn).not.toBeDisabled()
 })

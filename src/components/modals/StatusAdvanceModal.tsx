@@ -56,16 +56,6 @@ interface Props {
   targetStatus: POStatus
 }
 
-function getCurrentValue(po: PurchaseOrder, field: string): string | null {
-  const val = (po as unknown as Record<string, unknown>)[field]
-  if (val == null || val === "") return null
-  if (field.endsWith("_file")) return "Uploaded"
-  if (field === "invoice_date" || field === "delivery_date") return formatDate(String(val))
-  if (field === "commission_fee_pct") return `${val}%`
-  if (field === "exchange_rate") return Number(val).toLocaleString("id-ID")
-  return String(val)
-}
-
 export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
   const checkMutation = useCheckPOTransition()
   const updateMutation = useUpdatePurchaseOrder()
@@ -76,8 +66,17 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
 
   useEffect(() => {
     if (open) {
+      const initial: Record<string, string | File> = {}
+      for (const cfg of REQUIRED_FIELDS[targetStatus] ?? []) {
+        if (cfg.inputType === "file") continue
+        if (cfg.field === "order_details") continue
+        const val = (po as unknown as Record<string, unknown>)[cfg.field]
+        if (val != null && val !== "") {
+          initial[cfg.field] = String(val)
+        }
+      }
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormValues({})
+      setFormValues(initial)
       checkMutation.mutate({ id: po.id, status: targetStatus })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,10 +153,7 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
               <div className="space-y-1">
                 {fieldsForTarget.map(cfg => {
                   const originallyMissing = missingFieldSet.has(cfg.field)
-                  const isFilled = originallyMissing && !!formValues[cfg.field]
-                  // colour: red when missing + unfilled, green otherwise
-                  const showRed = originallyMissing && !isFilled
-                  const currentVal = getCurrentValue(po, cfg.field)
+                  const showRed = originallyMissing && !formValues[cfg.field]
                   return (
                     <div key={cfg.field} className={cn(
                       "flex items-start gap-2 text-sm px-2 py-1.5 rounded",
@@ -172,37 +168,59 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
                           <span className={cn("font-medium", showRed && "text-red-600 dark:text-red-400")}>
                             {cfg.label}
                           </span>
-                          {!originallyMissing && currentVal && (
-                            <span className="text-muted-foreground text-xs">{currentVal}</span>
-                          )}
                         </div>
-                        {/* Always show input for originally-missing fields so typing doesn't unmount the field */}
-                        {originallyMissing && cfg.field !== "order_details" && (
-                          cfg.inputType === "file" ? (
-                            <input
-                              type="file"
-                              accept="application/pdf,image/*"
-                              className="mt-1 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-muted file:text-foreground"
-                              onChange={e => {
-                                const file = e.target.files?.[0]
-                                if (file) setField(cfg.field, file)
-                              }}
+                        {cfg.inputType !== "file" && cfg.field !== "order_details" && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Input
+                              type={cfg.inputType}
+                              step={cfg.step}
+                              className="h-7 text-xs"
+                              placeholder={cfg.label}
+                              value={String(formValues[cfg.field] ?? "")}
+                              onChange={e => setField(cfg.field, e.target.value)}
                             />
-                          ) : (
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <Input
-                                type={cfg.inputType}
-                                step={cfg.step}
-                                className="h-7 text-xs"
-                                placeholder={cfg.label}
-                                value={String(formValues[cfg.field] ?? "")}
-                                onChange={e => setField(cfg.field, e.target.value)}
-                              />
-                              {cfg.suffix && <span className="text-xs text-muted-foreground whitespace-nowrap">{cfg.suffix}</span>}
+                            {cfg.suffix && <span className="text-xs text-muted-foreground whitespace-nowrap">{cfg.suffix}</span>}
+                          </div>
+                        )}
+                        {cfg.inputType === "file" && originallyMissing && (
+                          <input
+                            type="file"
+                            accept="application/pdf,image/*"
+                            className="mt-1 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-muted file:text-foreground"
+                            onChange={e => {
+                              const file = e.target.files?.[0]
+                              if (file) setField(cfg.field, file)
+                            }}
+                          />
+                        )}
+                        {cfg.inputType === "file" && !originallyMissing && (() => {
+                          const url = String((po as unknown as Record<string, unknown>)[cfg.field] ?? "")
+                          return (
+                            <div className="flex items-center gap-2 mt-1">
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 underline"
+                              >
+                                View
+                              </a>
+                              <label className="text-xs text-muted-foreground cursor-pointer">
+                                Replace
+                                <input
+                                  type="file"
+                                  accept="application/pdf,image/*"
+                                  className="ml-1 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-muted file:text-foreground"
+                                  onChange={e => {
+                                    const file = e.target.files?.[0]
+                                    if (file) setField(cfg.field, file)
+                                  }}
+                                />
+                              </label>
                             </div>
                           )
-                        )}
-                        {originallyMissing && cfg.field === "order_details" && (
+                        })()}
+                        {cfg.field === "order_details" && originallyMissing && (
                           <p className="text-xs text-muted-foreground mt-0.5">Add order items via Edit before advancing.</p>
                         )}
                       </div>
