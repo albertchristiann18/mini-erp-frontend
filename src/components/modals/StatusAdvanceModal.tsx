@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
-import { useCheckPOTransition, useAdvancePOStatus } from "../../hooks/usePurchasing"
+import { Input } from "../ui/input"
+import { useCheckPOTransition, useUpdatePurchaseOrder } from "../../hooks/usePurchasing"
 import { Check, X } from "lucide-react"
 import { cn, formatIDR, formatDate } from "../../lib/utils"
 import { toast } from "../../lib/toast"
@@ -13,28 +14,37 @@ const statusVariant: Record<POStatus, "secondary" | "info" | "warning" | "succes
   DELIVERED: "success", COMPLETED: "success", CANCELLED: "destructive",
 }
 
-const REQUIRED_FIELDS: Record<string, { field: string; label: string; section: string }[]> = {
+type FieldConfig = {
+  field: string
+  label: string
+  section: string
+  inputType: "text" | "number" | "date" | "file"
+  suffix?: string
+  step?: string
+}
+
+const REQUIRED_FIELDS: Record<string, FieldConfig[]> = {
   ORDERED: [
-    { field: "exchange_rate",               label: "Exchange Rate",       section: "Financial Setup" },
-    { field: "purchase_order_invoice_file", label: "PO Invoice File",    section: "Attachments" },
-    { field: "invoice_number",              label: "Invoice Number",      section: "Logistics & Dates" },
-    { field: "invoice_date",                label: "Invoice Date",        section: "Logistics & Dates" },
-    { field: "commission_fee_pct",          label: "Commission %",        section: "Financial Setup" },
-    { field: "forwarder_name",              label: "Forwarder",           section: "General" },
-    { field: "supplier_name",               label: "Supplier",            section: "General" },
-    { field: "shop_services",               label: "Jasa Belanja",        section: "General" },
-    { field: "delivery_fee",               label: "Delivery Fee (RMB)",  section: "Financial Setup" },
-    { field: "order_details",               label: "Order Items",         section: "Order Items" },
+    { field: "supplier_name",               label: "Supplier",            section: "General",          inputType: "text" },
+    { field: "forwarder_name",              label: "Forwarder",           section: "General",          inputType: "text" },
+    { field: "shop_services",               label: "Jasa Belanja",        section: "General",          inputType: "text" },
+    { field: "exchange_rate",               label: "Exchange Rate",       section: "Financial Setup",  inputType: "number", step: "0.001" },
+    { field: "commission_fee_pct",          label: "Commission %",        section: "Financial Setup",  inputType: "number" },
+    { field: "delivery_fee",               label: "Delivery Fee (RMB)",  section: "Financial Setup",  inputType: "number", step: "0.001" },
+    { field: "invoice_number",              label: "Invoice Number",      section: "Logistics & Dates", inputType: "text" },
+    { field: "invoice_date",                label: "Invoice Date",        section: "Logistics & Dates", inputType: "date" },
+    { field: "purchase_order_invoice_file", label: "PO Invoice File",    section: "Attachments",       inputType: "file" },
+    { field: "order_details",               label: "Order Items",         section: "Order Items",       inputType: "text" },
   ],
   SHIPPED: [
-    { field: "delivery_order_number", label: "Delivery Order No.",  section: "Logistics & Dates" },
-    { field: "delivery_order_file",   label: "Delivery Order File", section: "Attachments" },
-    { field: "shipping_fee_per_cbm",  label: "Shipping Fee / CBM",  section: "Financial Setup" },
-    { field: "cbm",                   label: "CBM",                 section: "Logistics & Dates" },
-    { field: "weight",                label: "Weight (kg)",         section: "Logistics & Dates" },
+    { field: "delivery_order_number", label: "Delivery Order No.",  section: "Logistics & Dates", inputType: "text" },
+    { field: "cbm",                   label: "CBM",                 section: "Logistics & Dates", inputType: "number", step: "0.001", suffix: "m\u00b3" },
+    { field: "weight",                label: "Weight",              section: "Logistics & Dates", inputType: "number", step: "0.01",  suffix: "kg" },
+    { field: "shipping_fee_per_cbm",  label: "Shipping Fee / CBM",  section: "Financial Setup",   inputType: "number" },
+    { field: "delivery_order_file",   label: "Delivery Order File", section: "Attachments",        inputType: "file" },
   ],
   DELIVERED: [
-    { field: "delivery_order_invoice_file", label: "DO Invoice File", section: "Attachments" },
+    { field: "delivery_order_invoice_file", label: "DO Invoice File", section: "Attachments", inputType: "file" },
   ],
   COMPLETED: [],
 }
@@ -46,12 +56,28 @@ interface Props {
   targetStatus: POStatus
 }
 
+function getCurrentValue(po: PurchaseOrder, field: string): string | null {
+  const val = (po as Record<string, unknown>)[field]
+  if (val == null || val === "") return null
+  if (field.endsWith("_file")) return "Uploaded"
+  if (field === "invoice_date" || field === "delivery_date") return formatDate(String(val))
+  if (field === "commission_fee_pct") return `${val}%`
+  if (field === "exchange_rate") return Number(val).toLocaleString("id-ID")
+  return String(val)
+}
+
 export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
   const checkMutation = useCheckPOTransition()
-  const advanceMutation = useAdvancePOStatus()
+  const updateMutation = useUpdatePurchaseOrder()
+  const [formValues, setFormValues] = useState<Record<string, string | File>>({})
+
+  const setField = (field: string, value: string | File) =>
+    setFormValues(prev => ({ ...prev, [field]: value }))
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormValues({})
       checkMutation.mutate({ id: po.id, status: targetStatus })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,31 +93,40 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
     [targetStatus],
   )
 
-  const sections = useMemo(() => {
-    const map = new Map<string, { field: string; label: string; section: string }[]>()
-    for (const field of fieldsForTarget) {
-      const existing = map.get(field.section) ?? []
-      existing.push(field)
-      map.set(field.section, existing)
-    }
-    return Array.from(map.entries())
-  }, [fieldsForTarget])
+  const allMissingFilled = useMemo(() => {
+    if (!checkMutation.data) return false
+    const missingFields = checkMutation.data.missing_fields.map(f => f.field)
+    const fillableMissing = missingFields.filter(f => f !== "order_details")
+    return fillableMissing.every(f => {
+      const v = formValues[f]
+      return v !== undefined && v !== "" && v !== null
+    })
+  }, [checkMutation.data, formValues])
+
+  const canConfirm = checkMutation.data?.can_transition || allMissingFilled
 
   const handleConfirm = async () => {
+    const payload: Record<string, unknown> = { status: targetStatus }
+    for (const [key, value] of Object.entries(formValues)) {
+      if (value !== "" && value !== null && value !== undefined) {
+        payload[key] = value
+      }
+    }
     try {
-      await advanceMutation.mutateAsync({ id: po.id, status: targetStatus })
+      await updateMutation.mutateAsync({ id: po.id, data: payload })
       toast.success(`Status updated to ${targetStatus}`)
       onClose()
-    } catch {
-      toast.error("Failed to update status")
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? "Failed to update status"
+      toast.error(msg)
     }
   }
 
-  const canTransition = checkMutation.data?.can_transition ?? false
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Advance to {targetStatus}</DialogTitle>
         </DialogHeader>
@@ -101,75 +136,88 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
             <div className="text-center text-muted-foreground py-8">Checking requirements...</div>
           ) : (
             <>
-              {/* Header preview card */}
               <div className="rounded-lg border bg-card p-4 space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-semibold">{po.purchase_order_number}</span>
                   <Badge variant={statusVariant[po.status]}>{po.status}</Badge>
-                  <span className="text-muted-foreground">→</span>
+                  <span className="text-muted-foreground">&rarr;</span>
                   <Badge variant={statusVariant[targetStatus]}>{targetStatus}</Badge>
                 </div>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p>Supplier: {po.supplier_name ?? "—"}</p>
-                  <p>Invoice Date: {po.invoice_date ? formatDate(po.invoice_date) : "—"}</p>
-                  <p>Exchange Rate: {po.exchange_rate ? Number(po.exchange_rate).toLocaleString("id-ID") : "—"}</p>
+                  <p>Supplier: {po.supplier_name ?? "\u2014"}</p>
+                  <p>Invoice Date: {po.invoice_date ? formatDate(po.invoice_date) : "\u2014"}</p>
+                  <p>Exchange Rate: {po.exchange_rate ? Number(po.exchange_rate).toLocaleString("id-ID") : "\u2014"}</p>
                   <p>Total Amount: {formatIDR(po.total_amount)}</p>
                 </div>
               </div>
 
-              {/* Requirements checklist */}
-              {sections.map(([section, fields]) => (
-                <div key={section}>
-                  <h4 className="text-sm font-semibold mb-2">{section}</h4>
-                  <div className="space-y-1">
-                    {fields.map(f => {
-                      const isMissing = missingFieldSet.has(f.field)
-                      const missingMsg = checkMutation.data?.missing_fields.find(m => m.field === f.field)
-                      return (
-                        <div key={f.field} className={cn(
-                          "flex items-start gap-2 text-sm px-2 py-1 rounded",
-                          isMissing && "bg-red-50 dark:bg-red-950/20"
-                        )}>
-                          {isMissing ? (
-                            <X className="h-4 w-4 text-red-500 mt-0.5 shrink-0" data-testid="x-icon" />
-                          ) : (
-                            <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" data-testid="check-icon" />
+              <div className="space-y-1">
+                {fieldsForTarget.map(cfg => {
+                  const isMissing = missingFieldSet.has(cfg.field)
+                  const currentVal = getCurrentValue(po, cfg.field)
+                  return (
+                    <div key={cfg.field} className={cn(
+                      "flex items-start gap-2 text-sm px-2 py-1.5 rounded",
+                      isMissing && "bg-red-50 dark:bg-red-950/20"
+                    )}>
+                      {isMissing
+                        ? <X className="h-4 w-4 text-red-500 mt-0.5 shrink-0" data-testid="x-icon" />
+                        : <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" data-testid="check-icon" />
+                      }
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("font-medium", isMissing && "text-red-600 dark:text-red-400")}>
+                            {cfg.label}
+                          </span>
+                          {!isMissing && currentVal && (
+                            <span className="text-muted-foreground text-xs">{currentVal}</span>
                           )}
-                          <div>
-                            <span className={cn(isMissing && "text-red-600 dark:text-red-400 font-medium")}>
-                              {f.label}
-                            </span>
-                            {isMissing && missingMsg && (
-                              <p className="text-xs text-red-500 mt-0.5">{missingMsg.message}</p>
-                            )}
-                          </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
+                        {isMissing && cfg.field !== "order_details" && (
+                          cfg.inputType === "file" ? (
+                            <input
+                              type="file"
+                              accept="application/pdf,image/*"
+                              className="mt-1 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-muted file:text-foreground"
+                              onChange={e => {
+                                const file = e.target.files?.[0]
+                                if (file) setField(cfg.field, file)
+                              }}
+                            />
+                          ) : (
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Input
+                                type={cfg.inputType}
+                                step={cfg.step}
+                                className="h-7 text-xs"
+                                placeholder={cfg.label}
+                                value={String(formValues[cfg.field] ?? "")}
+                                onChange={e => setField(cfg.field, e.target.value)}
+                              />
+                              {cfg.suffix && <span className="text-xs text-muted-foreground whitespace-nowrap">{cfg.suffix}</span>}
+                            </div>
+                          )
+                        )}
+                        {isMissing && cfg.field === "order_details" && (
+                          <p className="text-xs text-muted-foreground mt-0.5">Add order items via Edit before advancing.</p>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          {!checkMutation.isPending && (
-            <>
-              {!canTransition && fieldsForTarget.length > 0 && (
-                <p className="text-xs text-muted-foreground self-center mr-2">
-                  Fill missing fields via Edit before advancing
-                </p>
-              )}
-              <Button
-                onClick={handleConfirm}
-                disabled={!canTransition || advanceMutation.isPending}
-              >
-                {advanceMutation.isPending ? "Advancing..." : "Confirm"}
-              </Button>
-            </>
-          )}
+          <Button variant="outline" onClick={onClose} disabled={updateMutation.isPending}>Cancel</Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={!canConfirm || updateMutation.isPending || checkMutation.isPending}
+          >
+            {updateMutation.isPending ? "Saving..." : `Confirm \u2192 ${targetStatus}`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

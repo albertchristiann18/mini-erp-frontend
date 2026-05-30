@@ -1,11 +1,11 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, fireEvent } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { vi, it, expect } from "vitest"
 import { StatusAdvanceModal } from "../../../components/modals/StatusAdvanceModal"
 import type { PurchaseOrder, POStatus } from "../../../types/purchasing"
 
 const mockCheckMutate = vi.fn()
-const mockAdvanceMutate = vi.fn()
+const mockUpdateMutateAsync = vi.fn()
 let mockCheckResult: { can_transition: boolean; target_status: POStatus; missing_fields: { field: string; label: string; section: string; message: string }[] }
 
 vi.mock("../../../hooks/usePurchasing", () => ({
@@ -14,8 +14,8 @@ vi.mock("../../../hooks/usePurchasing", () => ({
     data: mockCheckResult,
     isPending: false,
   }),
-  useAdvancePOStatus: () => ({
-    mutateAsync: mockAdvanceMutate,
+  useUpdatePurchaseOrder: () => ({
+    mutateAsync: mockUpdateMutateAsync,
     isPending: false,
   }),
 }))
@@ -97,7 +97,7 @@ it("shows green checkmark for present fields", () => {
   expect(xIcons.length).toBe(0)
 })
 
-it("shows red indicator for missing fields", () => {
+it("shows red indicator for missing fields with editable input", () => {
   mockCheckResult = {
     can_transition: false,
     target_status: "SHIPPED",
@@ -105,10 +105,10 @@ it("shows red indicator for missing fields", () => {
   }
   renderModal()
   expect(screen.getByText("CBM")).toBeInTheDocument()
-  expect(screen.getByText("CBM is required when moving to SHIPPED.")).toBeInTheDocument()
+  expect(screen.getByPlaceholderText("CBM")).toBeInTheDocument()
 })
 
-it("Confirm button disabled when can_transition is false", () => {
+it("Confirm button disabled when can_transition is false and no values filled", () => {
   mockCheckResult = {
     can_transition: false,
     target_status: "SHIPPED",
@@ -123,5 +123,31 @@ it("Confirm button enabled when can_transition is true", () => {
   mockCheckResult = { can_transition: true, target_status: "SHIPPED", missing_fields: [] }
   renderModal()
   const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+  expect(confirmBtn).not.toBeDisabled()
+})
+
+it("renders editable input for missing field", () => {
+  mockCheckResult = {
+    can_transition: false,
+    target_status: "SHIPPED",
+    missing_fields: [{ field: "cbm", label: "CBM", section: "Logistics & Dates", message: "CBM is required." }],
+  }
+  renderModal()
+  const input = screen.getByPlaceholderText("CBM")
+  expect(input).toBeInTheDocument()
+  expect(input).toHaveAttribute("type", "number")
+})
+
+it("Confirm button enabled after filling missing fields", () => {
+  mockCheckResult = {
+    can_transition: false,
+    target_status: "SHIPPED",
+    missing_fields: [{ field: "cbm", label: "CBM", section: "Logistics & Dates", message: "CBM is required." }],
+  }
+  renderModal()
+  const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+  expect(confirmBtn).toBeDisabled()
+  const input = screen.getByPlaceholderText("CBM")
+  fireEvent.change(input, { target: { value: "1.5" } })
   expect(confirmBtn).not.toBeDisabled()
 })
