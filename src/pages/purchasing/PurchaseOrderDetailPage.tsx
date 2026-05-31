@@ -14,6 +14,14 @@ import { toast } from '../../lib/toast'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
+function getCurrencySymbol(currency: string | null | undefined): string {
+  const map: Record<string, string> = {
+    CNY: '\xA5', RMB: '\xA5', USD: '$', EUR: '\u20AC',
+    SGD: 'S$', MYR: 'RM', THB: '\u0E3F', IDR: 'Rp',
+  }
+  return map[(currency ?? '').toUpperCase()] ?? (currency ?? '')
+}
+
 const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   DRAFT: 'secondary', ORDERED: 'info', SHIPPED: 'warning',
   DELIVERED: 'success', COMPLETED: 'success', CANCELLED: 'destructive',
@@ -70,10 +78,10 @@ export default function PurchaseOrderDetailPage() {
   )
 
   const attachments = [
-    { label: 'PO Invoice', url: po.purchase_order_invoice_file },
-    { label: 'Delivery Order', url: po.delivery_order_file },
-    { label: 'DO Invoice', url: po.delivery_order_invoice_file },
-    { label: 'Packing List', url: po.packing_list_file },
+    { label: 'PO Invoice',     field: 'purchase_order_invoice_file',  url: po.purchase_order_invoice_file },
+    { label: 'Delivery Order', field: 'delivery_order_file',           url: po.delivery_order_file },
+    { label: 'DO Invoice',     field: 'delivery_order_invoice_file',   url: po.delivery_order_invoice_file },
+    { label: 'Packing List',   field: 'packing_list_file',             url: po.packing_list_file },
   ]
 
   const getFilename = (url: string) =>
@@ -310,15 +318,6 @@ export default function PurchaseOrderDetailPage() {
                 <p className="text-sm font-semibold">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</p>
               </div>
               <EditableInfoItem
-                field="commission_fee_rmb"
-                label="Commission (RMB)"
-                value={po.commission_fee_rmb}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('commission_fee_rmb')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
                 field="cbm"
                 label="CBM"
                 value={po.cbm != null ? `${po.cbm} (actual)` : po.forecast_cbm != null ? `${po.forecast_cbm} (forecast)` : null}
@@ -333,6 +332,15 @@ export default function PurchaseOrderDetailPage() {
                 value={po.weight}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('weight')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="shipping_fee_per_cbm"
+                label="Shipping Fee / CBM"
+                value={po.shipping_fee_per_cbm != null ? formatIDR(po.shipping_fee_per_cbm) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('shipping_fee_per_cbm')}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -376,8 +384,13 @@ export default function PurchaseOrderDetailPage() {
 
           {/* Card 2 — Order Items + summary box */}
           <div className="rounded-lg border bg-card">
-            <div className="px-6 py-4 border-b">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-base font-semibold">Order Items</h2>
+              {po.currency && (
+                <span className="text-xs text-muted-foreground">
+                  {getCurrencySymbol(po.currency)} {po.currency}
+                </span>
+              )}
             </div>
             <Table>
               <TableHeader>
@@ -385,8 +398,8 @@ export default function PurchaseOrderDetailPage() {
                   <TableHead>Variant</TableHead>
                   <TableHead className="text-right">Ordered</TableHead>
                   <TableHead className="text-right">Received</TableHead>
-                  <TableHead className="text-right">Unit Price (RMB)</TableHead>
-                  <TableHead className="text-right">Disc. Price (RMB)</TableHead>
+                  <TableHead className="text-right">Unit Price</TableHead>
+                  <TableHead className="text-right">Disc. Price</TableHead>
                   <TableHead className="text-right">Total (IDR)</TableHead>
                   {po.editable_fields.order_detail.includes('remarks') && editMode && (
                     <TableHead>Remarks</TableHead>
@@ -417,17 +430,23 @@ export default function PurchaseOrderDetailPage() {
                       </TableCell>
                       <TableCell className="text-right text-xs">
                         {isDetailEditable('unit_price_foreign') ? (
-                          <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                            value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
-                            onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
-                        ) : (item.unit_price_foreign ?? '—')}
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                            <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                              value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
+                              onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
+                          </div>
+                        ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${item.unit_price_foreign}` : '—')}
                       </TableCell>
                       <TableCell className="text-right text-xs">
                         {isDetailEditable('discounted_unit_price_foreign') ? (
-                          <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                            value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
-                            onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                        ) : (item.discounted_unit_price_foreign ?? '—')}
+                          <div className="flex items-center gap-1 justify-end">
+                            <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                            <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                              value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
+                              onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
+                          </div>
+                        ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${item.discounted_unit_price_foreign}` : '—')}
                       </TableCell>
                       <TableCell className="text-right text-xs">
                         {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
@@ -467,31 +486,57 @@ export default function PurchaseOrderDetailPage() {
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Attachments</h2>
             <div className="space-y-3">
-              {attachments.map(({ label, url }) => (
-                <div key={label} className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="flex items-center gap-4">
-                    <div className={cn(
-                      "flex h-12 w-12 items-center justify-center rounded-lg text-xs font-bold text-white",
-                      url ? "bg-red-600" : "bg-muted"
-                    )}>
-                      PDF
+              {attachments.map(({ label, field, url }) => {
+                const isFileEditable = editMode && po.editable_fields.header.includes(field)
+                const fileSelected = !!headerValues[field]
+                return (
+                  <div key={label} className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "flex h-12 w-12 items-center justify-center rounded-lg text-xs font-bold text-white",
+                        url || fileSelected ? "bg-red-600" : "bg-muted"
+                      )}>
+                        PDF
+                      </div>
+                      <div>
+                        <p className={cn("text-sm font-semibold", !url && !fileSelected && "text-muted-foreground")}>
+                          {label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {fileSelected
+                            ? 'Ready to upload'
+                            : url ? getFilename(url) : 'Not uploaded'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className={cn("text-sm font-semibold", !url && "text-muted-foreground")}>{label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {url ? getFilename(url) : 'Not uploaded'}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      {url && !fileSelected && (
+                        <a href={url} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline">
+                            <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
+                          </Button>
+                        </a>
+                      )}
+                      {isFileEditable && (
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                            onChange={e => {
+                              const file = e.target.files?.[0]
+                              if (file) setHeaderField(field, file)
+                            }}
+                          />
+                          <Button size="sm" variant="outline" asChild>
+                            <span>{fileSelected ? '\u2713 Ready' : url ? 'Replace' : 'Upload'}</span>
+                          </Button>
+                        </label>
+                      )}
                     </div>
                   </div>
-                  {url && (
-                    <a href={url} target="_blank" rel="noopener noreferrer">
-                      <Button size="sm" variant="outline">
-                        <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
-                      </Button>
-                    </a>
-                  )}
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 

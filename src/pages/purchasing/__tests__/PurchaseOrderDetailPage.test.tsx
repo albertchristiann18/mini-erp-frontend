@@ -190,3 +190,13 @@ it('renders Notes card showing No notes when note is null', async () => {
   renderPage()
   expect(await screen.findByText('No notes')).toBeInTheDocument()
 })
+
+it('shows shipping_fee_per_cbm field', async () => {
+  renderPage()
+  expect(await screen.findByText('Shipping Fee / CBM')).toBeInTheDocument()
+})
+
+it('hides Commission (RMB) field', async () => {
+  renderPage()
+  expect(screen.queryByText('Commission (RMB)')).not.toBeInTheDocument()
+})
