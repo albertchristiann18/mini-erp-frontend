@@ -22,6 +22,17 @@ function getCurrencySymbol(currency: string | null | undefined): string {
   return map[(currency ?? '').toUpperCase()] ?? (currency ?? '')
 }
 
+function formatForeignAmount(val: string | number | null | undefined): string {
+  if (val == null || val === '') return '\u2014'
+  return Number(val).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function formatDecimalUnit(val: string | number | null | undefined, unit?: string): string {
+  if (val == null || val === '') return '\u2014'
+  const formatted = Number(val).toLocaleString('id-ID', { maximumFractionDigits: 3 })
+  return unit ? `${formatted} ${unit}` : formatted
+}
+
 const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   DRAFT: 'secondary', ORDERED: 'info', SHIPPED: 'warning',
   DELIVERED: 'success', COMPLETED: 'success', CANCELLED: 'destructive',
@@ -289,7 +300,7 @@ export default function PurchaseOrderDetailPage() {
               <EditableInfoItem
                 field="exchange_rate"
                 label="Exchange Rate"
-                value={po.exchange_rate}
+                value={po.exchange_rate != null ? `Rp ${Number(po.exchange_rate).toLocaleString('id-ID')}` : null}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('exchange_rate')}
                 headerValues={headerValues}
@@ -307,7 +318,7 @@ export default function PurchaseOrderDetailPage() {
               <EditableInfoItem
                 field="delivery_fee"
                 label="Delivery Fee (RMB)"
-                value={po.delivery_fee}
+                value={po.delivery_fee != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(po.delivery_fee)}` : null}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('delivery_fee')}
                 headerValues={headerValues}
@@ -320,7 +331,7 @@ export default function PurchaseOrderDetailPage() {
               <EditableInfoItem
                 field="cbm"
                 label="CBM"
-                value={po.cbm != null ? `${po.cbm} (actual)` : po.forecast_cbm != null ? `${po.forecast_cbm} (forecast)` : null}
+                value={po.cbm != null ? `${formatDecimalUnit(po.cbm)} m³ (actual)` : po.forecast_cbm != null ? `${formatDecimalUnit(po.forecast_cbm)} m³ (forecast)` : null}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('cbm')}
                 headerValues={headerValues}
@@ -329,7 +340,7 @@ export default function PurchaseOrderDetailPage() {
               <EditableInfoItem
                 field="weight"
                 label="Weight (kg)"
-                value={po.weight}
+                value={po.weight != null ? formatDecimalUnit(po.weight, 'kg') : null}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('weight')}
                 headerValues={headerValues}
@@ -347,7 +358,7 @@ export default function PurchaseOrderDetailPage() {
               <EditableInfoItem
                 field="forecast_cbm"
                 label="Forecast CBM"
-                value={po.forecast_cbm}
+                value={po.forecast_cbm != null ? formatDecimalUnit(po.forecast_cbm, 'm3') : null}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('forecast_cbm')}
                 headerValues={headerValues}
@@ -436,7 +447,7 @@ export default function PurchaseOrderDetailPage() {
                               value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
                               onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
                           </div>
-                        ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${item.unit_price_foreign}` : '—')}
+                        ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
                       </TableCell>
                       <TableCell className="text-right text-xs">
                         {isDetailEditable('discounted_unit_price_foreign') ? (
@@ -446,7 +457,7 @@ export default function PurchaseOrderDetailPage() {
                               value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
                               onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
                           </div>
-                        ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${item.discounted_unit_price_foreign}` : '—')}
+                        ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
                       </TableCell>
                       <TableCell className="text-right text-xs">
                         {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
