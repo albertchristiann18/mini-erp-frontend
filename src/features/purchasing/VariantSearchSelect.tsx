@@ -4,18 +4,21 @@ import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { cn } from '../../lib/utils'
 import { useVariantSearch } from '../../hooks/useInventory'
+import { QuickCreateVariantModal } from './QuickCreateVariantModal'
 
 interface Props {
   value: string
-  onSelect: (id: string) => void
+  selectedLabel?: string
+  onSelect: (id: string, label: string) => void
   placeholder?: string
 }
 
-export function VariantSearchSelect({ value, onSelect, placeholder = 'Select variant' }: Props) {
+export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, placeholder = 'Select variant' }: Props) {
   const [open, setOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
-  const [selectedLabel, setSelectedLabel] = useState('')
+  const [internalSelectedLabel, setInternalSelectedLabel] = useState('')
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,8 +48,8 @@ export function VariantSearchSelect({ value, onSelect, placeholder = 'Select var
   }
 
   const handleSelect = (id: string, label: string) => {
-    setSelectedLabel(label)
-    onSelect(id)
+    setInternalSelectedLabel(label)
+    onSelect(id, label)
     setOpen(false)
     setSearchInput('')
     setActiveSearch('')
@@ -63,7 +66,7 @@ export function VariantSearchSelect({ value, onSelect, placeholder = 'Select var
         )}
         onClick={() => setOpen(o => !o)}
       >
-        <span className="truncate">{value ? (selectedLabel || placeholder) : placeholder}</span>
+        <span className="truncate">{value ? (internalSelectedLabel || externalSelectedLabel || placeholder) : placeholder}</span>
         <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
       </button>
 
@@ -109,8 +112,27 @@ export function VariantSearchSelect({ value, onSelect, placeholder = 'Select var
               ))
             )}
           </div>
+          <div className="border-t p-2">
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs text-primary hover:bg-accent transition-colors flex items-center gap-1"
+              onClick={() => { setOpen(false); setQuickCreateOpen(true) }}
+            >
+              <span>+</span> New product
+            </button>
+          </div>
         </div>
       )}
+
+      <QuickCreateVariantModal
+        open={quickCreateOpen}
+        onClose={() => setQuickCreateOpen(false)}
+        onCreated={(id, label) => {
+          setInternalSelectedLabel(label)
+          onSelect(id, label)
+          setQuickCreateOpen(false)
+        }}
+      />
     </div>
   )
 }

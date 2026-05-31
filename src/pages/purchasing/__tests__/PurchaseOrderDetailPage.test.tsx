@@ -10,8 +10,16 @@ vi.mock('../../../contexts/AuthContext', () => ({
 }))
 
 vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
-  VariantSearchSelect: ({ onSelect, placeholder }: { value: string; onSelect: (id: string) => void; placeholder?: string }) => (
-    <button data-testid="variant-search-select" onClick={() => onSelect('v-mock')}>
+  VariantSearchSelect: ({
+    onSelect,
+    placeholder,
+  }: {
+    value: string
+    selectedLabel?: string
+    onSelect: (id: string, label: string) => void
+    placeholder?: string
+  }) => (
+    <button data-testid="variant-search-select" onClick={() => onSelect('v-mock', 'Mock Variant (SKU-MOCK)')}>
       {placeholder ?? 'Select variant'}
     </button>
   ),

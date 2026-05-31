@@ -84,6 +84,7 @@ export default function PurchaseOrderDetailPage() {
   const [newItems, setNewItems] = useState<Array<{
     _tempId: string
     product_variant_id: string
+    product_variant_label: string
     ordered_qty: string
     unit_price_foreign: string
     discounted_unit_price_foreign: string
@@ -159,6 +160,7 @@ export default function PurchaseOrderDetailPage() {
     setNewItems(prev => [...prev, {
       _tempId: `new-${Date.now()}-${prev.length}`,
       product_variant_id: '',
+      product_variant_label: '',
       ordered_qty: '1',
       unit_price_foreign: '',
       discounted_unit_price_foreign: '',
@@ -542,7 +544,11 @@ export default function PurchaseOrderDetailPage() {
                   <TableCell>
                     <VariantSearchSelect
                       value={newItem.product_variant_id}
-                      onSelect={(id) => updateNewItem(newItem._tempId, 'product_variant_id', id)}
+                      selectedLabel={newItem.product_variant_label}
+                      onSelect={(id, label) => {
+                        updateNewItem(newItem._tempId, 'product_variant_id', id)
+                        updateNewItem(newItem._tempId, 'product_variant_label', label)
+                      }}
                       placeholder="Select variant"
                     />
                   </TableCell>

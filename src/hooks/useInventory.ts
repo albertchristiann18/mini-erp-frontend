@@ -27,8 +27,11 @@ export const useProducts = (page = 1, pageSize = 20, search?: string) => {
 export const useCreateProduct = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: unknown) => createProduct(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    mutationFn: (data: unknown) => createProduct(data).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['variant-search'] })
+    },
   })
 }
 
