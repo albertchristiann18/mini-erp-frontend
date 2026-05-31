@@ -71,7 +71,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border bg-popover shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border bg-card shadow-lg">
           <div className="flex gap-1 border-b p-2">
             <Input
               className="h-7 text-xs"

@@ -103,7 +103,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                 <FormField label={i === 0 ? 'Qty' : ''} error={errors.order_details?.[i]?.ordered_qty?.message}>
                   <Input type="number" {...register(`order_details.${i}.ordered_qty`, { valueAsNumber: true })} />
                 </FormField>
-                <FormField label={i === 0 ? 'Unit Price (RMB)' : ''} error={errors.order_details?.[i]?.unit_price_foreign?.message}>
+                <FormField label={i === 0 ? 'Unit Price' : ''} error={errors.order_details?.[i]?.unit_price_foreign?.message}>
                   <Input type="number" {...register(`order_details.${i}.unit_price_foreign`, { valueAsNumber: true })} />
                 </FormField>
                 <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end">
