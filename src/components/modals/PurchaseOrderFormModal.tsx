@@ -8,8 +8,9 @@ import { FormField } from '../ui/form'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useWarehouses, useProductVariants } from '../../hooks/useInventory'
+import { useWarehouses } from '../../hooks/useInventory'
 import { useCreatePurchaseOrder } from '../../hooks/usePurchasing'
+import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { toast } from '../../lib/toast'
 
 const itemSchema = z.object({
@@ -32,7 +33,6 @@ interface Props {
 export function PurchaseOrderFormModal({ open, onClose }: Props) {
   const navigate = useNavigate()
   const { data: warehousesData } = useWarehouses()
-  const { data: variantsData } = useProductVariants()
   const createMutation = useCreatePurchaseOrder((id) => {
     toast.success('Purchase order created')
     onClose()
@@ -57,7 +57,6 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   }
 
   const warehouses = warehousesData?.results ?? []
-  const variants = variantsData?.results ?? []
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
@@ -95,17 +94,11 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
             {fields.map((field, i) => (
               <div key={field.id} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end">
                 <FormField label={i === 0 ? 'Variant' : ''} error={errors.order_details?.[i]?.product_variant_id?.message}>
-                  <Select
+                  <VariantSearchSelect
                     value={watch(`order_details.${i}.product_variant_id`)}
-                    onValueChange={(v) => setValue(`order_details.${i}.product_variant_id`, v, { shouldValidate: true })}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Select variant" /></SelectTrigger>
-                    <SelectContent>
-                      {variants.map(v => (
-                        <SelectItem key={v.id} value={v.id}>{v.name} ({v.sku})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onSelect={(id) => setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })}
+                    placeholder="Select variant"
+                  />
                 </FormField>
                 <FormField label={i === 0 ? 'Qty' : ''} error={errors.order_details?.[i]?.ordered_qty?.message}>
                   <Input type="number" {...register(`order_details.${i}.ordered_qty`, { valueAsNumber: true })} />
