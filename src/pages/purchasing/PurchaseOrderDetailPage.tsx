@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../hooks/usePurchasing'
+import { useProductVariants } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { Badge } from '../../components/ui/badge'
@@ -8,7 +9,8 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
-import { ArrowLeft, ExternalLink, Pencil, Save, X as XIcon } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+import { ArrowLeft, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus } from '../../types/purchasing'
@@ -79,10 +81,22 @@ export default function PurchaseOrderDetailPage() {
   const [editMode, setEditMode] = useState(false)
   const [headerValues, setHeaderValues] = useState<Record<string, string | File>>({})
   const [detailValues, setDetailValues] = useState<Record<string, Record<string, string>>>({})
+  const [deletedDetailIds, setDeletedDetailIds] = useState<Set<string>>(new Set())
+  const [newItems, setNewItems] = useState<Array<{
+    _tempId: string
+    product_variant_id: string
+    ordered_qty: string
+    unit_price_foreign: string
+    discounted_unit_price_foreign: string
+  }>>([])
   const updateMutation = useUpdatePurchaseOrder()
+  const { data: variantsData } = useProductVariants()
+  const variants = variantsData?.results ?? []
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
+
+  const canAddDeleteItems = po.status === 'DRAFT' || po.status === 'ORDERED'
 
   const deliveryFeeIdr = Math.round(
     Number(po.delivery_fee ?? 0) * Number(po.exchange_rate ?? 0)
@@ -123,12 +137,16 @@ export default function PurchaseOrderDetailPage() {
     setHeaderValues(initial)
     setDetailValues(initDetails)
     setEditMode(true)
+    setDeletedDetailIds(new Set())
+    setNewItems([])
   }
 
   const cancelEditMode = () => {
     setEditMode(false)
     setHeaderValues({})
     setDetailValues({})
+    setDeletedDetailIds(new Set())
+    setNewItems([])
   }
 
   const setHeaderField = (field: string, value: string | File) =>
@@ -140,15 +158,51 @@ export default function PurchaseOrderDetailPage() {
       [itemId]: { ...(prev[itemId] ?? {}), [field]: value }
     }))
 
+  const addNewItem = () =>
+    setNewItems(prev => [...prev, {
+      _tempId: `new-${Date.now()}-${prev.length}`,
+      product_variant_id: '',
+      ordered_qty: '1',
+      unit_price_foreign: '',
+      discounted_unit_price_foreign: '',
+    }])
+
+  const removeNewItem = (_tempId: string) =>
+    setNewItems(prev => prev.filter(n => n._tempId !== _tempId))
+
+  const updateNewItem = (_tempId: string, field: string, value: string) =>
+    setNewItems(prev => prev.map(n => n._tempId === _tempId ? { ...n, [field]: value } : n))
+
+  const deleteExistingItem = (itemId: string) =>
+    setDeletedDetailIds(prev => new Set([...prev, itemId]))
+
   const handleSave = async () => {
     const payload: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(headerValues)) {
       if (value !== '' && value !== null && value !== undefined) payload[key] = value
     }
-    const changedDetails = Object.entries(detailValues)
-      .map(([itemId, changes]) => ({ id: itemId, ...changes }))
-      .filter(item => Object.keys(item).length > 1)
-    if (changedDetails.length > 0) payload.order_details = changedDetails
+    const canAddDel = po.status === 'DRAFT' || po.status === 'ORDERED'
+    if (canAddDel && (deletedDetailIds.size > 0 || newItems.length > 0)) {
+      const keptExisting = (po.order_details ?? [])
+        .filter(item => !deletedDetailIds.has(item.id))
+        .map(item => ({ id: item.id, ...(detailValues[item.id] ?? {}) }))
+      const newItemsPayload = newItems
+        .filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign)
+        .map(n => ({
+          product_variant_id: n.product_variant_id,
+          ordered_qty: Number(n.ordered_qty),
+          unit_price_foreign: Number(n.unit_price_foreign),
+          discounted_unit_price_foreign: n.discounted_unit_price_foreign
+            ? Number(n.discounted_unit_price_foreign)
+            : undefined,
+        }))
+      payload.order_details = [...keptExisting, ...newItemsPayload]
+    } else {
+      const changedDetails = Object.entries(detailValues)
+        .map(([itemId, changes]) => ({ id: itemId, ...changes }))
+        .filter(item => Object.keys(item).length > 1)
+      if (changedDetails.length > 0) payload.order_details = changedDetails
+    }
     if (Object.keys(payload).length === 0) { cancelEditMode(); return }
     try {
       await updateMutation.mutateAsync({ id: po.id, data: payload })
@@ -397,10 +451,10 @@ export default function PurchaseOrderDetailPage() {
           <div className="rounded-lg border bg-card">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-base font-semibold">Order Items</h2>
-              {po.currency && (
-                <span className="text-xs text-muted-foreground">
-                  {getCurrencySymbol(po.currency)} {po.currency}
-                </span>
+              {editMode && canAddDeleteItems && (
+                <Button type="button" size="sm" variant="outline" onClick={addNewItem}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Item
+                </Button>
               )}
             </div>
             <Table>
@@ -415,10 +469,11 @@ export default function PurchaseOrderDetailPage() {
                   {po.editable_fields.order_detail.includes('remarks') && editMode && (
                     <TableHead>Remarks</TableHead>
                   )}
+                  {editMode && canAddDeleteItems && <TableHead />}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(po.order_details ?? []).map(item => {
+                {(po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id)).map(item => {
                   const rowChanges = detailValues[item.id] ?? {}
                   const isDetailEditable = (field: string) =>
                     editMode && po.editable_fields.order_detail.includes(field)
@@ -469,9 +524,73 @@ export default function PurchaseOrderDetailPage() {
                             onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
                         </TableCell>
                       )}
+                      {editMode && canAddDeleteItems && (
+                        <TableCell>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-red-500 hover:text-red-600"
+                            onClick={() => deleteExistingItem(item.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )
                 })}
+              {editMode && canAddDeleteItems && newItems.map((newItem) => (
+                <TableRow key={newItem._tempId}>
+                  <TableCell>
+                    <Select
+                      value={newItem.product_variant_id}
+                      onValueChange={(v) => updateNewItem(newItem._tempId, 'product_variant_id', v)}
+                    >
+                      <SelectTrigger className="h-7 text-xs">
+                        <SelectValue placeholder="Select variant" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {variants.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name} ({v.sku_variant_code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Input type="number" className="h-7 w-16 text-xs text-right"
+                      value={newItem.ordered_qty}
+                      onChange={e => updateNewItem(newItem._tempId, 'ordered_qty', e.target.value)} />
+                  </TableCell>
+                  <TableCell />
+                  <TableCell className="text-right">
+                    <div className="flex items-center gap-1 justify-end">
+                      <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                      <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                        value={newItem.unit_price_foreign}
+                        onChange={e => updateNewItem(newItem._tempId, 'unit_price_foreign', e.target.value)} />
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center gap-1 justify-end">
+                      <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                      <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                        value={newItem.discounted_unit_price_foreign}
+                        onChange={e => updateNewItem(newItem._tempId, 'discounted_unit_price_foreign', e.target.value)} />
+                    </div>
+                  </TableCell>
+                  <TableCell />
+                  <TableCell>
+                    <Button type="button" size="icon" variant="ghost"
+                      className="h-7 w-7 text-red-500 hover:text-red-600"
+                      onClick={() => removeNewItem(newItem._tempId)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
               </TableBody>
             </Table>
             {/* Summary box — bottom right */}

@@ -200,3 +200,31 @@ it('hides Commission (RMB) field', async () => {
   renderPage()
   expect(screen.queryByText('Commission (RMB)')).not.toBeInTheDocument()
 })
+
+it('does not show currency badge in Order Items header', async () => {
+  renderPage()
+  const heading = await screen.findByText('Order Items')
+  const parent = heading.closest('div')!
+  expect(parent).not.toHaveTextContent('CNY')
+})
+
+it('shows Add Item button in edit mode for ORDERED status', async () => {
+  renderPage()
+  const editBtn = await screen.findByText('Edit')
+  await userEvent.click(editBtn)
+  expect(await screen.findByText('Add Item')).toBeInTheDocument()
+})
+
+it('shows delete button per row in edit mode for ORDERED status', async () => {
+  renderPage()
+  const editBtn = await screen.findByText('Edit')
+  await userEvent.click(editBtn)
+  const row = await screen.findByText('Blue / M').then(el => el.closest('tr')!)
+  const deleteBtn = row.querySelector('button')
+  expect(deleteBtn).toBeInTheDocument()
+})
+
+it('hides Add Item button when not in edit mode', async () => {
+  renderPage()
+  expect(screen.queryByText('Add Item')).not.toBeInTheDocument()
+})
