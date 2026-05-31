@@ -5,20 +5,27 @@ import { Topbar } from './Topbar'
 const titleMap: Record<string, string> = {
   '/': 'Dashboard',
   '/inventory/products': 'Products',
-  '/inventory/stock': 'Stock Movements',
+  '/inventory/stock': 'Stock',
+  '/inventory/stock-closing': 'Stock Closing Report',
   '/inventory/warehouses': 'Warehouses',
+  '/inventory/inventory-dashboard': 'Inventory Dashboard',
+  '/inventory/bulk-stock-update': 'Bulk Stock Update',
   '/purchasing/orders': 'Purchase Orders',
+  '/purchasing/replenishment': 'Replenishment Planning',
+  '/sales/dashboard': 'Sales Dashboard',
   '/sales/orders': 'Sales Orders',
   '/sales/returns': 'Returns',
   '/finance/expenses': 'Expenses',
   '/finance/payable': 'Accounts Payable',
   '/finance/receivable': 'Accounts Receivable',
   '/finance/reports': 'Financial Reports',
+  '/finance/cash-transactions': 'Cash Transactions',
 }
 
 export function AppLayout() {
   const { pathname } = useLocation()
-  const title = titleMap[pathname] ?? 'Mini ERP'
+  const title = titleMap[pathname]
+    ?? (pathname.startsWith('/purchasing/orders/') ? 'PO Detail' : 'Mini ERP')
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />

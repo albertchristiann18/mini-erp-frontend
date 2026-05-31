@@ -3,7 +3,7 @@ import {
   getCategories, getProducts, createProduct, updateProduct,
   getProductVariants, getProductVariantStocks, getWarehouses, createWarehouse, updateWarehouse,
   getStockMovements, getMasterCategories,
-  bulkCreateProducts, bulkUpdateInventory, adjustStock,
+  bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
 } from '../api/inventory'
 import client from '../api/client'
 import type { Product } from '../types/inventory'
@@ -21,7 +21,6 @@ export const useProducts = (page = 1, pageSize = 20, search?: string) => {
   return useQuery({
     queryKey: ['products', page, pageSize, search],
     queryFn: () => getProducts(params).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
   })
 }
 
@@ -45,7 +44,6 @@ export const useProductVariants = (page = 1, pageSize = 100) =>
   useQuery({
     queryKey: ['product-variants', page, pageSize],
     queryFn: () => getProductVariants({ page, page_size: pageSize }).then(r => r.data),
-    staleTime: 1000 * 60 * 2,
   })
 
 export const useWarehouses = (page = 1, pageSize = 100) =>
@@ -75,7 +73,6 @@ export const useStockMovements = (params: Record<string, string | number> = {}) 
   useQuery({
     queryKey: ['stock-movements', params],
     queryFn: () => getStockMovements(params).then(r => r.data),
-    staleTime: 1000 * 60 * 1,
   })
 
 export const useMasterCategories = () =>
@@ -105,7 +102,6 @@ export const useProductVariantStocks = (params: Record<string, string | number> 
   useQuery({
     queryKey: ['product-variant-stocks', params],
     queryFn: () => getProductVariantStocks(params).then(r => r.data),
-    staleTime: 1000 * 30,
   })
 
 export const useAdjustStock = () => {
@@ -125,3 +121,57 @@ export const useProduct = (id: string) =>
     queryFn: () => client.get<Product>(`/product/${id}/`).then(r => r.data),
     enabled: !!id,
   })
+
+export const useAvgSales = (variantIds: string[], days: number) =>
+  useQuery({
+    queryKey: ['avg-sales', variantIds, days],
+    queryFn: () => getAvgSales(variantIds, days).then(r => r.data),
+    enabled: variantIds.length > 0,
+  })
+
+export const useAllVariants = () =>
+  useQuery({
+    queryKey: ['all-variants'],
+    queryFn: () =>
+      getProductVariants({ page_size: 500, is_active: 'true' }).then(r => r.data),
+  })
+
+export const useInventorySummary = () =>
+  useQuery({
+    queryKey: ['inventory-summary'],
+    queryFn: () => getInventorySummary().then(r => r.data),
+  })
+
+export const useStockClosingReport = (month: string, warehouseId: string) => {
+  const [year, mon] = month.split("-")
+  const monthStart = `${year}-${mon}-01`
+  const lastDay = new Date(parseInt(year), parseInt(mon), 0).getDate()
+  const monthEnd = `${year}-${mon}-${String(lastDay).padStart(2, "0")}`
+
+  return useQuery({
+    queryKey: ["stock-closing", month, warehouseId],
+    queryFn: () => {
+      const params: Record<string, string | number> = {
+        page_size: 1000,
+        cdate_after: monthStart,
+        cdate_before: monthEnd,
+      }
+      if (warehouseId) params.warehouse = warehouseId
+      return getStockMovements(params).then(r => r.data)
+    },
+    enabled: !!month,
+  })
+}
+
+export const useUpdateVariantPrice = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ productId, variantId, basePrice }: { productId: string; variantId: string; basePrice: number }) =>
+      updateVariantPrice(productId, variantId, basePrice).then(r => r.data),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['product', variables.productId] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['inventory-summary'] })
+    },
+  })
+}

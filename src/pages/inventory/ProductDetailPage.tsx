@@ -5,14 +5,16 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
-import { ArrowLeft, Pencil } from 'lucide-react'
+import { ArrowLeft, Pencil, Tag } from 'lucide-react'
 import { ProductFormModal } from '../../components/modals/ProductFormModal'
+import { PriceChangeModal } from '../../components/modals/PriceChangeModal'
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [showEditModal, setShowEditModal] = useState(false)
+  const [showPriceModal, setShowPriceModal] = useState(false)
 
   const { data: product, isLoading } = useProduct(id!)
 
@@ -39,9 +41,14 @@ export default function ProductDetailPage() {
         </Badge>
         <Badge variant="outline" className="font-mono">{product.sku_code}</Badge>
         {user?.is_staff && (
-          <Button className="ml-auto" size="sm" onClick={() => setShowEditModal(true)}>
-            <Pencil className="h-4 w-4 mr-1" /> Edit
-          </Button>
+          <>
+            <Button variant="outline" size="sm" onClick={() => setShowPriceModal(true)}>
+              <Tag className="h-4 w-4 mr-1" /> Edit Prices
+            </Button>
+            <Button className="ml-auto" size="sm" onClick={() => setShowEditModal(true)}>
+              <Pencil className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          </>
         )}
       </div>
 
@@ -165,6 +172,7 @@ export default function ProductDetailPage() {
       </div>
 
       <ProductFormModal open={showEditModal} onClose={() => setShowEditModal(false)} product={product} />
+      <PriceChangeModal open={showPriceModal} onClose={() => setShowPriceModal(false)} product={product} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import client from './client'
 import type {
   AccountsPayable, AccountsReceivable, Expense, ExpenseCategory,
   DashboardKPIs, IncomeStatement, BalanceSheet, CashFlow, ExpenseSummary,
+  CashTransaction, CashTransactionCreate,
 } from '../types/finance'
 import type { PaginatedResponse } from '../types/inventory'
 
@@ -46,3 +47,15 @@ export const getBalanceSheet = (params: { company_id: string; as_of_date: string
 
 export const getCashFlow = (params: { company_id: string; start_date: string; end_date: string }) =>
   client.get<CashFlow>('/reports/cash-flow/', { params })
+
+export const getCashTransactions = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<CashTransaction>>('/cash-transactions/', { params })
+
+export const createCashTransaction = (data: CashTransactionCreate) =>
+  client.post<CashTransaction>('/cash-transactions/', data)
+
+export const updateCashTransaction = (id: string, data: Partial<CashTransactionCreate>) =>
+  client.patch<CashTransaction>(`/cash-transactions/${id}/`, data)
+
+export const deleteCashTransaction = (id: string) =>
+  client.delete(`/cash-transactions/${id}/`)

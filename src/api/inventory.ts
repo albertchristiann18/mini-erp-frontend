@@ -1,5 +1,5 @@
 import client from './client'
-import type { Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse } from '../types/inventory'
+import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse } from '../types/inventory'
 
 export const getCategories = () =>
   client.get<PaginatedResponse<Category>>('/category/')
@@ -63,3 +63,17 @@ export const bulkUpdateInventory = (updates: InventoryUpdate[]) =>
 
 export const adjustStock = (data: { variant_id: string; warehouse_id: string; type: 'add' | 'min' | 'set'; qty: number }) =>
   client.post('/inventory/adjust/', data)
+
+export const getAvgSales = (variantIds: string[], days: number) =>
+  client.get<AvgSalesResult>('/avg-sales/', {
+    params: { variant_ids: variantIds.join(','), days },
+  })
+
+export const getInventorySummary = () =>
+  client.get<InventorySummaryResponse>('/inventory-summary/')
+
+export const updateVariantPrice = (productId: string, variantId: string, basePrice: number) =>
+  client.patch<{ id: string; base_price: number }>(
+    `/product/${productId}/update_variant_price/${variantId}/`,
+    { base_price: basePrice }
+  )

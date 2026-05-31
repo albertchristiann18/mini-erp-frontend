@@ -14,22 +14,33 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', to: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
+  {
+    label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />,
+    children: [
+      { label: 'Overview', to: '/' },
+      { label: 'Inventory Dashboard', to: '/inventory/inventory-dashboard' },
+    ],
+  },
   {
     label: 'Inventory', icon: <Package className="h-4 w-4" />,
     children: [
       { label: 'Products', to: '/inventory/products' },
       { label: 'Stock', to: '/inventory/stock' },
+      { label: 'Stock Closing', to: '/inventory/stock-closing' },
       { label: 'Warehouses', to: '/inventory/warehouses' },
     ],
   },
   {
     label: 'Purchasing', icon: <Boxes className="h-4 w-4" />,
-    children: [{ label: 'Purchase Orders', to: '/purchasing/orders' }],
+    children: [
+      { label: 'Purchase Orders', to: '/purchasing/orders' },
+      { label: 'Replenishment', to: '/purchasing/replenishment' },
+    ],
   },
   {
     label: 'Sales', icon: <ShoppingCart className="h-4 w-4" />,
     children: [
+      { label: 'Sales Dashboard', to: '/sales/dashboard' },
       { label: 'Sales Orders', to: '/sales/orders' },
       { label: 'Returns', to: '/sales/returns' },
     ],
@@ -41,6 +52,7 @@ const navItems: NavItem[] = [
       { label: 'Accounts Payable', to: '/finance/payable' },
       { label: 'Accounts Receivable', to: '/finance/receivable' },
       { label: 'Reports', to: '/finance/reports' },
+      { label: 'Cash Transactions', to: '/finance/cash-transactions' },
     ],
   },
   {
