@@ -408,6 +408,12 @@ export default function PurchaseOrderDetailPage() {
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Freight (IDR)</p>
+                <p className="text-sm font-semibold">
+                  {po.shipping_fee != null && po.shipping_fee > 0 ? formatIDR(po.shipping_fee) : '—'}
+                </p>
+              </div>
               <EditableInfoItem
                 field="forecast_cbm"
                 label="Forecast CBM"

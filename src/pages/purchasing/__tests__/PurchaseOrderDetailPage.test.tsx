@@ -249,3 +249,8 @@ it('shows variant search select in new item row after clicking Add Item', async 
   await userEvent.click(addBtn)
   expect(await screen.findByTestId('variant-search-select')).toBeInTheDocument()
 })
+
+it('renders Freight (IDR) label in PO info card', async () => {
+  renderPage()
+  expect(await screen.findByText('Freight (IDR)')).toBeInTheDocument()
+})

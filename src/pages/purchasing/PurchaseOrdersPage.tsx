@@ -171,7 +171,7 @@ export default function PurchaseOrdersPage() {
               <TableHead className="text-right">CBM</TableHead>
               <SortableHead field="total_ordered_qty" label="QTY" ordering={ordering} onSort={handleSort} className="text-right" />
               <SortableHead field="total_item_amount" label="Goods" ordering={ordering} onSort={handleSort} className="text-right" />
-              <SortableHead field="commission_fee" label="Commission" ordering={ordering} onSort={handleSort} className="text-right" />
+              <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-right">Supplier Delivery</TableHead>
               <SortableHead field="shipping_fee" label="Freight" ordering={ordering} onSort={handleSort} className="text-right" />
               <TableHead className="text-right">Ship/QTY</TableHead>
@@ -196,7 +196,7 @@ export default function PurchaseOrdersPage() {
                 </TableCell>
                 <TableCell className="text-right">{po.total_ordered_qty}</TableCell>
                 <TableCell className="text-right text-xs">{po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'}</TableCell>
-                <TableCell className="text-right text-xs">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</TableCell>
+                <TableCell className="text-right text-xs">{po.total_amount != null ? formatIDR(po.total_amount) : '—'}</TableCell>
                 <TableCell className="text-right text-xs">{po.delivery_fee_idr != null ? formatIDR(po.delivery_fee_idr) : '—'}</TableCell>
                 <TableCell className="text-right text-xs">{po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'}</TableCell>
                 <TableCell className="text-right text-xs">{po.shipping_per_qty != null ? formatIDR(po.shipping_per_qty) : '—'}</TableCell>
