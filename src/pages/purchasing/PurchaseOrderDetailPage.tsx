@@ -1,15 +1,14 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../hooks/usePurchasing'
-import { useProductVariants } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
+import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { ArrowLeft, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
@@ -90,8 +89,6 @@ export default function PurchaseOrderDetailPage() {
     discounted_unit_price_foreign: string
   }>>([])
   const updateMutation = useUpdatePurchaseOrder()
-  const { data: variantsData } = useProductVariants()
-  const variants = variantsData?.results ?? []
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -543,21 +540,11 @@ export default function PurchaseOrderDetailPage() {
               {editMode && canAddDeleteItems && newItems.map((newItem) => (
                 <TableRow key={newItem._tempId}>
                   <TableCell>
-                    <Select
+                    <VariantSearchSelect
                       value={newItem.product_variant_id}
-                      onValueChange={(v) => updateNewItem(newItem._tempId, 'product_variant_id', v)}
-                    >
-                      <SelectTrigger className="h-7 text-xs">
-                        <SelectValue placeholder="Select variant" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {variants.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.name} ({v.sku_variant_code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onSelect={(id) => updateNewItem(newItem._tempId, 'product_variant_id', id)}
+                      placeholder="Select variant"
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <Input type="number" className="h-7 w-16 text-xs text-right"

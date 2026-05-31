@@ -9,8 +9,12 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { is_staff: true } }),
 }))
 
-vi.mock('../../../hooks/useInventory', () => ({
-  useProductVariants: () => ({ data: { results: [] } }),
+vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
+  VariantSearchSelect: ({ onSelect, placeholder }: { value: string; onSelect: (id: string) => void; placeholder?: string }) => (
+    <button data-testid="variant-search-select" onClick={() => onSelect('v-mock')}>
+      {placeholder ?? 'Select variant'}
+    </button>
+  ),
 }))
 
 vi.mock('../../../hooks/usePurchasing', () => ({
@@ -227,4 +231,13 @@ it('shows delete button per row in edit mode for ORDERED status', async () => {
 it('hides Add Item button when not in edit mode', async () => {
   renderPage()
   expect(screen.queryByText('Add Item')).not.toBeInTheDocument()
+})
+
+it('shows variant search select in new item row after clicking Add Item', async () => {
+  renderPage()
+  const editBtn = await screen.findByText('Edit')
+  await userEvent.click(editBtn)
+  const addBtn = await screen.findByText('Add Item')
+  await userEvent.click(addBtn)
+  expect(await screen.findByTestId('variant-search-select')).toBeInTheDocument()
 })

@@ -46,6 +46,16 @@ export const useProductVariants = (page = 1, pageSize = 100) =>
     queryFn: () => getProductVariants({ page, page_size: pageSize }).then(r => r.data),
   })
 
+export const useVariantSearch = (
+  params: { search?: string; page_size?: number },
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: ['variant-search', params],
+    queryFn: () => getProductVariantStocks({ ...params }).then(r => r.data),
+    enabled,
+  })
+
 export const useWarehouses = (page = 1, pageSize = 100) =>
   useQuery({
     queryKey: ['warehouses', page, pageSize],
