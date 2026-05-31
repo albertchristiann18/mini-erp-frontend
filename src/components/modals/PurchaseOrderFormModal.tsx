@@ -21,6 +21,8 @@ const itemSchema = z.object({
 
 const schema = z.object({
   warehouse_id: z.string().min(1, 'Warehouse is required'),
+  currency: z.string().optional(),
+  exchange_rate: z.number().positive('Must be > 0').optional(),
   order_details: z.array(itemSchema).min(1, 'At least one item required'),
 })
 type FormValues = z.infer<typeof schema>
@@ -41,7 +43,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
 
   const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { order_details: [{ product_variant_id: '', ordered_qty: 1, unit_price_foreign: 0 }] },
+    defaultValues: { currency: 'CNY', order_details: [{ product_variant_id: '', ordered_qty: 1, unit_price_foreign: 0 }] },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'order_details' })
@@ -49,8 +51,11 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   const handleClose = () => { reset(); onClose() }
 
   const onSubmit = async (values: FormValues) => {
+    const payload: Record<string, unknown> = { ...values }
+    if (!payload.currency) delete payload.currency
+    if (!payload.exchange_rate) delete payload.exchange_rate
     try {
-      await createMutation.mutateAsync(values)
+      await createMutation.mutateAsync(payload)
     } catch {
       toast.error('Failed to create purchase order')
     }
@@ -65,7 +70,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
           <DialogTitle>New Purchase Order</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <FormField label="Warehouse" error={errors.warehouse_id?.message} required>
               <Select
                 value={watch('warehouse_id')}
@@ -78,6 +83,25 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                   ))}
                 </SelectContent>
               </Select>
+            </FormField>
+            <FormField label="Currency">
+              <Select
+                value={watch('currency')}
+                onValueChange={(v) => setValue('currency', v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CNY">CNY (¥ Yuan)</SelectItem>
+                  <SelectItem value="USD">USD ($ Dollar)</SelectItem>
+                  <SelectItem value="EUR">EUR (€ Euro)</SelectItem>
+                  <SelectItem value="SGD">SGD (S$ Singapore)</SelectItem>
+                  <SelectItem value="MYR">MYR (RM Ringgit)</SelectItem>
+                  <SelectItem value="IDR">IDR (Rp Rupiah)</SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
+            <FormField label="Exchange Rate (IDR)">
+              <Input type="number" step={0.001} placeholder="e.g. 2250" {...register('exchange_rate', { valueAsNumber: true })} />
             </FormField>
           </div>
 
