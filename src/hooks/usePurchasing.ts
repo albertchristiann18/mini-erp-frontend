@@ -18,11 +18,14 @@ export const usePurchaseOrder = (id: string) =>
     enabled: !!id,
   })
 
-export const useCreatePurchaseOrder = () => {
+export const useCreatePurchaseOrder = (onCreated?: (id: string) => void) => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: unknown) => createPurchaseOrder(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchase-orders'] }),
+    mutationFn: (data: unknown) => createPurchaseOrder(data).then(r => r.data),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      onCreated?.(data.id)
+    },
   })
 }
 

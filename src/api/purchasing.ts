@@ -9,7 +9,7 @@ export const getPurchaseOrder = (id: string) =>
   client.get<PurchaseOrder>(`/purchase-order/${id}/`)
 
 export const createPurchaseOrder = (data: unknown) =>
-  client.post('/purchase-order/', data)
+  client.post<{ id: string }>('/purchase-order/', data)
 
 export const updatePurchaseOrder = (id: string, data: Record<string, unknown>) => {
   const hasFile = Object.values(data).some(v => v instanceof File)
