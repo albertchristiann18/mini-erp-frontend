@@ -24,6 +24,7 @@ const schema = z.object({
   variant_sku: z.string().optional(),
   selling_price: z.number().optional(),
   is_active: z.boolean().optional(),
+  supplier_link: z.string().url('Must be a valid URL').optional().or(z.literal('')),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -56,6 +57,7 @@ export function ProductFormModal({ open, onClose, product }: Props) {
       setValue('category', product.category)
       setValue('description', product.description)
       setValue('is_active', product.is_active)
+      setValue('supplier_link', product.supplier_link ?? '')
       setPhotos(product.photos || [])
     }
   }, [product, open, setValue])
@@ -77,6 +79,7 @@ export function ProductFormModal({ open, onClose, product }: Props) {
             description: values.description,
             category: values.category,
             is_active: values.is_active,
+            supplier_link: values.supplier_link || null,
           },
         })
         toast.success('Product updated')
@@ -91,6 +94,7 @@ export function ProductFormModal({ open, onClose, product }: Props) {
       sku: values.sku,
       category: values.category,
       description: values.description,
+      supplier_link: values.supplier_link || null,
       variants: [{
         name: values.variant_name,
         sku: `${values.sku}-${values.variant_sku}`,
@@ -157,6 +161,13 @@ export function ProductFormModal({ open, onClose, product }: Props) {
             <p className="text-xs text-muted-foreground mt-1">
               {watch('description')?.length || 0}/25 minimum characters
             </p>
+          </FormField>
+          <FormField label="Supplier Link" error={errors.supplier_link?.message}>
+            <Input
+              {...register('supplier_link')}
+              placeholder="https://..."
+              type="url"
+            />
           </FormField>
           {isEditing && (
             <FormField label="Status">

@@ -29,6 +29,7 @@ const mockProduct = {
   height: 0,
   weight: 0,
   is_active: true,
+  supplier_link: null,
   cdate: '',
   udate: '',
   variants: [

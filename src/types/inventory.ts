@@ -31,6 +31,7 @@ export interface Product {
   height: number
   weight: number
   is_active: boolean
+  supplier_link: string | null
   photos?: ProductPhoto[]
   variants?: ProductVariant[]
   cdate: string
