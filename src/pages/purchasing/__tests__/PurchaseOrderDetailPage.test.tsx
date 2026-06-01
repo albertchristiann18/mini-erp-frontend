@@ -273,3 +273,11 @@ it('shows correct group qty and cost totals', async () => {
   )).toBeInTheDocument()
   expect(screen.getByText(/Cost:/)).toBeInTheDocument()
 })
+
+it('shows currency as select in edit mode', async () => {
+  renderPage()
+  const editBtn = await screen.findByText('Edit')
+  await userEvent.click(editBtn)
+  const comboboxes = await screen.findAllByRole('combobox')
+  expect(comboboxes.length).toBeGreaterThanOrEqual(1)
+})

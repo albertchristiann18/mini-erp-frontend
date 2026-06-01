@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../hooks/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
@@ -8,6 +8,7 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { ArrowLeft, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
@@ -40,16 +41,24 @@ const statusVariant: Record<POStatus, BadgeProps['variant']> = {
 
 type FieldInputConfig = {
   label: string
-  inputType: 'text' | 'number' | 'date' | 'file'
+  inputType: 'text' | 'number' | 'date' | 'file' | 'select'
   step?: string
   suffix?: string
+  options?: { value: string; label: string }[]
 }
 
 const HEADER_FIELD_CONFIG: Record<string, FieldInputConfig> = {
   supplier_name:               { label: 'Supplier',            inputType: 'text' },
   forwarder_name:              { label: 'Forwarder',           inputType: 'text' },
   shop_services:               { label: 'Jasa Belanja',        inputType: 'text' },
-  currency:                    { label: 'Currency',            inputType: 'text' },
+  currency:                    { label: 'Currency',            inputType: 'select', options: [
+    { value: 'CNY', label: 'CNY (¥ Yuan)' },
+    { value: 'USD', label: 'USD ($ Dollar)' },
+    { value: 'EUR', label: 'EUR (€ Euro)' },
+    { value: 'SGD', label: 'SGD (S$ Singapore)' },
+    { value: 'MYR', label: 'MYR (RM Ringgit)' },
+    { value: 'IDR', label: 'IDR (Rp Rupiah)' },
+  ] },
   exchange_rate:               { label: 'Exchange Rate',       inputType: 'number', step: '0.001' },
   commission_fee_pct:          { label: 'Commission %',        inputType: 'number' },
   delivery_fee:               { label: 'Delivery Fee (RMB)',  inputType: 'number', step: '0.001' },
@@ -92,6 +101,18 @@ export default function PurchaseOrderDetailPage() {
     discounted_unit_price_foreign: string
   }>>([])
   const updateMutation = useUpdatePurchaseOrder()
+  const [hasDiscount, setHasDiscount] = useState(false)
+
+  useEffect(() => {
+    if (!po) return
+    const anyDiscounted = (po.order_details ?? []).some(item =>
+      item.discounted_unit_price_foreign != null &&
+      item.discounted_unit_price_foreign !== item.unit_price_foreign
+    )
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasDiscount(anyDiscounted)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
+  }, [po?.id])
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -189,16 +210,20 @@ export default function PurchaseOrderDetailPage() {
     if (canAddDel && (deletedDetailIds.size > 0 || newItems.length > 0)) {
       const keptExisting = (po.order_details ?? [])
         .filter(item => !deletedDetailIds.has(item.id))
-        .map(item => ({ id: item.id, ...(detailValues[item.id] ?? {}) }))
+        .map(item => {
+          const changes = { ...(detailValues[item.id] ?? {}) }
+          if (!hasDiscount) delete changes.discounted_unit_price_foreign
+          return { id: item.id, ...changes }
+        })
       const newItemsPayload = newItems
         .filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign)
         .map(n => ({
           product_variant_id: n.product_variant_id,
           ordered_qty: Number(n.ordered_qty),
           unit_price_foreign: Number(n.unit_price_foreign),
-          discounted_unit_price_foreign: n.discounted_unit_price_foreign
-            ? Number(n.discounted_unit_price_foreign)
-            : undefined,
+          ...(hasDiscount && n.discounted_unit_price_foreign
+            ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
+            : {}),
         }))
       payload.order_details = [...keptExisting, ...newItemsPayload]
     } else {
@@ -461,18 +486,29 @@ export default function PurchaseOrderDetailPage() {
           <div className="rounded-lg border bg-card">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-base font-semibold">Order Items</h2>
-              {editMode && canAddDeleteItems && (
-                <Button type="button" size="sm" variant="outline" onClick={addNewItem}>
-                  <Plus className="h-3 w-3 mr-1" /> Add Item
-                </Button>
-              )}
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={hasDiscount}
+                    onChange={e => setHasDiscount(e.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  Has Discount
+                </label>
+                {editMode && canAddDeleteItems && (
+                  <Button type="button" size="sm" variant="outline" onClick={addNewItem}>
+                    <Plus className="h-3 w-3 mr-1" /> Add Item
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30">
+            <div className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30`}>
               <span>Variant</span>
               <span className="text-right">Ordered</span>
               <span className="text-right">Received</span>
               <span className="text-right">Unit Price</span>
-              <span className="text-right">Disc. Price</span>
+              {hasDiscount && <span className="text-right">Disc. Price</span>}
               <span className="text-right">Total (IDR)</span>
               <span>Remarks</span>
               <span />
@@ -524,7 +560,10 @@ export default function PurchaseOrderDetailPage() {
             })().map(group => {
               const groupQty = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
                 group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
-              const groupCost = group.existingItems.reduce((s, i) => s + (i.discounted_total_price_base ?? 0), 0)
+              const groupCost = group.existingItems.reduce((s, i) => {
+                if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
+                return s + (i.total_price_base ?? 0)
+              }, 0)
               const showRemarks = po.editable_fields.order_detail.includes('remarks') && editMode
 
               return (
@@ -546,7 +585,7 @@ export default function PurchaseOrderDetailPage() {
                     const isDetailEditable = (field: string) =>
                       editMode && po.editable_fields.order_detail.includes(field)
                     return (
-                      <div key={item.id} className="grid grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px] gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0">
+                      <div key={item.id} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
                         <span className="font-mono font-medium">{item.product_variant_name}</span>
                         <span className="text-right">
                           {isDetailEditable('ordered_qty') ? (
@@ -568,10 +607,16 @@ export default function PurchaseOrderDetailPage() {
                               <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
                               <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
                                 value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
-                                onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
+                                onChange={e => {
+                                  setDetailField(item.id, 'unit_price_foreign', e.target.value)
+                                  if (hasDiscount) {
+                                    setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
+                                  }
+                                }} />
                             </div>
                           ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
                         </span>
+                        {hasDiscount && (
                         <span className="text-right">
                           {isDetailEditable('discounted_unit_price_foreign') ? (
                             <div className="flex items-center gap-1 justify-end">
@@ -582,8 +627,11 @@ export default function PurchaseOrderDetailPage() {
                             </div>
                           ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
                         </span>
+                        )}
                         <span className="text-right font-medium">
-                          {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
+                          {hasDiscount
+                            ? (item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—')
+                            : (item.total_price_base != null ? formatIDR(item.total_price_base) : '—')}
                         </span>
                         {showRemarks ? (
                           <Input className="h-7 text-xs" placeholder="Remarks..."
@@ -601,7 +649,7 @@ export default function PurchaseOrderDetailPage() {
                     )
                   })}
                   {editMode && canAddDeleteItems && group.newItemsList.map(n => (
-                    <div key={n._tempId} className="grid grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px] gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0">
+                    <div key={n._tempId} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
                       <VariantSearchSelect
                         value={n.product_variant_id}
                         selectedLabel={n.product_variant_label}
@@ -622,14 +670,21 @@ export default function PurchaseOrderDetailPage() {
                         <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
                         <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
                           value={n.unit_price_foreign}
-                          onChange={e => updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)} />
+                          onChange={e => {
+                            updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)
+                            if (hasDiscount) {
+                              updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)
+                            }
+                          }} />
                       </div>
+                      {hasDiscount && (
                       <div className="flex items-center gap-1 justify-end">
                         <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
                         <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
                           value={n.discounted_unit_price_foreign}
                           onChange={e => updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)} />
                       </div>
+                      )}
                       <span />
                       <span />
                       <Button type="button" size="icon" variant="ghost"
@@ -835,6 +890,26 @@ function EditableInfoItem({
 }) {
   const cfg = HEADER_FIELD_CONFIG[field]
   if (editMode && editable && cfg) {
+    if (cfg.inputType === 'select' && cfg.options) {
+      return (
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+          <Select
+            value={String(headerValues[field] ?? value ?? '')}
+            onValueChange={val => setHeaderField(field, val)}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              {cfg.options.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )
+    }
     if (cfg.inputType === 'file') {
       const existingUrl = typeof value === 'string' && value ? value : null
       return (

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,6 +21,7 @@ const itemSchema = z.object({
   product_supplier_link: z.string().nullable().optional(),
   ordered_qty: z.number().min(1, 'Min 1'),
   unit_price_foreign: z.number().min(0, 'Required'),
+  discounted_unit_price_foreign: z.number().min(0).optional(),
 })
 
 const schema = z.object({
@@ -46,20 +48,24 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
 
   const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0 }] },
+    defaultValues: { currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined }] },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'order_details' })
+  const [hasDiscount, setHasDiscount] = useState(false)
 
-  const handleClose = () => { reset(); onClose() }
+  const handleClose = () => { reset(); setHasDiscount(false); onClose() }
 
   const onSubmit = async (values: FormValues) => {
     const payload: Record<string, unknown> = {
       ...values,
-      order_details: values.order_details.map(({ product_variant_id, ordered_qty, unit_price_foreign }) => ({
+      order_details: values.order_details.map(({ product_variant_id, ordered_qty, unit_price_foreign, discounted_unit_price_foreign }) => ({
         product_variant_id,
         ordered_qty,
         unit_price_foreign,
+        ...(hasDiscount && discounted_unit_price_foreign != null
+          ? { discounted_unit_price_foreign }
+          : {}),
       }))
     }
     if (!payload.currency) delete payload.currency
@@ -149,9 +155,20 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-foreground">Order Items</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0 })}>
-                <Plus className="h-3 w-3 mr-1" /> Add Item
-              </Button>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={hasDiscount}
+                    onChange={e => setHasDiscount(e.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  Has Discount
+                </label>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined })}>
+                  <Plus className="h-3 w-3 mr-1" /> Add Item
+                </Button>
+              </div>
             </div>
             {errors.order_details?.root && (
               <p className="text-xs text-red-500">{errors.order_details.root.message}</p>
@@ -160,7 +177,10 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
               const groupQty = group.indices.reduce((sum, i) => sum + (watchedItems[i]?.ordered_qty ?? 0), 0)
               const groupCost = group.indices.reduce((sum, i) => {
                 const item = watchedItems[i]
-                return sum + (item?.ordered_qty ?? 0) * (item?.unit_price_foreign ?? 0)
+                const price = hasDiscount && (item?.discounted_unit_price_foreign ?? 0) > 0
+                  ? (item?.discounted_unit_price_foreign ?? 0)
+                  : (item?.unit_price_foreign ?? 0)
+                return sum + (item?.ordered_qty ?? 0) * price
               }, 0)
               return (
                 <div key={group.productId} className="space-y-1">
@@ -177,7 +197,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                     <span className="text-xs text-muted-foreground">Cost: <span className="font-bold text-foreground">{currSymbol}{groupCost.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</span></span>
                   </div>
                   {group.indices.map(i => (
-                    <div key={fields[i].id} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end pl-2">
+                    <div key={fields[i].id} className={`grid ${hasDiscount ? 'grid-cols-[1fr_80px_100px_100px_32px]' : 'grid-cols-[1fr_80px_100px_32px]'} gap-2 items-end pl-2`}>
                       <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
                         <VariantSearchSelect
                           value={watch(`order_details.${i}.product_variant_id`)}
@@ -194,8 +214,28 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                         <Input type="number" {...register(`order_details.${i}.ordered_qty`, { valueAsNumber: true })} />
                       </FormField>
                       <FormField label={''} error={errors.order_details?.[i]?.unit_price_foreign?.message}>
-                        <Input type="number" {...register(`order_details.${i}.unit_price_foreign`, { valueAsNumber: true })} />
+                        <Input
+                          type="number"
+                          step="0.001"
+                          value={watch(`order_details.${i}.unit_price_foreign`) ?? ''}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value)
+                            setValue(`order_details.${i}.unit_price_foreign`, isNaN(val) ? 0 : val, { shouldValidate: true })
+                            if (hasDiscount) {
+                              setValue(`order_details.${i}.discounted_unit_price_foreign`, isNaN(val) ? 0 : val)
+                            }
+                          }}
+                        />
                       </FormField>
+                      {hasDiscount && (
+                        <FormField label={''} error={errors.order_details?.[i]?.discounted_unit_price_foreign?.message}>
+                          <Input
+                            type="number"
+                            step="0.001"
+                            {...register(`order_details.${i}.discounted_unit_price_foreign`, { valueAsNumber: true })}
+                          />
+                        </FormField>
+                      )}
                       <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end">
                         <Trash2 className="h-4 w-4" />
                       </Button>
