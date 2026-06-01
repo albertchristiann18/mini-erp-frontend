@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
+import { ArrowLeft, ChevronRight, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, PurchaseOrderDetail } from '../../types/purchasing'
@@ -104,6 +104,14 @@ export default function PurchaseOrderDetailPage() {
   }>>([])
   const updateMutation = useUpdatePurchaseOrder()
   const [hasDiscount, setHasDiscount] = useState(false)
+  const [expandedCostAnalysis, setExpandedCostAnalysis] = useState<Set<string>>(new Set())
+  const toggleCostAnalysis = (key: string) =>
+    setExpandedCostAnalysis(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
   useEffect(() => {
     if (!po) return
@@ -607,6 +615,17 @@ export default function PurchaseOrderDetailPage() {
           <span />
         </div>
         {(() => {
+          const poExchangeRate = Number(po.exchange_rate ?? 0)
+          const freightPerUnit = po.shipping_fee && po.total_ordered_qty
+            ? Math.round(po.shipping_fee / po.total_ordered_qty)
+            : 0
+          const commissionPerUnit = po.commission_fee && po.total_ordered_qty
+            ? Math.round(po.commission_fee / po.total_ordered_qty)
+            : 0
+          const cogsRatioForecast = po.cogs_ratio_forecast != null
+            ? Number(po.cogs_ratio_forecast)
+            : null
+
           const visibleDetails = (po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
 
           type DisplayGroup = {
@@ -652,8 +671,7 @@ export default function PurchaseOrderDetailPage() {
             }
           }
 
-          return Array.from(groupMap.values())
-        })().map(group => {
+          return Array.from(groupMap.values()).map(group => {
           const groupQty = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
             group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
           const groupCost = group.existingItems.reduce((s, i) => {
@@ -818,9 +836,59 @@ export default function PurchaseOrderDetailPage() {
                   </Button>
                 </div>
               ))}
+              {/* Cost Analysis toggle */}
+              {group.existingItems.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => toggleCostAnalysis(group.groupKey)}
+                    className="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/20 transition-colors border-t"
+                  >
+                    <ChevronRight className={cn('h-3 w-3 transition-transform', expandedCostAnalysis.has(group.groupKey) && 'rotate-90')} />
+                    Cost Analysis
+                  </button>
+
+                  {expandedCostAnalysis.has(group.groupKey) && (
+                    <div className="border-t bg-muted/10">
+                      {/* Column headers */}
+                      <div className={`grid ${cogsRatioForecast != null ? 'grid-cols-[1fr_110px_110px_110px_120px_130px]' : 'grid-cols-[1fr_110px_110px_110px_120px]'} gap-2 px-3 py-1.5 text-xs font-medium text-muted-foreground border-b`}>
+                        <span>Variant</span>
+                        <span className="text-right">Unit IDR</span>
+                        <span className="text-right">Freight/unit</span>
+                        <span className="text-right">Commission/unit</span>
+                        <span className="text-right font-semibold">Total Cost/unit</span>
+                        {cogsRatioForecast != null && <span className="text-right">COGS Forecast/unit</span>}
+                      </div>
+                      {/* Data rows */}
+                      {group.existingItems.map(item => {
+                        const unitPriceIdr = Math.round(Number(item.unit_price_foreign ?? 0) * poExchangeRate)
+                        const totalCostPerUnit = unitPriceIdr + freightPerUnit + commissionPerUnit
+                        const cogsForecastPerUnit = cogsRatioForecast != null
+                          ? Math.round(unitPriceIdr * (1 + cogsRatioForecast / 100))
+                          : null
+                        return (
+                          <div
+                            key={`cost-${item.id}`}
+                            className={`grid ${cogsRatioForecast != null ? 'grid-cols-[1fr_110px_110px_110px_120px_130px]' : 'grid-cols-[1fr_110px_110px_110px_120px]'} gap-2 px-3 py-1.5 text-xs border-b last:border-b-0`}
+                          >
+                            <span className="font-mono text-muted-foreground truncate">{item.product_variant_name}</span>
+                            <span className="text-right">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</span>
+                            <span className="text-right">{freightPerUnit > 0 ? formatIDR(freightPerUnit) : '—'}</span>
+                            <span className="text-right">{commissionPerUnit > 0 ? formatIDR(commissionPerUnit) : '—'}</span>
+                            <span className="text-right font-semibold">{totalCostPerUnit > 0 ? formatIDR(totalCostPerUnit) : '—'}</span>
+                            {cogsForecastPerUnit != null && (
+                              <span className="text-right font-semibold text-amber-600">{formatIDR(cogsForecastPerUnit)}</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )
-        })}
+        })})()}
       </div>
 
       {/* Section 4 — Order Summary + Status History */}
