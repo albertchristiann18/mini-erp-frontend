@@ -487,15 +487,17 @@ export default function PurchaseOrderDetailPage() {
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-base font-semibold">Order Items</h2>
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={hasDiscount}
-                    onChange={e => setHasDiscount(e.target.checked)}
-                    className="h-3.5 w-3.5"
-                  />
-                  Has Discount
-                </label>
+                {editMode && (
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={hasDiscount}
+                      onChange={e => setHasDiscount(e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    Has Discount
+                  </label>
+                )}
                 {editMode && canAddDeleteItems && (
                   <Button type="button" size="sm" variant="outline" onClick={addNewItem}>
                     <Plus className="h-3 w-3 mr-1" /> Add Item
@@ -629,13 +631,25 @@ export default function PurchaseOrderDetailPage() {
                         </span>
                         )}
                         <span className="text-right font-medium">
-                          {hasDiscount
-                            ? (item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—')
-                            : (item.total_price_base != null
-                                ? formatIDR(item.total_price_base)
-                                : item.discounted_total_price_base != null
-                                  ? formatIDR(item.discounted_total_price_base)
-                                  : '—')}
+                          {(() => {
+                            if (editMode) {
+                              const effectivePrice = hasDiscount
+                                ? Number(rowChanges.discounted_unit_price_foreign ?? item.discounted_unit_price_foreign ?? item.unit_price_foreign ?? 0)
+                                : Number(rowChanges.unit_price_foreign ?? item.unit_price_foreign ?? 0)
+                              const effectiveQty = Number(rowChanges.ordered_qty ?? item.ordered_qty ?? 0)
+                              const rate = Number(po.exchange_rate ?? 0)
+                              const live = Math.round(effectivePrice * effectiveQty * rate)
+                              return live > 0 ? formatIDR(live) : '—'
+                            }
+                            if (hasDiscount) {
+                              return item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'
+                            }
+                            return item.total_price_base != null
+                              ? formatIDR(item.total_price_base)
+                              : item.discounted_total_price_base != null
+                                ? formatIDR(item.discounted_total_price_base)
+                                : '—'
+                          })()}
                         </span>
                         {showRemarks ? (
                           <Input className="h-7 text-xs" placeholder="Remarks..."
