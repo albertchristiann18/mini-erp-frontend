@@ -290,198 +290,9 @@ export default function PurchaseOrderDetailPage() {
       </div>
 
       {/* Two-column grid */}
-      <div className="grid grid-cols-3 gap-6">
-        {/* LEFT COLUMN — 2 cols wide */}
-        <div className="col-span-2 space-y-6">
-          {/* Card 1 — PO Information */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Purchase Order Information</h2>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-5">
-              <EditableInfoItem
-                field="supplier_name"
-                label="Supplier"
-                value={po.supplier_name}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('supplier_name')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="forwarder_name"
-                label="Forwarder"
-                value={po.forwarder_name}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('forwarder_name')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="shop_services"
-                label="Jasa Belanja"
-                value={po.shop_services}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('shop_services')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="invoice_number"
-                label="Invoice No."
-                value={po.invoice_number}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('invoice_number')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="invoice_date"
-                label="Invoice Date"
-                value={po.invoice_date ? formatDate(po.invoice_date) : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('invoice_date')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="delivery_order_number"
-                label="Delivery Order No."
-                value={po.delivery_order_number}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_order_number')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="delivery_date"
-                label="Delivery Date"
-                value={po.delivery_date ? formatDate(po.delivery_date) : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_date')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="forecast_delivery_date"
-                label="Forecast Delivery"
-                value={po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_delivery_date')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-            </div>
-            <div className="border-t pt-4 grid grid-cols-2 gap-x-8 gap-y-4">
-              <EditableInfoItem
-                field="currency"
-                label="Currency"
-                value={po.currency}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('currency')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="exchange_rate"
-                label="Exchange Rate"
-                value={po.exchange_rate != null ? `Rp ${Number(po.exchange_rate).toLocaleString('id-ID')}` : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('exchange_rate')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="commission_fee_pct"
-                label="Commission %"
-                value={po.commission_fee_pct != null ? `${po.commission_fee_pct}%` : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('commission_fee_pct')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="delivery_fee"
-                label="Delivery Fee (RMB)"
-                value={po.delivery_fee != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(po.delivery_fee)}` : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_fee')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Commission (IDR)</p>
-                <p className="text-sm font-semibold">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</p>
-              </div>
-              <EditableInfoItem
-                field="cbm"
-                label="CBM"
-                value={po.cbm != null ? `${formatDecimalUnit(po.cbm)} m³ (actual)` : po.forecast_cbm != null ? `${formatDecimalUnit(po.forecast_cbm)} m³ (forecast)` : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('cbm')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="weight"
-                label="Weight (kg)"
-                value={po.weight != null ? formatDecimalUnit(po.weight, 'kg') : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('weight')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="shipping_fee_per_cbm"
-                label="Shipping Fee / CBM"
-                value={po.shipping_fee_per_cbm != null ? formatIDR(po.shipping_fee_per_cbm) : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('shipping_fee_per_cbm')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Freight (IDR)</p>
-                <p className="text-sm font-semibold">
-                  {po.shipping_fee != null && po.shipping_fee > 0 ? formatIDR(po.shipping_fee) : '—'}
-                </p>
-              </div>
-              <EditableInfoItem
-                field="forecast_cbm"
-                label="Forecast CBM"
-                value={po.forecast_cbm != null ? formatDecimalUnit(po.forecast_cbm, 'm3') : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_cbm')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
-                field="forecast_shipping_fee"
-                label="Forecast Shipping"
-                value={po.forecast_shipping_fee != null ? formatIDR(po.forecast_shipping_fee) : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_shipping_fee')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-            </div>
-          </div>
-
-          {/* Notes card */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-3">Notes</h2>
-            {editMode ? (
-              <Textarea
-                className="min-h-[80px] text-sm"
-                placeholder="Add notes..."
-                value={String(headerValues['note'] ?? '')}
-                onChange={e => setHeaderField('note', e.target.value)}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {po.note || 'No notes'}
-              </p>
-            )}
-          </div>
-
+      <div className="grid grid-cols-4 gap-6">
+        {/* LEFT COLUMN — 3 cols wide */}
+        <div className="col-span-3 space-y-6">
           {/* Card 2 — Order Items + summary box */}
           <div className="rounded-lg border bg-card">
             <div className="px-6 py-4 border-b flex items-center justify-between">
@@ -715,26 +526,203 @@ export default function PurchaseOrderDetailPage() {
                 </div>
               )
             })}
-            {/* Summary box — bottom right */}
-            <div className="flex justify-end px-6 py-5 border-t">
-              <div className="w-72 space-y-2 text-sm">
-                <SummaryRow label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
-                <SummaryRow label="Commission" value={po.commission_fee != null ? formatIDR(po.commission_fee) : '—'} />
-                <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
-                <SummaryRow label="Freight" value={po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'} />
-                <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
-                  <span>Total Amount</span>
-                  <span>{formatIDR(po.total_amount)}</span>
-                </div>
-              </div>
-            </div>
+
           </div>
 
         </div>
 
         {/* RIGHT SIDEBAR — 1 col */}
         <div className="space-y-6">
-          {/* Sidebar Card 1 — Attachments */}
+          {/* Sidebar Card — PO Information */}
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-base font-semibold mb-4">Purchase Order Information</h2>
+            <div className="grid grid-cols-1 gap-x-8 gap-y-4 mb-5">
+              <EditableInfoItem
+                field="supplier_name"
+                label="Supplier"
+                value={po.supplier_name}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('supplier_name')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forwarder_name"
+                label="Forwarder"
+                value={po.forwarder_name}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forwarder_name')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="shop_services"
+                label="Jasa Belanja"
+                value={po.shop_services}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('shop_services')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="invoice_number"
+                label="Invoice No."
+                value={po.invoice_number}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('invoice_number')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="invoice_date"
+                label="Invoice Date"
+                value={po.invoice_date ? formatDate(po.invoice_date) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('invoice_date')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="delivery_order_number"
+                label="Delivery Order No."
+                value={po.delivery_order_number}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('delivery_order_number')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="delivery_date"
+                label="Delivery Date"
+                value={po.delivery_date ? formatDate(po.delivery_date) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('delivery_date')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forecast_delivery_date"
+                label="Forecast Delivery"
+                value={po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forecast_delivery_date')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+            </div>
+            <div className="border-t pt-4 grid grid-cols-1 gap-x-8 gap-y-4">
+              <EditableInfoItem
+                field="currency"
+                label="Currency"
+                value={po.currency}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('currency')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="exchange_rate"
+                label="Exchange Rate"
+                value={po.exchange_rate != null ? `Rp ${Number(po.exchange_rate).toLocaleString('id-ID')}` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('exchange_rate')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="commission_fee_pct"
+                label="Commission %"
+                value={po.commission_fee_pct != null ? `${po.commission_fee_pct}%` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('commission_fee_pct')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="delivery_fee"
+                label="Delivery Fee (RMB)"
+                value={po.delivery_fee != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(po.delivery_fee)}` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('delivery_fee')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Commission (IDR)</p>
+                <p className="text-sm font-semibold">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</p>
+              </div>
+              <EditableInfoItem
+                field="cbm"
+                label="CBM"
+                value={po.cbm != null ? `${formatDecimalUnit(po.cbm)} m³ (actual)` : po.forecast_cbm != null ? `${formatDecimalUnit(po.forecast_cbm)} m³ (forecast)` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('cbm')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="weight"
+                label="Weight (kg)"
+                value={po.weight != null ? formatDecimalUnit(po.weight, 'kg') : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('weight')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="shipping_fee_per_cbm"
+                label="Shipping Fee / CBM"
+                value={po.shipping_fee_per_cbm != null ? formatIDR(po.shipping_fee_per_cbm) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('shipping_fee_per_cbm')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Freight (IDR)</p>
+                <p className="text-sm font-semibold">
+                  {po.shipping_fee != null && po.shipping_fee > 0 ? formatIDR(po.shipping_fee) : '—'}
+                </p>
+              </div>
+              <EditableInfoItem
+                field="forecast_cbm"
+                label="Forecast CBM"
+                value={po.forecast_cbm != null ? formatDecimalUnit(po.forecast_cbm, 'm3') : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forecast_cbm')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forecast_shipping_fee"
+                label="Forecast Shipping"
+                value={po.forecast_shipping_fee != null ? formatIDR(po.forecast_shipping_fee) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forecast_shipping_fee')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+            </div>
+          </div>
+
+          {/* Sidebar Card — Notes */}
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="text-base font-semibold mb-3">Notes</h2>
+            {editMode ? (
+              <Textarea
+                className="min-h-[80px] text-sm"
+                placeholder="Add notes..."
+                value={String(headerValues['note'] ?? '')}
+                onChange={e => setHeaderField('note', e.target.value)}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {po.note || 'No notes'}
+              </p>
+            )}
+          </div>
+
+          {/* Sidebar Card — Attachments */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Attachments</h2>
             <div className="space-y-3">
@@ -792,41 +780,25 @@ export default function PurchaseOrderDetailPage() {
             </div>
           </div>
 
-          {/* Sidebar Card 2 — Supplier & Logistics */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Supplier & Logistics</h2>
-            <div className="rounded-lg bg-muted/40 p-4 space-y-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Supplier</p>
-                <p className="text-sm font-semibold">{po.supplier_name ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Forwarder</p>
-                <p className="text-sm font-semibold">{po.forwarder_name ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Jasa Belanja</p>
-                <p className="text-sm font-semibold">{po.shop_services ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Exchange Rate</p>
-                <p className="text-sm font-semibold">{po.exchange_rate ? `Rp ${Number(po.exchange_rate).toLocaleString('id-ID')}` : '—'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar Card 3 — Financial Summary */}
+          {/* Sidebar Card — Financial Summary */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Financial Summary</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <StatBox label="Total Amount" value={formatIDR(po.total_amount)} highlight />
-              <StatBox label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
+            <div className="space-y-3 text-sm">
+              <SummaryRow label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
+              <SummaryRow label="Commission" value={po.commission_fee != null ? formatIDR(po.commission_fee) : '—'} />
+              <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
+              <SummaryRow label="Freight" value={po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'} />
+              <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                <span>Total Amount</span>
+                <span>{formatIDR(po.total_amount)}</span>
+              </div>
+            </div>
+            <div className="border-t pt-3 mt-3">
               <StatBox label="COGS Ratio" value={po.cost_ratio_cogs != null ? `${po.cost_ratio_cogs.toFixed(2)}%` : '—'} />
-              <StatBox label="Ship / QTY" value={po.shipping_per_qty != null ? formatIDR(po.shipping_per_qty) : '—'} />
             </div>
           </div>
 
-          {/* Sidebar Card 4 — Order Summary */}
+          {/* Sidebar Card — Order Summary */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Order Summary</h2>
             <div className="space-y-3 text-sm">
@@ -851,7 +823,7 @@ export default function PurchaseOrderDetailPage() {
             </div>
           </div>
 
-          {/* Sidebar Card 5 — Status History */}
+          {/* Sidebar Card — Status History */}
           {po.status_history && po.status_history.length > 0 && (
             <div className="rounded-lg border bg-card p-6">
               <h2 className="text-base font-semibold mb-4">Status History</h2>
