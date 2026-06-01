@@ -562,7 +562,7 @@ export default function PurchaseOrderDetailPage() {
                 group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
               const groupCost = group.existingItems.reduce((s, i) => {
                 if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
-                return s + (i.total_price_base ?? 0)
+                return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
               }, 0)
               const showRemarks = po.editable_fields.order_detail.includes('remarks') && editMode
 
@@ -631,7 +631,11 @@ export default function PurchaseOrderDetailPage() {
                         <span className="text-right font-medium">
                           {hasDiscount
                             ? (item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—')
-                            : (item.total_price_base != null ? formatIDR(item.total_price_base) : '—')}
+                            : (item.total_price_base != null
+                                ? formatIDR(item.total_price_base)
+                                : item.discounted_total_price_base != null
+                                  ? formatIDR(item.discounted_total_price_base)
+                                  : '—')}
                         </span>
                         {showRemarks ? (
                           <Input className="h-7 text-xs" placeholder="Remarks..."
