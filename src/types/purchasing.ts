@@ -16,6 +16,7 @@ export interface PurchaseOrderDetail {
   product_id: string
   product_name: string
   product_supplier_link: string | null
+  product_photo_url: string | null
   ordered_qty: number
   received_qty: number | null
   unit_price_foreign: string | null
@@ -59,6 +60,7 @@ export interface PurchaseOrder {
   procure_amount: number | null
   refund_amount: number | null
   cost_ratio_cogs: number
+  cogs_ratio_forecast: string | null
   shipping_per_qty: number
   invoice_number: string | null
   invoice_date: string | null

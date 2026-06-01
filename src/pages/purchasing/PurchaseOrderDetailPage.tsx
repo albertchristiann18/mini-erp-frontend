@@ -61,6 +61,7 @@ const HEADER_FIELD_CONFIG: Record<string, FieldInputConfig> = {
   ] },
   exchange_rate:               { label: 'Exchange Rate',       inputType: 'number', step: '0.001' },
   commission_fee_pct:          { label: 'Commission %',        inputType: 'number' },
+  cogs_ratio_forecast:         { label: 'COGS Forecast %',    inputType: 'number', step: '0.01' },
   delivery_fee:               { label: 'Delivery Fee (RMB)',  inputType: 'number', step: '0.001' },
   commission_fee_rmb:          { label: 'Commission (RMB)',    inputType: 'number', step: '0.001' },
   invoice_number:              { label: 'Invoice No.',         inputType: 'text' },
@@ -96,6 +97,7 @@ export default function PurchaseOrderDetailPage() {
     product_id: string
     product_name: string
     product_supplier_link: string | null
+    product_photo_url: string | null
     ordered_qty: string
     unit_price_foreign: string
     discounted_unit_price_foreign: string
@@ -187,6 +189,7 @@ export default function PurchaseOrderDetailPage() {
       product_id: '',
       product_name: '',
       product_supplier_link: null,
+      product_photo_url: null,
       ordered_qty: '1',
       unit_price_foreign: '',
       discounted_unit_price_foreign: '',
@@ -289,251 +292,10 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
-      {/* Two-column grid */}
+      {/* Section 1 — header row */}
       <div className="grid grid-cols-4 gap-6">
-        {/* LEFT COLUMN — 3 cols wide */}
-        <div className="col-span-3 space-y-6">
-          {/* Card 2 — Order Items + summary box */}
-          <div className="rounded-lg border bg-card">
-            <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-base font-semibold">Order Items</h2>
-              <div className="flex items-center gap-3">
-                {editMode && (
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={hasDiscount}
-                      onChange={e => setHasDiscount(e.target.checked)}
-                      className="h-3.5 w-3.5"
-                    />
-                    Has Discount
-                  </label>
-                )}
-                {editMode && canAddDeleteItems && (
-                  <Button type="button" size="sm" variant="outline" onClick={addNewItem}>
-                    <Plus className="h-3 w-3 mr-1" /> Add Item
-                  </Button>
-                )}
-              </div>
-            </div>
-            <div className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30`}>
-              <span>Variant</span>
-              <span className="text-right">Ordered</span>
-              <span className="text-right">Received</span>
-              <span className="text-right">Unit Price</span>
-              {hasDiscount && <span className="text-right">Disc. Price</span>}
-              <span className="text-right">Total (IDR)</span>
-              <span>Remarks</span>
-              <span />
-            </div>
-            {(() => {
-              const visibleDetails = (po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
-
-              type DisplayGroup = {
-                groupKey: string
-                productName: string
-                productSupplierLink: string | null
-                existingItems: PurchaseOrderDetail[]
-                newItemsList: typeof newItems
-              }
-
-              const groupMap = new Map<string, DisplayGroup>()
-
-              for (const item of visibleDetails) {
-                const key = item.product_id || 'unknown'
-                if (!groupMap.has(key)) {
-                  groupMap.set(key, {
-                    groupKey: key,
-                    productName: item.product_name || 'Unknown Product',
-                    productSupplierLink: item.product_supplier_link,
-                    existingItems: [],
-                    newItemsList: [],
-                  })
-                }
-                groupMap.get(key)!.existingItems.push(item)
-              }
-
-              if (editMode && canAddDeleteItems) {
-                for (const n of newItems) {
-                  const key = n.product_id || `new-${n._tempId}`
-                  if (!groupMap.has(key)) {
-                    groupMap.set(key, {
-                      groupKey: key,
-                      productName: n.product_name || 'Unknown Product',
-                      productSupplierLink: n.product_supplier_link,
-                      existingItems: [],
-                      newItemsList: [],
-                    })
-                  }
-                  groupMap.get(key)!.newItemsList.push(n)
-                }
-              }
-
-              return Array.from(groupMap.values())
-            })().map(group => {
-              const groupQty = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
-                group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
-              const groupCost = group.existingItems.reduce((s, i) => {
-                if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
-                return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
-              }, 0)
-              const showRemarks = po.editable_fields.order_detail.includes('remarks') && editMode
-
-              return (
-                <div key={group.groupKey}>
-                  <div className="flex items-center gap-3 px-3 py-2.5 bg-muted/50 border-b">
-                    <span className="text-sm font-bold text-foreground flex-1">{group.productName}</span>
-                    {group.productSupplierLink && (
-                      <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs font-medium">
-                        <ExternalLink className="h-3.5 w-3.5" />
-                        <span>Supplier</span>
-                      </a>
-                    )}
-                    <span className="text-xs text-muted-foreground">Qty: <span className="font-bold text-foreground">{groupQty}</span></span>
-                    <span className="text-xs text-muted-foreground">Cost: <span className="font-bold text-foreground">{groupCost > 0 ? formatIDR(groupCost) : '—'}</span></span>
-                  </div>
-                  {group.existingItems.map(item => {
-                    const rowChanges = detailValues[item.id] ?? {}
-                    const isDetailEditable = (field: string) =>
-                      editMode && po.editable_fields.order_detail.includes(field)
-                    return (
-                      <div key={item.id} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
-                        <span className="font-mono font-medium">{item.product_variant_name}</span>
-                        <span className="text-right">
-                          {isDetailEditable('ordered_qty') ? (
-                            <Input type="number" className="h-7 w-14 text-xs text-right"
-                              value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
-                              onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
-                          ) : item.ordered_qty}
-                        </span>
-                        <span className="text-right">
-                          {isDetailEditable('received_qty') ? (
-                            <Input type="number" className="h-7 w-14 text-xs text-right"
-                              value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
-                              onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
-                          ) : (item.received_qty ?? '—')}
-                        </span>
-                        <span className="text-right">
-                          {isDetailEditable('unit_price_foreign') ? (
-                            <div className="flex items-center gap-1 justify-end">
-                              <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                              <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                                value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
-                                onChange={e => {
-                                  setDetailField(item.id, 'unit_price_foreign', e.target.value)
-                                  if (hasDiscount) {
-                                    setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
-                                  }
-                                }} />
-                            </div>
-                          ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
-                        </span>
-                        {hasDiscount && (
-                        <span className="text-right">
-                          {isDetailEditable('discounted_unit_price_foreign') ? (
-                            <div className="flex items-center gap-1 justify-end">
-                              <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                              <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                                value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
-                                onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                            </div>
-                          ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
-                        </span>
-                        )}
-                        <span className="text-right font-medium">
-                          {(() => {
-                            if (editMode) {
-                              const effectivePrice = hasDiscount
-                                ? Number(rowChanges.discounted_unit_price_foreign ?? item.discounted_unit_price_foreign ?? item.unit_price_foreign ?? 0)
-                                : Number(rowChanges.unit_price_foreign ?? item.unit_price_foreign ?? 0)
-                              const effectiveQty = Number(rowChanges.ordered_qty ?? item.ordered_qty ?? 0)
-                              const rate = Number(po.exchange_rate ?? 0)
-                              const live = Math.round(effectivePrice * effectiveQty * rate)
-                              return live > 0 ? formatIDR(live) : '—'
-                            }
-                            if (hasDiscount) {
-                              return item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'
-                            }
-                            return item.total_price_base != null
-                              ? formatIDR(item.total_price_base)
-                              : item.discounted_total_price_base != null
-                                ? formatIDR(item.discounted_total_price_base)
-                                : '—'
-                          })()}
-                        </span>
-                        {showRemarks ? (
-                          <Input className="h-7 text-xs" placeholder="Remarks..."
-                            value={rowChanges.remarks ?? String(item.remarks ?? '')}
-                            onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
-                        ) : <span />}
-                        {editMode && canAddDeleteItems ? (
-                          <Button type="button" size="icon" variant="ghost"
-                            className="h-7 w-7 text-red-500 hover:text-red-600"
-                            onClick={() => deleteExistingItem(item.id)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : <span />}
-                      </div>
-                    )
-                  })}
-                  {editMode && canAddDeleteItems && group.newItemsList.map(n => (
-                    <div key={n._tempId} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
-                      <VariantSearchSelect
-                        value={n.product_variant_id}
-                        selectedLabel={n.product_variant_label}
-                        onSelect={(id, label, productId, productName, productSupplierLink) => {
-                          updateNewItem(n._tempId, 'product_variant_id', id)
-                          updateNewItem(n._tempId, 'product_variant_label', label)
-                          updateNewItem(n._tempId, 'product_id', productId)
-                          updateNewItem(n._tempId, 'product_name', productName)
-                          updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
-                        }}
-                        placeholder="Select variant"
-                      />
-                      <Input type="number" className="h-7 w-14 text-xs text-right"
-                        value={n.ordered_qty}
-                        onChange={e => updateNewItem(n._tempId, 'ordered_qty', e.target.value)} />
-                      <span />
-                      <div className="flex items-center gap-1 justify-end">
-                        <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                        <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                          value={n.unit_price_foreign}
-                          onChange={e => {
-                            updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)
-                            if (hasDiscount) {
-                              updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)
-                            }
-                          }} />
-                      </div>
-                      {hasDiscount && (
-                      <div className="flex items-center gap-1 justify-end">
-                        <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                        <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                          value={n.discounted_unit_price_foreign}
-                          onChange={e => updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)} />
-                      </div>
-                      )}
-                      <span />
-                      <span />
-                      <Button type="button" size="icon" variant="ghost"
-                        className="h-7 w-7 text-red-500 hover:text-red-600"
-                        onClick={() => removeNewItem(n._tempId)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )
-            })}
-
-          </div>
-
-        </div>
-
-        {/* RIGHT SIDEBAR — 1 col */}
-        <div className="space-y-6">
-          {/* Sidebar Card — PO Information */}
+        {/* PO Information — 3 cols */}
+        <div className="col-span-3">
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Purchase Order Information</h2>
             <div className="grid grid-cols-1 gap-x-8 gap-y-4 mb-5">
@@ -639,6 +401,15 @@ export default function PurchaseOrderDetailPage() {
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
+                field="cogs_ratio_forecast"
+                label="COGS Forecast %"
+                value={po.cogs_ratio_forecast != null ? `${po.cogs_ratio_forecast}%` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('cogs_ratio_forecast')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
                 field="delivery_fee"
                 label="Delivery Fee (RMB)"
                 value={po.delivery_fee != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(po.delivery_fee)}` : null}
@@ -704,25 +475,28 @@ export default function PurchaseOrderDetailPage() {
               />
             </div>
           </div>
-
-          {/* Sidebar Card — Notes */}
-          <div className="rounded-lg border bg-card p-4">
-            <h2 className="text-base font-semibold mb-3">Notes</h2>
-            {editMode ? (
-              <Textarea
-                className="min-h-[80px] text-sm"
-                placeholder="Add notes..."
-                value={String(headerValues['note'] ?? '')}
-                onChange={e => setHeaderField('note', e.target.value)}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {po.note || 'No notes'}
-              </p>
-            )}
+        </div>
+        {/* Summary + Attachments sidebar — 1 col */}
+        <div className="space-y-4">
+          {/* Financial Summary card */}
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-base font-semibold mb-4">Financial Summary</h2>
+            <div className="space-y-3 text-sm">
+              <SummaryRow label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
+              <SummaryRow label="Commission" value={po.commission_fee != null ? formatIDR(po.commission_fee) : '—'} />
+              <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
+              <SummaryRow label="Freight" value={po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'} />
+              <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                <span>Total Amount</span>
+                <span>{formatIDR(po.total_amount)}</span>
+              </div>
+            </div>
+            <div className="border-t pt-3 mt-3 space-y-3">
+              <StatBox label="COGS Ratio" value={po.cost_ratio_cogs != null ? `${po.cost_ratio_cogs.toFixed(2)}%` : '—'} />
+              <StatBox label="COGS Forecast %" value={po.cogs_ratio_forecast != null ? `${po.cogs_ratio_forecast}%` : '—'} />
+            </div>
           </div>
-
-          {/* Sidebar Card — Attachments */}
+          {/* Attachments card */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Attachments</h2>
             <div className="space-y-3">
@@ -779,80 +553,331 @@ export default function PurchaseOrderDetailPage() {
               })}
             </div>
           </div>
-
-          {/* Sidebar Card — Financial Summary */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Financial Summary</h2>
-            <div className="space-y-3 text-sm">
-              <SummaryRow label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
-              <SummaryRow label="Commission" value={po.commission_fee != null ? formatIDR(po.commission_fee) : '—'} />
-              <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
-              <SummaryRow label="Freight" value={po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'} />
-              <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
-                <span>Total Amount</span>
-                <span>{formatIDR(po.total_amount)}</span>
-              </div>
-            </div>
-            <div className="border-t pt-3 mt-3">
-              <StatBox label="COGS Ratio" value={po.cost_ratio_cogs != null ? `${po.cost_ratio_cogs.toFixed(2)}%` : '—'} />
-            </div>
-          </div>
-
-          {/* Sidebar Card — Order Summary */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Order Summary</h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Ordered</span>
-                <span className="font-semibold">{po.total_ordered_qty} units</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Received</span>
-                <span className="font-semibold">{po.total_received_qty} units</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Line Items</span>
-                <span className="font-semibold">{po.order_details?.length ?? 0} SKUs</span>
-              </div>
-              {po.cbm && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">CBM</span>
-                  <span className="font-semibold">{po.cbm} m³</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar Card — Status History */}
-          {po.status_history && po.status_history.length > 0 && (
-            <div className="rounded-lg border bg-card p-6">
-              <h2 className="text-base font-semibold mb-4">Status History</h2>
-              <div className="space-y-4">
-                {po.status_history.map((entry, i) => (
-                  <div key={entry.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 shrink-0" />
-                      {i < po.status_history.length - 1 && (
-                        <div className="w-px flex-1 bg-border mt-1" />
-                      )}
-                    </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
-                      </p>
-                      {entry.note && (
-                        <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
+      </div>
+
+      {/* Section 2 — Notes (full width) */}
+      <div className="rounded-lg border bg-card p-4">
+        <h2 className="text-base font-semibold mb-3">Notes</h2>
+        {editMode ? (
+          <Textarea
+            className="min-h-[80px] text-sm"
+            placeholder="Add notes..."
+            value={String(headerValues['note'] ?? '')}
+            onChange={e => setHeaderField('note', e.target.value)}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {po.note || 'No notes'}
+          </p>
+        )}
+      </div>
+
+      {/* Section 3 — Order Items (full width) */}
+      <div className="rounded-lg border bg-card">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h2 className="text-base font-semibold">Order Items</h2>
+          <div className="flex items-center gap-3">
+            {editMode && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hasDiscount}
+                  onChange={e => setHasDiscount(e.target.checked)}
+                  className="h-3.5 w-3.5"
+                />
+                Has Discount
+              </label>
+            )}
+            {editMode && canAddDeleteItems && (
+              <Button type="button" size="sm" variant="outline" onClick={addNewItem}>
+                <Plus className="h-3 w-3 mr-1" /> Add Item
+              </Button>
+            )}
+          </div>
+        </div>
+        <div className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30`}>
+          <span>Variant</span>
+          <span className="text-right">Ordered</span>
+          <span className="text-right">Received</span>
+          <span className="text-right">Unit Price</span>
+          {hasDiscount && <span className="text-right">Disc. Price</span>}
+          <span className="text-right">Total (IDR)</span>
+          <span>Remarks</span>
+          <span />
+        </div>
+        {(() => {
+          const visibleDetails = (po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
+
+          type DisplayGroup = {
+            groupKey: string
+            productName: string
+            productSupplierLink: string | null
+            productPhotoUrl: string | null
+            existingItems: PurchaseOrderDetail[]
+            newItemsList: typeof newItems
+          }
+
+          const groupMap = new Map<string, DisplayGroup>()
+
+          for (const item of visibleDetails) {
+            const key = item.product_id || 'unknown'
+            if (!groupMap.has(key)) {
+              groupMap.set(key, {
+                groupKey: key,
+                productName: item.product_name || 'Unknown Product',
+                productSupplierLink: item.product_supplier_link,
+                productPhotoUrl: item.product_photo_url ?? null,
+                existingItems: [],
+                newItemsList: [],
+              })
+            }
+            groupMap.get(key)!.existingItems.push(item)
+          }
+
+          if (editMode && canAddDeleteItems) {
+            for (const n of newItems) {
+              const key = n.product_id || `new-${n._tempId}`
+              if (!groupMap.has(key)) {
+                groupMap.set(key, {
+                  groupKey: key,
+                  productName: n.product_name || 'Unknown Product',
+                  productSupplierLink: n.product_supplier_link,
+                  productPhotoUrl: n.product_photo_url ?? null,
+                  existingItems: [],
+                  newItemsList: [],
+                })
+              }
+              groupMap.get(key)!.newItemsList.push(n)
+            }
+          }
+
+          return Array.from(groupMap.values())
+        })().map(group => {
+          const groupQty = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
+            group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
+          const groupCost = group.existingItems.reduce((s, i) => {
+            if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
+            return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
+          }, 0)
+          const showRemarks = po.editable_fields.order_detail.includes('remarks') && editMode
+
+          return (
+            <div key={group.groupKey}>
+              <div className="flex items-center gap-3 px-3 py-2.5 bg-muted/50 border-b">
+                {group.productPhotoUrl ? (
+                  <img
+                    src={group.productPhotoUrl}
+                    alt={group.productName}
+                    className="h-8 w-8 rounded object-cover shrink-0 border border-border"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded bg-muted shrink-0 flex items-center justify-center text-muted-foreground">
+                    <span className="text-xs">—</span>
+                  </div>
+                )}
+                <span className="text-sm font-bold text-foreground flex-1">{group.productName}</span>
+                {group.productSupplierLink && (
+                  <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs font-medium">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Supplier</span>
+                  </a>
+                )}
+                <span className="text-xs text-muted-foreground">Qty: <span className="font-bold text-foreground">{groupQty}</span></span>
+                <span className="text-xs text-muted-foreground">Cost: <span className="font-bold text-foreground">{groupCost > 0 ? formatIDR(groupCost) : '—'}</span></span>
+              </div>
+              {group.existingItems.map(item => {
+                const rowChanges = detailValues[item.id] ?? {}
+                const isDetailEditable = (field: string) =>
+                  editMode && po.editable_fields.order_detail.includes(field)
+                return (
+                  <div key={item.id} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
+                    <span className="font-mono font-medium">{item.product_variant_name}</span>
+                    <span className="text-right">
+                      {isDetailEditable('ordered_qty') ? (
+                        <Input type="number" className="h-7 w-14 text-xs text-right"
+                          value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
+                          onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
+                      ) : item.ordered_qty}
+                    </span>
+                    <span className="text-right">
+                      {isDetailEditable('received_qty') ? (
+                        <Input type="number" className="h-7 w-14 text-xs text-right"
+                          value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
+                          onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
+                      ) : (item.received_qty ?? '—')}
+                    </span>
+                    <span className="text-right">
+                      {isDetailEditable('unit_price_foreign') ? (
+                        <div className="flex items-center gap-1 justify-end">
+                          <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                          <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                            value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
+                            onChange={e => {
+                              setDetailField(item.id, 'unit_price_foreign', e.target.value)
+                              if (hasDiscount) {
+                                setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
+                              }
+                            }} />
+                        </div>
+                      ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
+                    </span>
+                    {hasDiscount && (
+                    <span className="text-right">
+                      {isDetailEditable('discounted_unit_price_foreign') ? (
+                        <div className="flex items-center gap-1 justify-end">
+                          <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                          <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                            value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
+                            onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
+                        </div>
+                      ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                    </span>
+                    )}
+                    <span className="text-right font-medium">
+                      {(() => {
+                        if (editMode) {
+                          const effectivePrice = hasDiscount
+                            ? Number(rowChanges.discounted_unit_price_foreign ?? item.discounted_unit_price_foreign ?? item.unit_price_foreign ?? 0)
+                            : Number(rowChanges.unit_price_foreign ?? item.unit_price_foreign ?? 0)
+                          const effectiveQty = Number(rowChanges.ordered_qty ?? item.ordered_qty ?? 0)
+                          const rate = Number(po.exchange_rate ?? 0)
+                          const live = Math.round(effectivePrice * effectiveQty * rate)
+                          return live > 0 ? formatIDR(live) : '—'
+                        }
+                        if (hasDiscount) {
+                          return item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'
+                        }
+                        return item.total_price_base != null
+                          ? formatIDR(item.total_price_base)
+                          : item.discounted_total_price_base != null
+                            ? formatIDR(item.discounted_total_price_base)
+                            : '—'
+                      })()}
+                    </span>
+                    {showRemarks ? (
+                      <Input className="h-7 text-xs" placeholder="Remarks..."
+                        value={rowChanges.remarks ?? String(item.remarks ?? '')}
+                        onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
+                    ) : <span />}
+                    {editMode && canAddDeleteItems ? (
+                      <Button type="button" size="icon" variant="ghost"
+                        className="h-7 w-7 text-red-500 hover:text-red-600"
+                        onClick={() => deleteExistingItem(item.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : <span />}
+                  </div>
+                )
+              })}
+              {editMode && canAddDeleteItems && group.newItemsList.map(n => (
+                <div key={n._tempId} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
+                  <VariantSearchSelect
+                    value={n.product_variant_id}
+                    selectedLabel={n.product_variant_label}
+                    onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) => {
+                      updateNewItem(n._tempId, 'product_variant_id', id)
+                      updateNewItem(n._tempId, 'product_variant_label', label)
+                      updateNewItem(n._tempId, 'product_id', productId)
+                      updateNewItem(n._tempId, 'product_name', productName)
+                      updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
+                      updateNewItem(n._tempId, 'product_photo_url', productPhotoUrl ?? '')
+                    }}
+                    placeholder="Select variant"
+                  />
+                  <Input type="number" className="h-7 w-14 text-xs text-right"
+                    value={n.ordered_qty}
+                    onChange={e => updateNewItem(n._tempId, 'ordered_qty', e.target.value)} />
+                  <span />
+                  <div className="flex items-center gap-1 justify-end">
+                    <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                    <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                      value={n.unit_price_foreign}
+                      onChange={e => {
+                        updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)
+                        if (hasDiscount) {
+                          updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)
+                        }
+                      }} />
+                  </div>
+                  {hasDiscount && (
+                  <div className="flex items-center gap-1 justify-end">
+                    <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                    <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                      value={n.discounted_unit_price_foreign}
+                      onChange={e => updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)} />
+                  </div>
+                  )}
+                  <span />
+                  <span />
+                  <Button type="button" size="icon" variant="ghost"
+                    className="h-7 w-7 text-red-500 hover:text-red-600"
+                    onClick={() => removeNewItem(n._tempId)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Section 4 — Order Summary + Status History */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Order Summary card */}
+        <div className="rounded-lg border bg-card p-6">
+          <h2 className="text-base font-semibold mb-4">Order Summary</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total Ordered</span>
+              <span className="font-semibold">{po.total_ordered_qty} units</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total Received</span>
+              <span className="font-semibold">{po.total_received_qty} units</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Line Items</span>
+              <span className="font-semibold">{po.order_details?.length ?? 0} SKUs</span>
+            </div>
+            {po.cbm && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CBM</span>
+                <span className="font-semibold">{po.cbm} m³</span>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* Status History card */}
+        {po.status_history && po.status_history.length > 0 && (
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-base font-semibold mb-4">Status History</h2>
+            <div className="space-y-4">
+              {po.status_history.map((entry, i) => (
+                <div key={entry.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 shrink-0" />
+                    {i < po.status_history.length - 1 && (
+                      <div className="w-px flex-1 bg-border mt-1" />
+                    )}
+                  </div>
+                  <div className="pb-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
+                    </p>
+                    {entry.note && (
+                      <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {po.next_status && (

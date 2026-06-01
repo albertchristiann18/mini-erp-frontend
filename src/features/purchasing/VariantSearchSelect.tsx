@@ -9,7 +9,7 @@ import { QuickCreateVariantModal } from './QuickCreateVariantModal'
 interface Props {
   value: string
   selectedLabel?: string
-  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null) => void
+  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
   placeholder?: string
 }
 
@@ -47,9 +47,9 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     }
   }
 
-  const handleSelect = (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null) => {
+  const handleSelect = (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => {
     setInternalSelectedLabel(label)
-    onSelect(id, label, productId, productName, productSupplierLink)
+    onSelect(id, label, productId, productName, productSupplierLink, productPhotoUrl)
     setOpen(false)
     setSearchInput('')
     setActiveSearch('')
@@ -102,7 +102,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
                   key={v.id}
                   type="button"
                   className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent transition-colors"
-                  onClick={() => handleSelect(v.id, `${v.name} (${v.sku_variant_code})`, v.product, v.product_name, v.product_supplier_link ?? null)}
+                  onClick={() => handleSelect(v.id, `${v.name} (${v.sku_variant_code})`, v.product, v.product_name, v.product_supplier_link ?? null, v.product_photo_url ?? null)}
                 >
                   <div className="font-medium">{v.name}</div>
                   <div className="text-muted-foreground">
@@ -129,7 +129,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
         onClose={() => setQuickCreateOpen(false)}
         onCreated={(id, label) => {
           setInternalSelectedLabel(label)
-          onSelect(id, label, '', '', null)
+          onSelect(id, label, '', '', null, null)
           setQuickCreateOpen(false)
         }}
       />

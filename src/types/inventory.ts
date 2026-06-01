@@ -47,6 +47,7 @@ export interface ProductVariant {
   sku: string
   sku_variant_code: string
   product_supplier_link: string | null
+  product_photo_url: string | null
   base_price: number
   total_available_qty: number
   total_incoming_qty: number

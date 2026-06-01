@@ -201,7 +201,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                       <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
                         <VariantSearchSelect
                           value={watch(`order_details.${i}.product_variant_id`)}
-                          onSelect={(id, _label, productId, productName, productSupplierLink) => {
+                          onSelect={(id, _label, productId, productName, productSupplierLink, _productPhotoUrl) => {
                             setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
                             setValue(`order_details.${i}.product_id`, productId)
                             setValue(`order_details.${i}.product_name`, productName)
