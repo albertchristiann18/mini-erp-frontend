@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, ChevronRight, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, PurchaseOrderDetail } from '../../types/purchasing'
@@ -107,6 +107,14 @@ export default function PurchaseOrderDetailPage() {
   const [expandedCostAnalysis, setExpandedCostAnalysis] = useState<Set<string>>(new Set())
   const toggleCostAnalysis = (key: string) =>
     setExpandedCostAnalysis(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const toggleGroupCollapse = (key: string) =>
+    setCollapsedGroups(prev => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -254,6 +262,11 @@ export default function PurchaseOrderDetailPage() {
     }
   }
 
+  const computedGoodsAmount = (po.order_details ?? []).reduce((s, i) => {
+    if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
+    return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
+  }, 0)
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -304,9 +317,9 @@ export default function PurchaseOrderDetailPage() {
       <div className="grid grid-cols-4 gap-6">
         {/* PO Information — 3 cols */}
         <div className="col-span-3">
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Purchase Order Information</h2>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-4 mb-5">
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="text-base font-semibold mb-3">Purchase Order Information</h2>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-4">
               <EditableInfoItem
                 field="supplier_name"
                 label="Supplier"
@@ -380,7 +393,7 @@ export default function PurchaseOrderDetailPage() {
                 setHeaderField={setHeaderField}
               />
             </div>
-            <div className="border-t pt-4 grid grid-cols-1 gap-x-8 gap-y-4">
+            <div className="border-t pt-3 grid grid-cols-2 gap-x-6 gap-y-3">
               <EditableInfoItem
                 field="currency"
                 label="Currency"
@@ -490,7 +503,7 @@ export default function PurchaseOrderDetailPage() {
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Financial Summary</h2>
             <div className="space-y-3 text-sm">
-              <SummaryRow label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
+              <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
               <SummaryRow label="Commission" value={po.commission_fee != null ? formatIDR(po.commission_fee) : '—'} />
               <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
               <SummaryRow label="Freight" value={po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'} />
@@ -561,6 +574,30 @@ export default function PurchaseOrderDetailPage() {
               })}
             </div>
           </div>
+          {/* Order Summary card */}
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-base font-semibold mb-4">Order Summary</h2>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Ordered</span>
+                <span className="font-semibold">{po.total_ordered_qty} units</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Received</span>
+                <span className="font-semibold">{po.total_received_qty} units</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Line Items</span>
+                <span className="font-semibold">{po.order_details?.length ?? 0} SKUs</span>
+              </div>
+              {po.cbm && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">CBM</span>
+                  <span className="font-semibold">{po.cbm} m³</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -604,7 +641,7 @@ export default function PurchaseOrderDetailPage() {
             )}
           </div>
         </div>
-        <div className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30`}>
+        <div className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30`}>
           <span>Variant</span>
           <span className="text-right">Ordered</span>
           <span className="text-right">Received</span>
@@ -682,35 +719,48 @@ export default function PurchaseOrderDetailPage() {
 
           return (
             <div key={group.groupKey}>
-              <div className="flex items-center gap-3 px-3 py-2.5 bg-muted/50 border-b">
-                {group.productPhotoUrl ? (
-                  <img
-                    src={group.productPhotoUrl}
-                    alt={group.productName}
-                    className="h-8 w-8 rounded object-cover shrink-0 border border-border"
-                  />
-                ) : (
-                  <div className="h-8 w-8 rounded bg-muted shrink-0 flex items-center justify-center text-muted-foreground">
-                    <span className="text-xs">—</span>
-                  </div>
-                )}
-                <span className="text-sm font-bold text-foreground flex-1">{group.productName}</span>
-                {group.productSupplierLink && (
-                  <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs font-medium">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    <span>Supplier</span>
-                  </a>
-                )}
-                <span className="text-xs text-muted-foreground">Qty: <span className="font-bold text-foreground">{groupQty}</span></span>
-                <span className="text-xs text-muted-foreground">Cost: <span className="font-bold text-foreground">{groupCost > 0 ? formatIDR(groupCost) : '—'}</span></span>
+              <div
+                className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 items-center px-3 py-2.5 bg-muted/50 border-b cursor-pointer hover:bg-muted/70 transition-colors`}
+                onClick={() => toggleGroupCollapse(group.groupKey)}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
+                  {group.productPhotoUrl ? (
+                    <img src={group.productPhotoUrl} alt={group.productName}
+                      className="h-7 w-7 rounded object-cover shrink-0 border border-border" />
+                  ) : (
+                    <div className="h-7 w-7 rounded bg-muted shrink-0" />
+                  )}
+                  <span className="text-sm font-bold text-foreground truncate">{group.productName}</span>
+                  {group.productSupplierLink && (
+                    <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="flex items-center gap-0.5 text-blue-500 hover:text-blue-600 text-xs font-medium shrink-0">
+                      <ExternalLink className="h-3 w-3" />
+                      <span>Supplier</span>
+                    </a>
+                  )}
+                </div>
+                <span className="text-right text-xs font-bold text-foreground">{groupQty}</span>
+                <span className="text-right text-xs font-bold text-foreground">
+                  {group.existingItems.reduce((s, i) => s + (i.received_qty ?? 0), 0) || '—'}
+                </span>
+                <span />
+                {hasDiscount && <span />}
+                <span className="text-right text-xs font-bold text-foreground">
+                  {groupCost > 0 ? formatIDR(groupCost) : '—'}
+                </span>
+                <span />
+                <span />
               </div>
+              {!collapsedGroups.has(group.groupKey) && (
+              <>
               {group.existingItems.map(item => {
                 const rowChanges = detailValues[item.id] ?? {}
                 const isDetailEditable = (field: string) =>
                   editMode && po.editable_fields.order_detail.includes(field)
                 return (
-                  <div key={item.id} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
+                  <div key={item.id} className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
                     <span className="font-mono font-medium">{item.product_variant_name}</span>
                     <span className="text-right">
                       {isDetailEditable('ordered_qty') ? (
@@ -790,7 +840,7 @@ export default function PurchaseOrderDetailPage() {
                 )
               })}
               {editMode && canAddDeleteItems && group.newItemsList.map(n => (
-                <div key={n._tempId} className={`grid ${hasDiscount ? 'grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px]' : 'grid-cols-[1fr_60px_60px_100px_100px_1fr_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
+                <div key={n._tempId} className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
                   <VariantSearchSelect
                     value={n.product_variant_id}
                     selectedLabel={n.product_variant_label}
@@ -886,67 +936,42 @@ export default function PurchaseOrderDetailPage() {
                   )}
                 </>
               )}
+              </>
+            )}
             </div>
           )
         })})()}
       </div>
 
-      {/* Section 4 — Order Summary + Status History */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Order Summary card */}
+      {/* Section 4 — Status History (full width) */}
+      {po.status_history && po.status_history.length > 0 && (
         <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-base font-semibold mb-4">Order Summary</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Ordered</span>
-              <span className="font-semibold">{po.total_ordered_qty} units</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Received</span>
-              <span className="font-semibold">{po.total_received_qty} units</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Line Items</span>
-              <span className="font-semibold">{po.order_details?.length ?? 0} SKUs</span>
-            </div>
-            {po.cbm && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">CBM</span>
-                <span className="font-semibold">{po.cbm} m³</span>
+          <h2 className="text-base font-semibold mb-4">Status History</h2>
+          <div className="space-y-4">
+            {po.status_history.map((entry, i) => (
+              <div key={entry.id} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 shrink-0" />
+                  {i < po.status_history.length - 1 && (
+                    <div className="w-px flex-1 bg-border mt-1" />
+                  )}
+                </div>
+                <div className="pb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
+                  </p>
+                  {entry.note && (
+                    <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>
+                  )}
+                </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
-        {/* Status History card */}
-        {po.status_history && po.status_history.length > 0 && (
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Status History</h2>
-            <div className="space-y-4">
-              {po.status_history.map((entry, i) => (
-                <div key={entry.id} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 shrink-0" />
-                    {i < po.status_history.length - 1 && (
-                      <div className="w-px flex-1 bg-border mt-1" />
-                    )}
-                  </div>
-                  <div className="pb-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
-                    </p>
-                    {entry.note && (
-                      <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      )}
 
       {po.next_status && (
         <StatusAdvanceModal

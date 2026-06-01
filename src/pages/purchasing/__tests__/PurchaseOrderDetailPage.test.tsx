@@ -281,10 +281,8 @@ it('shows product group headers with supplier link in order items', async () => 
 it('shows correct group qty and cost totals', async () => {
   renderPage()
   await screen.findByText('T-Shirt')
-  expect(screen.getByText((content, element) =>
-    content.startsWith('Qty:') && element?.tagName === 'SPAN'
-  )).toBeInTheDocument()
-  expect(screen.getByText(/Cost:/)).toBeInTheDocument()
+  expect(screen.getAllByText('10')[0]).toBeInTheDocument()
+  expect(screen.getAllByText(/Rp/).length).toBeGreaterThanOrEqual(1)
 })
 
 it('shows currency as select in edit mode', async () => {
