@@ -2,7 +2,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, ExternalLink } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { FormField } from '../ui/form'
 import { Input } from '../ui/input'
@@ -15,6 +15,9 @@ import { toast } from '../../lib/toast'
 
 const itemSchema = z.object({
   product_variant_id: z.string().min(1, 'Variant required'),
+  product_id: z.string().optional(),
+  product_name: z.string().optional(),
+  product_supplier_link: z.string().nullable().optional(),
   ordered_qty: z.number().min(1, 'Min 1'),
   unit_price_foreign: z.number().min(0, 'Required'),
 })
@@ -43,7 +46,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
 
   const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { currency: 'CNY', order_details: [{ product_variant_id: '', ordered_qty: 1, unit_price_foreign: 0 }] },
+    defaultValues: { currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0 }] },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'order_details' })
@@ -51,7 +54,14 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   const handleClose = () => { reset(); onClose() }
 
   const onSubmit = async (values: FormValues) => {
-    const payload: Record<string, unknown> = { ...values }
+    const payload: Record<string, unknown> = {
+      ...values,
+      order_details: values.order_details.map(({ product_variant_id, ordered_qty, unit_price_foreign }) => ({
+        product_variant_id,
+        ordered_qty,
+        unit_price_foreign,
+      }))
+    }
     if (!payload.currency) delete payload.currency
     if (!payload.exchange_rate) delete payload.exchange_rate
     try {
@@ -62,6 +72,37 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   }
 
   const warehouses = warehousesData?.results ?? []
+  const watchedItems = watch('order_details')
+  const currencySymbols: Record<string, string> = {
+    CNY: '¥', USD: '$', EUR: '€', SGD: 'S$', MYR: 'RM', IDR: 'Rp',
+  }
+  const currSymbol = currencySymbols[watch('currency') ?? 'CNY'] ?? ''
+
+  type ProductGroup = {
+    productId: string | undefined
+    productName: string
+    productSupplierLink: string | null | undefined
+    indices: number[]
+  }
+
+  function groupItems(items: typeof watchedItems): ProductGroup[] {
+    const map = new Map<string, ProductGroup>()
+    items.forEach((item, i) => {
+      const key = item.product_id || `ungrouped-${i}`
+      if (!map.has(key)) {
+        map.set(key, {
+          productId: item.product_id,
+          productName: item.product_name || 'Unknown Product',
+          productSupplierLink: item.product_supplier_link,
+          indices: [],
+        })
+      }
+      map.get(key)!.indices.push(i)
+    })
+    return Array.from(map.values())
+  }
+
+  const groups = groupItems(watchedItems)
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
@@ -108,33 +149,60 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-foreground">Order Items</p>
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_variant_id: '', ordered_qty: 1, unit_price_foreign: 0 })}>
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0 })}>
                 <Plus className="h-3 w-3 mr-1" /> Add Item
               </Button>
             </div>
             {errors.order_details?.root && (
               <p className="text-xs text-red-500">{errors.order_details.root.message}</p>
             )}
-            {fields.map((field, i) => (
-              <div key={field.id} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end">
-                <FormField label={i === 0 ? 'Variant' : ''} error={errors.order_details?.[i]?.product_variant_id?.message}>
-                  <VariantSearchSelect
-                    value={watch(`order_details.${i}.product_variant_id`)}
-                    onSelect={(id) => setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })}
-                    placeholder="Select variant"
-                  />
-                </FormField>
-                <FormField label={i === 0 ? 'Qty' : ''} error={errors.order_details?.[i]?.ordered_qty?.message}>
-                  <Input type="number" {...register(`order_details.${i}.ordered_qty`, { valueAsNumber: true })} />
-                </FormField>
-                <FormField label={i === 0 ? 'Unit Price' : ''} error={errors.order_details?.[i]?.unit_price_foreign?.message}>
-                  <Input type="number" {...register(`order_details.${i}.unit_price_foreign`, { valueAsNumber: true })} />
-                </FormField>
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+            {groups.map(group => {
+              const groupQty = group.indices.reduce((sum, i) => sum + (watchedItems[i]?.ordered_qty ?? 0), 0)
+              const groupCost = group.indices.reduce((sum, i) => {
+                const item = watchedItems[i]
+                return sum + (item?.ordered_qty ?? 0) * (item?.unit_price_foreign ?? 0)
+              }, 0)
+              return (
+                <div key={group.productId} className="space-y-1">
+                  <div className="flex items-center gap-2 px-1 py-1 bg-muted/50 rounded text-xs">
+                    <span className="font-semibold text-foreground flex-1">{group.productName}</span>
+                    {group.productSupplierLink && (
+                      <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-600" title="Open supplier link">
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    <span className="text-muted-foreground">Qty: {groupQty}</span>
+                    <span className="text-muted-foreground">Cost: {currSymbol}{groupCost.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</span>
+                  </div>
+                  {group.indices.map(i => (
+                    <div key={fields[i].id} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end pl-2">
+                      <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
+                        <VariantSearchSelect
+                          value={watch(`order_details.${i}.product_variant_id`)}
+                          onSelect={(id, _label, productId, productName, productSupplierLink) => {
+                            setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
+                            setValue(`order_details.${i}.product_id`, productId)
+                            setValue(`order_details.${i}.product_name`, productName)
+                            setValue(`order_details.${i}.product_supplier_link`, productSupplierLink)
+                          }}
+                          placeholder="Select variant"
+                        />
+                      </FormField>
+                      <FormField label={''} error={errors.order_details?.[i]?.ordered_qty?.message}>
+                        <Input type="number" {...register(`order_details.${i}.ordered_qty`, { valueAsNumber: true })} />
+                      </FormField>
+                      <FormField label={''} error={errors.order_details?.[i]?.unit_price_foreign?.message}>
+                        <Input type="number" {...register(`order_details.${i}.unit_price_foreign`, { valueAsNumber: true })} />
+                      </FormField>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
           </div>
 
           <DialogFooter>

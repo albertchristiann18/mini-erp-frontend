@@ -9,7 +9,7 @@ import { QuickCreateVariantModal } from './QuickCreateVariantModal'
 interface Props {
   value: string
   selectedLabel?: string
-  onSelect: (id: string, label: string) => void
+  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null) => void
   placeholder?: string
 }
 
@@ -47,9 +47,9 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     }
   }
 
-  const handleSelect = (id: string, label: string) => {
+  const handleSelect = (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null) => {
     setInternalSelectedLabel(label)
-    onSelect(id, label)
+    onSelect(id, label, productId, productName, productSupplierLink)
     setOpen(false)
     setSearchInput('')
     setActiveSearch('')
@@ -102,7 +102,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
                   key={v.id}
                   type="button"
                   className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent transition-colors"
-                  onClick={() => handleSelect(v.id, `${v.name} (${v.sku_variant_code})`)}
+                  onClick={() => handleSelect(v.id, `${v.name} (${v.sku_variant_code})`, v.product, v.product_name, v.product_supplier_link ?? null)}
                 >
                   <div className="font-medium">{v.name}</div>
                   <div className="text-muted-foreground">
@@ -129,7 +129,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
         onClose={() => setQuickCreateOpen(false)}
         onCreated={(id, label) => {
           setInternalSelectedLabel(label)
-          onSelect(id, label)
+          onSelect(id, label, '', '', null)
           setQuickCreateOpen(false)
         }}
       />

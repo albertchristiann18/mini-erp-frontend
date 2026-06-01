@@ -16,10 +16,10 @@ vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
   }: {
     value: string
     selectedLabel?: string
-    onSelect: (id: string, label: string) => void
+    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null) => void
     placeholder?: string
   }) => (
-    <button data-testid="variant-search-select" onClick={() => onSelect('v-mock', 'Mock Variant (SKU-MOCK)')}>
+    <button data-testid="variant-search-select" onClick={() => onSelect('v-mock', 'Mock Variant (SKU-MOCK)', 'prod1', 'T-Shirt', 'https://supplier.example.com')}>
       {placeholder ?? 'Select variant'}
     </button>
   ),
@@ -74,6 +74,9 @@ vi.mock('../../../hooks/usePurchasing', () => ({
           id: 'det1',
           product_variant: 'v1',
           product_variant_name: 'Blue / M',
+          product_id: 'prod1',
+          product_name: 'T-Shirt',
+          product_supplier_link: 'https://supplier.example.com/product/1',
           ordered_qty: 10,
           received_qty: null,
           unit_price_foreign: '25.000',
@@ -231,8 +234,8 @@ it('shows delete button per row in edit mode for ORDERED status', async () => {
   renderPage()
   const editBtn = await screen.findByText('Edit')
   await userEvent.click(editBtn)
-  const row = await screen.findByText('Blue / M').then(el => el.closest('tr')!)
-  const deleteBtn = row.querySelector('button')
+  const rowEl = await screen.findByText('Blue / M').then(el => el.closest('[class*="grid"]')!)
+  const deleteBtn = rowEl.querySelector('button')
   expect(deleteBtn).toBeInTheDocument()
 })
 
@@ -253,4 +256,18 @@ it('shows variant search select in new item row after clicking Add Item', async 
 it('renders Freight (IDR) label in PO info card', async () => {
   renderPage()
   expect(await screen.findByText('Freight (IDR)')).toBeInTheDocument()
+})
+
+it('shows product group headers with supplier link in order items', async () => {
+  renderPage()
+  expect(await screen.findByText('T-Shirt')).toBeInTheDocument()
+  const supplierLink = screen.getByTitle('Open supplier link')
+  expect(supplierLink.closest('a')).toHaveAttribute('href', 'https://supplier.example.com/product/1')
+})
+
+it('shows correct group qty and cost totals', async () => {
+  renderPage()
+  await screen.findByText('T-Shirt')
+  expect(screen.getByText('Qty: 10')).toBeInTheDocument()
+  expect(screen.getByText(/Cost:/)).toBeInTheDocument()
 })

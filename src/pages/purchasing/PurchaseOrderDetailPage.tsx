@@ -8,11 +8,10 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { ArrowLeft, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
-import type { POStatus } from '../../types/purchasing'
+import type { POStatus, PurchaseOrderDetail } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
 function getCurrencySymbol(currency: string | null | undefined): string {
@@ -85,6 +84,9 @@ export default function PurchaseOrderDetailPage() {
     _tempId: string
     product_variant_id: string
     product_variant_label: string
+    product_id: string
+    product_name: string
+    product_supplier_link: string | null
     ordered_qty: string
     unit_price_foreign: string
     discounted_unit_price_foreign: string
@@ -161,6 +163,9 @@ export default function PurchaseOrderDetailPage() {
       _tempId: `new-${Date.now()}-${prev.length}`,
       product_variant_id: '',
       product_variant_label: '',
+      product_id: '',
+      product_name: '',
+      product_supplier_link: null,
       ordered_qty: '1',
       unit_price_foreign: '',
       discounted_unit_price_foreign: '',
@@ -462,136 +467,170 @@ export default function PurchaseOrderDetailPage() {
                 </Button>
               )}
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Variant</TableHead>
-                  <TableHead className="text-right">Ordered</TableHead>
-                  <TableHead className="text-right">Received</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Disc. Price</TableHead>
-                  <TableHead className="text-right">Total (IDR)</TableHead>
-                  {po.editable_fields.order_detail.includes('remarks') && editMode && (
-                    <TableHead>Remarks</TableHead>
-                  )}
-                  {editMode && canAddDeleteItems && <TableHead />}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id)).map(item => {
-                  const rowChanges = detailValues[item.id] ?? {}
-                  const isDetailEditable = (field: string) =>
-                    editMode && po.editable_fields.order_detail.includes(field)
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs font-medium">{item.product_variant_name}</TableCell>
-                      <TableCell className="text-right">
-                        {isDetailEditable('ordered_qty') ? (
-                          <Input type="number" className="h-7 w-16 text-xs text-right"
-                            value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
-                            onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
-                        ) : item.ordered_qty}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {isDetailEditable('received_qty') ? (
-                          <Input type="number" className="h-7 w-16 text-xs text-right"
-                            value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
-                            onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
-                        ) : (item.received_qty ?? '—')}
-                      </TableCell>
-                      <TableCell className="text-right text-xs">
-                        {isDetailEditable('unit_price_foreign') ? (
-                          <div className="flex items-center gap-1 justify-end">
-                            <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                            <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                              value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
-                              onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
-                          </div>
-                        ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
-                      </TableCell>
-                      <TableCell className="text-right text-xs">
-                        {isDetailEditable('discounted_unit_price_foreign') ? (
-                          <div className="flex items-center gap-1 justify-end">
-                            <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                            <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                              value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
-                              onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                          </div>
-                        ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
-                      </TableCell>
-                      <TableCell className="text-right text-xs">
-                        {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
-                      </TableCell>
-                      {po.editable_fields.order_detail.includes('remarks') && editMode && (
-                        <TableCell>
+            {(() => {
+              const visibleDetails = (po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
+
+              type DisplayGroup = {
+                groupKey: string
+                productName: string
+                productSupplierLink: string | null
+                existingItems: PurchaseOrderDetail[]
+                newItemsList: typeof newItems
+              }
+
+              const groupMap = new Map<string, DisplayGroup>()
+
+              for (const item of visibleDetails) {
+                const key = item.product_id || 'unknown'
+                if (!groupMap.has(key)) {
+                  groupMap.set(key, {
+                    groupKey: key,
+                    productName: item.product_name || 'Unknown Product',
+                    productSupplierLink: item.product_supplier_link,
+                    existingItems: [],
+                    newItemsList: [],
+                  })
+                }
+                groupMap.get(key)!.existingItems.push(item)
+              }
+
+              if (editMode && canAddDeleteItems) {
+                for (const n of newItems) {
+                  const key = n.product_id || `new-${n._tempId}`
+                  if (!groupMap.has(key)) {
+                    groupMap.set(key, {
+                      groupKey: key,
+                      productName: n.product_name || 'Unknown Product',
+                      productSupplierLink: n.product_supplier_link,
+                      existingItems: [],
+                      newItemsList: [],
+                    })
+                  }
+                  groupMap.get(key)!.newItemsList.push(n)
+                }
+              }
+
+              return Array.from(groupMap.values())
+            })().map(group => {
+              const groupQty = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
+                group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
+              const groupCost = group.existingItems.reduce((s, i) => s + (i.discounted_total_price_base ?? 0), 0)
+              const showRemarks = po.editable_fields.order_detail.includes('remarks') && editMode
+
+              return (
+                <div key={group.groupKey}>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 text-xs border-b">
+                    <span className="font-semibold text-foreground flex-1">{group.productName}</span>
+                    {group.productSupplierLink && (
+                      <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-600" title="Open supplier link">
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    <span className="text-muted-foreground">Qty: {groupQty}</span>
+                    <span className="text-muted-foreground">Cost: {groupCost > 0 ? formatIDR(groupCost) : '—'}</span>
+                  </div>
+                  {group.existingItems.map(item => {
+                    const rowChanges = detailValues[item.id] ?? {}
+                    const isDetailEditable = (field: string) =>
+                      editMode && po.editable_fields.order_detail.includes(field)
+                    return (
+                      <div key={item.id} className="grid grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px] gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0">
+                        <span className="font-mono font-medium">{item.product_variant_name}</span>
+                        <span className="text-right">
+                          {isDetailEditable('ordered_qty') ? (
+                            <Input type="number" className="h-7 w-14 text-xs text-right"
+                              value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
+                              onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
+                          ) : item.ordered_qty}
+                        </span>
+                        <span className="text-right">
+                          {isDetailEditable('received_qty') ? (
+                            <Input type="number" className="h-7 w-14 text-xs text-right"
+                              value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
+                              onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
+                          ) : (item.received_qty ?? '—')}
+                        </span>
+                        <span className="text-right">
+                          {isDetailEditable('unit_price_foreign') ? (
+                            <div className="flex items-center gap-1 justify-end">
+                              <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                              <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                                value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
+                                onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
+                            </div>
+                          ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
+                        </span>
+                        <span className="text-right">
+                          {isDetailEditable('discounted_unit_price_foreign') ? (
+                            <div className="flex items-center gap-1 justify-end">
+                              <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                              <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                                value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
+                                onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
+                            </div>
+                          ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                        </span>
+                        <span className="text-right font-medium">
+                          {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
+                        </span>
+                        {showRemarks ? (
                           <Input className="h-7 text-xs" placeholder="Remarks..."
                             value={rowChanges.remarks ?? String(item.remarks ?? '')}
                             onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
-                        </TableCell>
-                      )}
-                      {editMode && canAddDeleteItems && (
-                        <TableCell>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
+                        ) : <span />}
+                        {editMode && canAddDeleteItems ? (
+                          <Button type="button" size="icon" variant="ghost"
                             className="h-7 w-7 text-red-500 hover:text-red-600"
-                            onClick={() => deleteExistingItem(item.id)}
-                          >
+                            onClick={() => deleteExistingItem(item.id)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )
-                })}
-              {editMode && canAddDeleteItems && newItems.map((newItem) => (
-                <TableRow key={newItem._tempId}>
-                  <TableCell>
-                    <VariantSearchSelect
-                      value={newItem.product_variant_id}
-                      selectedLabel={newItem.product_variant_label}
-                      onSelect={(id, label) => {
-                        updateNewItem(newItem._tempId, 'product_variant_id', id)
-                        updateNewItem(newItem._tempId, 'product_variant_label', label)
-                      }}
-                      placeholder="Select variant"
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Input type="number" className="h-7 w-16 text-xs text-right"
-                      value={newItem.ordered_qty}
-                      onChange={e => updateNewItem(newItem._tempId, 'ordered_qty', e.target.value)} />
-                  </TableCell>
-                  <TableCell />
-                  <TableCell className="text-right">
-                    <div className="flex items-center gap-1 justify-end">
-                      <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                      <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                        value={newItem.unit_price_foreign}
-                        onChange={e => updateNewItem(newItem._tempId, 'unit_price_foreign', e.target.value)} />
+                        ) : <span />}
+                      </div>
+                    )
+                  })}
+                  {editMode && canAddDeleteItems && group.newItemsList.map(n => (
+                    <div key={n._tempId} className="grid grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px] gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0">
+                      <VariantSearchSelect
+                        value={n.product_variant_id}
+                        selectedLabel={n.product_variant_label}
+                        onSelect={(id, label, productId, productName, productSupplierLink) => {
+                          updateNewItem(n._tempId, 'product_variant_id', id)
+                          updateNewItem(n._tempId, 'product_variant_label', label)
+                          updateNewItem(n._tempId, 'product_id', productId)
+                          updateNewItem(n._tempId, 'product_name', productName)
+                          updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
+                        }}
+                        placeholder="Select variant"
+                      />
+                      <Input type="number" className="h-7 w-14 text-xs text-right"
+                        value={n.ordered_qty}
+                        onChange={e => updateNewItem(n._tempId, 'ordered_qty', e.target.value)} />
+                      <span />
+                      <div className="flex items-center gap-1 justify-end">
+                        <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                        <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                          value={n.unit_price_foreign}
+                          onChange={e => updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)} />
+                      </div>
+                      <div className="flex items-center gap-1 justify-end">
+                        <span className="text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
+                        <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
+                          value={n.discounted_unit_price_foreign}
+                          onChange={e => updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)} />
+                      </div>
+                      <span />
+                      <span />
+                      <Button type="button" size="icon" variant="ghost"
+                        className="h-7 w-7 text-red-500 hover:text-red-600"
+                        onClick={() => removeNewItem(n._tempId)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center gap-1 justify-end">
-                      <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                      <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                        value={newItem.discounted_unit_price_foreign}
-                        onChange={e => updateNewItem(newItem._tempId, 'discounted_unit_price_foreign', e.target.value)} />
-                    </div>
-                  </TableCell>
-                  <TableCell />
-                  <TableCell>
-                    <Button type="button" size="icon" variant="ghost"
-                      className="h-7 w-7 text-red-500 hover:text-red-600"
-                      onClick={() => removeNewItem(newItem._tempId)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              </TableBody>
-            </Table>
+                  ))}
+                </div>
+              )
+            })}
             {/* Summary box — bottom right */}
             <div className="flex justify-end px-6 py-5 border-t">
               <div className="w-72 space-y-2 text-sm">

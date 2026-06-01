@@ -13,6 +13,9 @@ export interface PurchaseOrderDetail {
   id: string
   product_variant: string
   product_variant_name: string
+  product_id: string
+  product_name: string
+  product_supplier_link: string | null
   ordered_qty: number
   received_qty: number | null
   unit_price_foreign: string | null
