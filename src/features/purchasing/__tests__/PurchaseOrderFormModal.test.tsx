@@ -91,7 +91,7 @@ it('shows supplier link icon when product has supplier link', async () => {
   const selects = screen.getAllByTestId('variant-search-select')
   fireEvent.click(selects[0])
 
-  const linkIcons = screen.queryAllByTitle('Open supplier link')
+  const linkIcons = screen.queryAllByText('Supplier')
   expect(linkIcons.length).toBeGreaterThanOrEqual(1)
 })
 

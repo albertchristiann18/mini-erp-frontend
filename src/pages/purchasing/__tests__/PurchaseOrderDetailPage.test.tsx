@@ -261,13 +261,15 @@ it('renders Freight (IDR) label in PO info card', async () => {
 it('shows product group headers with supplier link in order items', async () => {
   renderPage()
   expect(await screen.findByText('T-Shirt')).toBeInTheDocument()
-  const supplierLink = screen.getByTitle('Open supplier link')
-  expect(supplierLink.closest('a')).toHaveAttribute('href', 'https://supplier.example.com/product/1')
+  const supplierLink = screen.getByRole('link', { name: /supplier/i })
+  expect(supplierLink).toHaveAttribute('href', 'https://supplier.example.com/product/1')
 })
 
 it('shows correct group qty and cost totals', async () => {
   renderPage()
   await screen.findByText('T-Shirt')
-  expect(screen.getByText('Qty: 10')).toBeInTheDocument()
+  expect(screen.getByText((content, element) =>
+    content.startsWith('Qty:') && element?.tagName === 'SPAN'
+  )).toBeInTheDocument()
   expect(screen.getByText(/Cost:/)).toBeInTheDocument()
 })

@@ -467,6 +467,16 @@ export default function PurchaseOrderDetailPage() {
                 </Button>
               )}
             </div>
+            <div className="grid grid-cols-[1fr_60px_60px_100px_100px_100px_1fr_32px] gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30">
+              <span>Variant</span>
+              <span className="text-right">Ordered</span>
+              <span className="text-right">Received</span>
+              <span className="text-right">Unit Price</span>
+              <span className="text-right">Disc. Price</span>
+              <span className="text-right">Total (IDR)</span>
+              <span>Remarks</span>
+              <span />
+            </div>
             {(() => {
               const visibleDetails = (po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
 
@@ -519,16 +529,17 @@ export default function PurchaseOrderDetailPage() {
 
               return (
                 <div key={group.groupKey}>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 text-xs border-b">
-                    <span className="font-semibold text-foreground flex-1">{group.productName}</span>
+                  <div className="flex items-center gap-3 px-3 py-2.5 bg-muted/50 border-b">
+                    <span className="text-sm font-bold text-foreground flex-1">{group.productName}</span>
                     {group.productSupplierLink && (
                       <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
-                        className="text-blue-500 hover:text-blue-600" title="Open supplier link">
-                        <ExternalLink className="h-3 w-3" />
+                        className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-xs font-medium">
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        <span>Supplier</span>
                       </a>
                     )}
-                    <span className="text-muted-foreground">Qty: {groupQty}</span>
-                    <span className="text-muted-foreground">Cost: {groupCost > 0 ? formatIDR(groupCost) : '—'}</span>
+                    <span className="text-xs text-muted-foreground">Qty: <span className="font-bold text-foreground">{groupQty}</span></span>
+                    <span className="text-xs text-muted-foreground">Cost: <span className="font-bold text-foreground">{groupCost > 0 ? formatIDR(groupCost) : '—'}</span></span>
                   </div>
                   {group.existingItems.map(item => {
                     const rowChanges = detailValues[item.id] ?? {}
