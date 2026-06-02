@@ -458,15 +458,6 @@ export default function PurchaseOrderDetailPage() {
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
-              <EditableInfoItem
-                field="shipping_fee_per_cbm"
-                label="Shipping Fee / CBM"
-                value={po.shipping_fee_per_cbm != null ? formatIDR(po.shipping_fee_per_cbm) : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('shipping_fee_per_cbm')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Freight (IDR)</p>
                 <p className="text-sm font-semibold">
@@ -482,15 +473,7 @@ export default function PurchaseOrderDetailPage() {
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
-              <EditableInfoItem
-                field="forecast_shipping_fee"
-                label="Forecast Shipping"
-                value={po.forecast_shipping_fee != null ? formatIDR(po.forecast_shipping_fee) : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_shipping_fee')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
+
             </div>
           </div>
           {/* Attachments card */}
