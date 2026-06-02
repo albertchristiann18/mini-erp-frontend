@@ -148,9 +148,6 @@ export default function PurchaseOrderDetailPage() {
     { label: 'Packing List',   field: 'packing_list_file',             url: po.packing_list_file },
   ]
 
-  const getFilename = (url: string) =>
-    decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? 'file')
-
   const enterEditMode = () => {
     const initial: Record<string, string | File> = {}
     for (const field of po.editable_fields.header) {
@@ -316,7 +313,7 @@ export default function PurchaseOrderDetailPage() {
       {/* Section 1 — header row */}
       <div className="grid grid-cols-4 gap-6">
         {/* PO Information — 3 cols */}
-        <div className="col-span-3">
+        <div className="col-span-3 space-y-4">
           <div className="rounded-lg border bg-card p-4">
             <h2 className="text-base font-semibold mb-3">Purchase Order Information</h2>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-4">
@@ -496,6 +493,59 @@ export default function PurchaseOrderDetailPage() {
               />
             </div>
           </div>
+          {/* Attachments card */}
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="text-sm font-semibold mb-3">Attachments</h2>
+            <div className="grid grid-cols-4 gap-3">
+              {attachments.map(({ label, field, url }) => {
+                const isFileEditable = editMode && po.editable_fields.header.includes(field)
+                const fileSelected = !!headerValues[field]
+                return (
+                  <div key={label} className="flex flex-col items-center gap-2 rounded-lg border p-3 text-center">
+                    <div className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-lg text-xs font-bold text-white",
+                      url || fileSelected ? "bg-red-600" : "bg-muted"
+                    )}>
+                      PDF
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className={cn("text-xs font-semibold leading-tight", !url && !fileSelected && "text-muted-foreground")}>
+                        {label}
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-tight">
+                        {fileSelected ? 'Ready' : url ? 'Uploaded' : 'Not uploaded'}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1 w-full">
+                      {url && !fileSelected && (
+                        <a href={url} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" variant="outline" className="w-full text-xs h-7">
+                            <ExternalLink className="h-3 w-3 mr-1" /> View
+                          </Button>
+                        </a>
+                      )}
+                      {isFileEditable && (
+                        <label className="cursor-pointer w-full">
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="application/pdf,image/*"
+                            onChange={e => {
+                              const file = e.target.files?.[0]
+                              if (file) setHeaderField(field, file)
+                            }}
+                          />
+                          <Button size="sm" variant="outline" className="w-full text-xs h-7" asChild>
+                            <span>{fileSelected ? '\u2713 Ready' : url ? 'Replace' : 'Upload'}</span>
+                          </Button>
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
         {/* Summary + Attachments sidebar — 1 col */}
         <div className="space-y-4">
@@ -517,63 +567,7 @@ export default function PurchaseOrderDetailPage() {
               <StatBox label="COGS Forecast %" value={po.cogs_ratio_forecast != null ? `${po.cogs_ratio_forecast}%` : '—'} />
             </div>
           </div>
-          {/* Attachments card */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Attachments</h2>
-            <div className="space-y-3">
-              {attachments.map(({ label, field, url }) => {
-                const isFileEditable = editMode && po.editable_fields.header.includes(field)
-                const fileSelected = !!headerValues[field]
-                return (
-                  <div key={label} className="flex items-center justify-between rounded-lg border p-4">
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "flex h-12 w-12 items-center justify-center rounded-lg text-xs font-bold text-white",
-                        url || fileSelected ? "bg-red-600" : "bg-muted"
-                      )}>
-                        PDF
-                      </div>
-                      <div>
-                        <p className={cn("text-sm font-semibold", !url && !fileSelected && "text-muted-foreground")}>
-                          {label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {fileSelected
-                            ? 'Ready to upload'
-                            : url ? getFilename(url) : 'Not uploaded'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {url && !fileSelected && (
-                        <a href={url} target="_blank" rel="noopener noreferrer">
-                          <Button size="sm" variant="outline">
-                            <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
-                          </Button>
-                        </a>
-                      )}
-                      {isFileEditable && (
-                        <label className="cursor-pointer">
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="application/pdf,image/*"
-                            onChange={e => {
-                              const file = e.target.files?.[0]
-                              if (file) setHeaderField(field, file)
-                            }}
-                          />
-                          <Button size="sm" variant="outline" asChild>
-                            <span>{fileSelected ? '\u2713 Ready' : url ? 'Replace' : 'Upload'}</span>
-                          </Button>
-                        </label>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+
           {/* Order Summary card */}
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Order Summary</h2>
@@ -598,6 +592,35 @@ export default function PurchaseOrderDetailPage() {
               )}
             </div>
           </div>
+          {/* Status History card */}
+          {po.status_history && po.status_history.length > 0 && (
+            <div className="rounded-lg border bg-card p-4">
+              <h2 className="text-sm font-semibold mb-3">Status History</h2>
+              <div className="space-y-3">
+                {po.status_history.map((entry, i) => (
+                  <div key={entry.id} className="flex gap-2">
+                    <div className="flex flex-col items-center">
+                      <div className="h-2 w-2 rounded-full bg-primary mt-1 shrink-0" />
+                      {i < po.status_history.length - 1 && (
+                        <div className="w-px flex-1 bg-border mt-1" />
+                      )}
+                    </div>
+                    <div className="pb-3">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
+                      </p>
+                      {entry.note && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{entry.note}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -943,35 +966,7 @@ export default function PurchaseOrderDetailPage() {
         })})()}
       </div>
 
-      {/* Section 4 — Status History (full width) */}
-      {po.status_history && po.status_history.length > 0 && (
-        <div className="rounded-lg border bg-card p-6">
-          <h2 className="text-base font-semibold mb-4">Status History</h2>
-          <div className="space-y-4">
-            {po.status_history.map((entry, i) => (
-              <div key={entry.id} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 shrink-0" />
-                  {i < po.status_history.length - 1 && (
-                    <div className="w-px flex-1 bg-border mt-1" />
-                  )}
-                </div>
-                <div className="pb-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
-                  </p>
-                  {entry.note && (
-                    <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {po.next_status && (
         <StatusAdvanceModal
