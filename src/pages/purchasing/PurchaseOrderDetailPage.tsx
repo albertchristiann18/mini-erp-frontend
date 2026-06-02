@@ -458,12 +458,15 @@ export default function PurchaseOrderDetailPage() {
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Freight (IDR)</p>
-                <p className="text-sm font-semibold">
-                  {po.shipping_fee != null && po.shipping_fee > 0 ? formatIDR(po.shipping_fee) : '—'}
-                </p>
-              </div>
+              <EditableInfoItem
+                field="shipping_fee_per_cbm"
+                label="Shipping Fee / CBM"
+                value={po.shipping_fee_per_cbm != null ? formatIDR(po.shipping_fee_per_cbm) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('shipping_fee_per_cbm')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
               <EditableInfoItem
                 field="forecast_cbm"
                 label="Forecast CBM"
