@@ -550,7 +550,6 @@ export default function PurchaseOrderDetailPage() {
             </div>
             <div className="border-t pt-3 mt-3 space-y-3">
               <StatBox label="COGS Ratio" value={po.cost_ratio_cogs != null ? `${po.cost_ratio_cogs.toFixed(2)}%` : '—'} />
-              <StatBox label="COGS Forecast %" value={po.cogs_ratio_forecast != null ? `${po.cogs_ratio_forecast}%` : '—'} />
             </div>
           </div>
 
