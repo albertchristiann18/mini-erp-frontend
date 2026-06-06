@@ -51,6 +51,7 @@ const mockPO: PurchaseOrder = {
   procure_amount: 4750000,
   refund_amount: null,
   cost_ratio_cogs: 12.5,
+  cogs_ratio_forecast: null,
   shipping_per_qty: 25000,
   invoice_number: "INV-001",
   invoice_date: "2026-05-01",

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,7 +10,8 @@ import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { useWarehouses } from '../../hooks/useInventory'
-import { useCreatePurchaseOrder } from '../../hooks/usePurchasing'
+import { useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
+import type { ReplenishmentItem } from '../../types/purchasing'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { toast } from '../../lib/toast'
 
@@ -53,6 +54,13 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
 
   const { fields, append, remove } = useFieldArray({ control, name: 'order_details' })
   const [hasDiscount, setHasDiscount] = useState(false)
+  const [avgWindow, setAvgWindow] = useState<7 | 30>(30)
+  const { data: replenishData } = useReplenishment()
+  const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
+    const m = new Map<string, ReplenishmentItem>()
+    for (const item of replenishData?.results ?? []) m.set(item.variant_id, item)
+    return m
+  }, [replenishData])
 
   const handleClose = () => { reset(); setHasDiscount(false); onClose() }
 
@@ -156,6 +164,18 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-foreground">Order Items</p>
               <div className="flex items-center gap-3">
+                <div className="flex rounded-md border overflow-hidden text-xs h-6">
+                  <button
+                    type="button"
+                    className={`px-2 ${avgWindow === 7 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                    onClick={() => setAvgWindow(7)}
+                  >7d</button>
+                  <button
+                    type="button"
+                    className={`px-2 ${avgWindow === 30 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                    onClick={() => setAvgWindow(30)}
+                  >30d</button>
+                </div>
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -172,6 +192,15 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
             </div>
             {errors.order_details?.root && (
               <p className="text-xs text-red-500">{errors.order_details.root.message}</p>
+            )}
+            {fields.length > 0 && (
+              <div className={`grid ${hasDiscount ? 'grid-cols-[1fr_80px_100px_100px_32px]' : 'grid-cols-[1fr_80px_100px_32px]'} gap-2 pl-2`}>
+                <span className="text-xs font-medium text-muted-foreground">Variant</span>
+                <span className="text-xs font-medium text-muted-foreground">Qty</span>
+                <span className="text-xs font-medium text-muted-foreground">Unit Price</span>
+                {hasDiscount && <span className="text-xs font-medium text-muted-foreground">Disc. Price</span>}
+                <span />
+              </div>
             )}
             {groups.map(group => {
               const groupQty = group.indices.reduce((sum, i) => sum + (watchedItems[i]?.ordered_qty ?? 0), 0)
@@ -196,51 +225,59 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                     <span className="text-xs text-muted-foreground">Qty: <span className="font-bold text-foreground">{groupQty}</span></span>
                     <span className="text-xs text-muted-foreground">Cost: <span className="font-bold text-foreground">{currSymbol}{groupCost.toLocaleString('id-ID', { maximumFractionDigits: 2 })}</span></span>
                   </div>
-                  {group.indices.map(i => (
-                    <div key={fields[i].id} className={`grid ${hasDiscount ? 'grid-cols-[1fr_80px_100px_100px_32px]' : 'grid-cols-[1fr_80px_100px_32px]'} gap-2 items-end pl-2`}>
-                      <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
-                        <VariantSearchSelect
-                          value={watch(`order_details.${i}.product_variant_id`)}
-                          onSelect={(id, _label, productId, productName, productSupplierLink, _productPhotoUrl) => {
-                            setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
-                            setValue(`order_details.${i}.product_id`, productId)
-                            setValue(`order_details.${i}.product_name`, productName)
-                            setValue(`order_details.${i}.product_supplier_link`, productSupplierLink)
-                          }}
-                          placeholder="Select variant"
-                        />
-                      </FormField>
-                      <FormField label={''} error={errors.order_details?.[i]?.ordered_qty?.message}>
-                        <Input type="number" {...register(`order_details.${i}.ordered_qty`, { valueAsNumber: true })} />
-                      </FormField>
-                      <FormField label={''} error={errors.order_details?.[i]?.unit_price_foreign?.message}>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          value={watch(`order_details.${i}.unit_price_foreign`) ?? ''}
-                          onChange={e => {
-                            const val = parseFloat(e.target.value)
-                            setValue(`order_details.${i}.unit_price_foreign`, isNaN(val) ? 0 : val, { shouldValidate: true })
-                            if (hasDiscount) {
-                              setValue(`order_details.${i}.discounted_unit_price_foreign`, isNaN(val) ? 0 : val)
-                            }
-                          }}
-                        />
-                      </FormField>
-                      {hasDiscount && (
-                        <FormField label={''} error={errors.order_details?.[i]?.discounted_unit_price_foreign?.message}>
-                          <Input
-                            type="number"
-                            step="0.001"
-                            {...register(`order_details.${i}.discounted_unit_price_foreign`, { valueAsNumber: true })}
-                          />
-                        </FormField>
-                      )}
-                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+                  {group.indices.map(i => {
+                    const variantId = watch(`order_details.${i}.product_variant_id`)
+                    return (
+                      <div key={fields[i].id}>
+                        <div className={`grid ${hasDiscount ? 'grid-cols-[1fr_80px_100px_100px_32px]' : 'grid-cols-[1fr_80px_100px_32px]'} gap-2 items-end pl-2`}>
+                          <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
+                            <VariantSearchSelect
+                              value={watch(`order_details.${i}.product_variant_id`)}
+                              onSelect={(id, _label, productId, productName, productSupplierLink) => {
+                                setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
+                                setValue(`order_details.${i}.product_id`, productId)
+                                setValue(`order_details.${i}.product_name`, productName)
+                                setValue(`order_details.${i}.product_supplier_link`, productSupplierLink)
+                              }}
+                              placeholder="Select variant"
+                            />
+                          </FormField>
+                          <FormField label={''} error={errors.order_details?.[i]?.ordered_qty?.message}>
+                            <Input type="number" {...register(`order_details.${i}.ordered_qty`, { valueAsNumber: true })} />
+                          </FormField>
+                          <FormField label={''} error={errors.order_details?.[i]?.unit_price_foreign?.message}>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              value={watch(`order_details.${i}.unit_price_foreign`) ?? ''}
+                              onChange={e => {
+                                const val = parseFloat(e.target.value)
+                                setValue(`order_details.${i}.unit_price_foreign`, isNaN(val) ? 0 : val, { shouldValidate: true })
+                                if (hasDiscount) {
+                                  setValue(`order_details.${i}.discounted_unit_price_foreign`, isNaN(val) ? 0 : val)
+                                }
+                              }}
+                            />
+                          </FormField>
+                          {hasDiscount && (
+                            <FormField label={''} error={errors.order_details?.[i]?.discounted_unit_price_foreign?.message}>
+                              <Input
+                                type="number"
+                                step="0.001"
+                                {...register(`order_details.${i}.discounted_unit_price_foreign`, { valueAsNumber: true })}
+                              />
+                            </FormField>
+                          )}
+                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {variantId && (
+                          <VariantStockStrip variantId={variantId} stockMap={stockMap} avgWindow={avgWindow} />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })}
@@ -255,5 +292,33 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function VariantStockStrip({
+  variantId,
+  stockMap,
+  avgWindow,
+}: {
+  variantId: string
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 30
+}) {
+  const stats = stockMap.get(variantId)
+  if (!stats) return null
+  const avg = avgWindow === 7 ? stats.avg_sales_7d : stats.avg_sales_30d
+  const doi = avg > 0 ? Math.round((stats.stock_on_hand + stats.incoming_qty) / avg) : null
+  return (
+    <div className="ml-2 flex flex-wrap gap-3 pb-1.5 text-xs text-muted-foreground">
+      <span>SOH: <strong className="text-foreground">{stats.stock_on_hand}</strong></span>
+      <span>Incoming: <strong className="text-blue-600">{stats.incoming_qty}</strong></span>
+      <span>AVG {avgWindow}d: <strong className="text-foreground">{avg.toFixed(1)}/day</strong></span>
+      <span>
+        DOI:{' '}
+        <strong className={doi !== null && doi < 14 ? 'text-red-600' : 'text-foreground'}>
+          {doi !== null ? `${doi}d` : '∞'}
+        </strong>
+      </span>
+    </div>
   )
 }

@@ -104,6 +104,7 @@ export interface ProductVariantStock {
   product_sku: string
   category_name: string
   product_supplier_link: string | null
+  product_photo_url: string | null
   base_price: number
   total_available_qty: number
   physical_qty: number

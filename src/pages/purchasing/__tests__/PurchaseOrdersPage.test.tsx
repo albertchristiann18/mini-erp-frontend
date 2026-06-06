@@ -21,6 +21,7 @@ vi.mock('../../../hooks/usePurchasing', () => ({
   usePurchaseOrdersFiltered: (...args: unknown[]) => mockUsePurchaseOrdersFiltered(...args),
   usePurchaseOrderSummary: (...args: unknown[]) => mockUsePurchaseOrderSummary(...args),
   useCreatePurchaseOrder: () => ({ mutate: () => {}, isPending: false }),
+  useReplenishment: () => ({ data: { results: [] } }),
 }))
 
 vi.mock('../../../hooks/useInventory', () => ({
@@ -148,7 +149,15 @@ it('clicking Invoice Date column header toggles ordering', async () => {
 
   expect(mockUsePurchaseOrdersFiltered).toHaveBeenLastCalledWith(
     expect.objectContaining({ ordering: '-invoice_date' }),
+    expect.objectContaining({ enabled: true }),
   )
+})
+
+it('renders Created Date column header', async () => {
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
+  renderPage()
+  expect(await screen.findByText('Created Date')).toBeInTheDocument()
 })
 
 it('clicking a table row navigates to the PO detail page', async () => {
@@ -156,8 +165,22 @@ it('clicking a table row navigates to the PO detail page', async () => {
   mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
   renderPage()
 
+  const searchInput = screen.getByPlaceholderText('Search PO#, Invoice#, DO#...')
+  fireEvent.change(searchInput, { target: { value: 'PO-2026' } })
+  fireEvent.keyDown(searchInput, { key: 'Enter' })
+
   const row = await screen.findByText('PO-2026-001')
   fireEvent.click(row)
 
   expect(mockNavigate).toHaveBeenCalledWith('/purchasing/orders/po1')
+})
+
+it('loads data immediately on mount without requiring a search trigger', async () => {
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
+  renderPage()
+  expect(mockUsePurchaseOrdersFiltered).toHaveBeenCalledWith(
+    expect.objectContaining({ ordering: '-delivery_date' }),
+    expect.objectContaining({ enabled: true }),
+  )
 })

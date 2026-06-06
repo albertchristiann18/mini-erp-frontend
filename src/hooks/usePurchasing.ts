@@ -58,10 +58,11 @@ export const useUpdatePurchaseOrder = () => {
   })
 }
 
-export const usePurchaseOrdersFiltered = (params: Record<string, string | number>) =>
+export const usePurchaseOrdersFiltered = (params: Record<string, string | number>, options?: { enabled?: boolean }) =>
   useQuery({
     queryKey: ['purchase-orders', params],
     queryFn: () => getPurchaseOrders(params).then(r => r.data),
+    enabled: options?.enabled ?? true,
   })
 
 export const useReplenishment = (warehouseId?: string) =>

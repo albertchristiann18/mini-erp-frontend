@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Button } from './ui/button'
 
 interface PaginationProps {
@@ -6,10 +7,11 @@ interface PaginationProps {
   totalPages: number
   onPageChange: (page: number) => void
   isLoading?: boolean
+  children?: ReactNode
 }
 
-export function Pagination({ page, totalPages, onPageChange, isLoading }: PaginationProps) {
-  if (totalPages <= 1) return null
+export function Pagination({ page, totalPages, onPageChange, isLoading, children }: PaginationProps) {
+  if (totalPages <= 1 && !children) return null
   return (
     <div className="flex items-center justify-end gap-2 pt-3">
       <Button
@@ -33,6 +35,7 @@ export function Pagination({ page, totalPages, onPageChange, isLoading }: Pagina
         Next
         <ChevronRight className="h-4 w-4" />
       </Button>
+      {children}
     </div>
   )
 }

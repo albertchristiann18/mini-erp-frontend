@@ -11,6 +11,7 @@ vi.mock('../../../hooks/useInventory', () => ({
 
 vi.mock('../../../hooks/usePurchasing', () => ({
   useCreatePurchaseOrder: () => ({ mutateAsync: vi.fn() }),
+  useReplenishment: () => ({ data: { results: [] } }),
 }))
 
 vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
@@ -29,6 +30,20 @@ function renderModal(open = true) {
     </QueryClientProvider>,
   )
 }
+
+it('shows column headers when modal opens', () => {
+  renderModal()
+  expect(screen.getByText('Variant')).toBeInTheDocument()
+  expect(screen.getByText('Qty')).toBeInTheDocument()
+  expect(screen.getByText('Unit Price')).toBeInTheDocument()
+})
+
+it('shows Disc. Price header when Has Discount is checked', async () => {
+  renderModal()
+  expect(screen.queryByText('Disc. Price')).not.toBeInTheDocument()
+  await userEvent.click(screen.getByLabelText('Has Discount'))
+  expect(screen.getByText('Disc. Price')).toBeInTheDocument()
+})
 
 it('shows discount column when Has Discount is checked', async () => {
   renderModal()

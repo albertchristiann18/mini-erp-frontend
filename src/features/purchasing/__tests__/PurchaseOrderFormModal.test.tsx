@@ -18,12 +18,12 @@ vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
   }: {
     value: string
     selectedLabel?: string
-    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null) => void
+    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
     placeholder?: string
   }) => (
     <button
       data-testid="variant-search-select"
-      onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1')}
+      onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1', null)}
     >
       {placeholder ?? 'Select variant'}
     </button>
@@ -38,6 +38,22 @@ vi.mock('../../../hooks/usePurchasing', () => ({
     mockMutateAsync.mockResolvedValue(id)
     return { mutateAsync: mockMutateAsync, isPending: false }
   },
+  useReplenishment: () => ({
+    data: {
+      results: [
+        {
+          variant_id: 'v1',
+          sku_variant_code: 'V1',
+          variant_name: 'Variant 1',
+          product_name: 'Product A',
+          stock_on_hand: 10,
+          incoming_qty: 20,
+          avg_sales_7d: 1.5,
+          avg_sales_30d: 2.0,
+        },
+      ],
+    },
+  }),
 }))
 
 vi.mock('../../../hooks/useInventory', () => ({
@@ -104,4 +120,17 @@ it('shows group total qty and cost', async () => {
 
   const costElements = screen.getAllByText(/Cost:/)
   expect(costElements.length).toBeGreaterThanOrEqual(1)
+})
+
+it('shows stock intel strip with SOH, AVG, DOI when variant is selected', async () => {
+  renderModal()
+  expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+
+  const selects = screen.getAllByTestId('variant-search-select')
+  fireEvent.click(selects[0])
+
+  expect(screen.getByText(/SOH:/)).toBeInTheDocument()
+  expect(screen.getByText(/Incoming:/)).toBeInTheDocument()
+  expect(screen.getByText(/AVG/)).toBeInTheDocument()
+  expect(screen.getByText(/DOI:/)).toBeInTheDocument()
 })
