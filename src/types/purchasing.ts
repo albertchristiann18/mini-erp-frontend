@@ -28,6 +28,10 @@ export interface PurchaseOrderDetail {
   discounted_total_price_foreign: string | null
   discounted_total_price_base: number | null
   remarks: string
+  avg_sales: string | null
+  avg_sales_7d: string | null
+  stock_on_hand: number
+  incoming_qty: number
 }
 
 export interface PurchaseOrder {

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../hooks/usePurchasing'
+import { usePurchaseOrder, useUpdatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ArrowLeft, ChevronDown, ChevronRight, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
-import type { POStatus, PurchaseOrderDetail } from '../../types/purchasing'
+import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
 function getCurrencySymbol(currency: string | null | undefined): string {
@@ -120,6 +120,14 @@ export default function PurchaseOrderDetailPage() {
       else next.add(key)
       return next
     })
+
+  const [avgWindow, setAvgWindow] = useState<7 | 30>(30)
+  const { data: replenishData } = useReplenishment()
+  const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
+    const m = new Map<string, ReplenishmentItem>()
+    for (const item of replenishData?.results ?? []) m.set(item.variant_id, item)
+    return m
+  }, [replenishData])
 
   useEffect(() => {
     if (!po) return
@@ -631,6 +639,20 @@ export default function PurchaseOrderDetailPage() {
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-base font-semibold">Order Items</h2>
           <div className="flex items-center gap-3">
+            {!editMode && (
+              <div className="flex rounded-md border overflow-hidden text-xs h-6">
+                <button
+                  type="button"
+                  className={`px-2 ${avgWindow === 7 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                  onClick={() => setAvgWindow(7)}
+                >7d</button>
+                <button
+                  type="button"
+                  className={`px-2 ${avgWindow === 30 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                  onClick={() => setAvgWindow(30)}
+                >30d</button>
+              </div>
+            )}
             {editMode && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
                 <input
@@ -768,7 +790,8 @@ export default function PurchaseOrderDetailPage() {
                 const isDetailEditable = (field: string) =>
                   editMode && po.editable_fields.order_detail.includes(field)
                 return (
-                  <div key={item.id} className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
+                  <div key={item.id}>
+                    <div className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
                     <span className="font-mono font-medium">{item.product_variant_name}</span>
                     <span className="text-right">
                       {isDetailEditable('ordered_qty') ? (
@@ -845,10 +868,13 @@ export default function PurchaseOrderDetailPage() {
                       </Button>
                     ) : <span />}
                   </div>
+                  <DetailStockStrip item={item} stockMap={stockMap} avgWindow={avgWindow} editMode={editMode} />
+                </div>
                 )
               })}
               {editMode && canAddDeleteItems && group.newItemsList.map(n => (
-                <div key={n._tempId} className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
+                <div key={n._tempId}>
+                  <div className={`grid ${hasDiscount ? 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_120px_130px_minmax(80px,1fr)_32px]' : 'grid-cols-[minmax(120px,2fr)_80px_80px_120px_130px_minmax(80px,1fr)_32px]'} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0`}>
                   <VariantSearchSelect
                     value={n.product_variant_id}
                     selectedLabel={n.product_variant_label}
@@ -892,8 +918,12 @@ export default function PurchaseOrderDetailPage() {
                     onClick={() => removeNewItem(n._tempId)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
+                  </div>
+                  {n.product_variant_id && (
+                    <NewItemStockStrip variantId={n.product_variant_id} stockMap={stockMap} avgWindow={avgWindow} />
+                  )}
                 </div>
-              ))}
+                ))}
               {/* Cost Analysis toggle */}
               {group.existingItems.length > 0 && (
                 <>
@@ -961,6 +991,75 @@ export default function PurchaseOrderDetailPage() {
           targetStatus={po.next_status}
         />
       )}
+    </div>
+  )
+}
+
+function DetailStockStrip({
+  item,
+  stockMap,
+  avgWindow,
+  editMode,
+}: {
+  item: PurchaseOrderDetail
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 30
+  editMode: boolean
+}) {
+  const hasSnapshot = item.avg_sales !== null
+  const liveStats = !hasSnapshot ? stockMap.get(item.product_variant) : undefined
+
+  if (!hasSnapshot && !liveStats) return null
+
+  const soh = hasSnapshot ? item.stock_on_hand : (liveStats?.stock_on_hand ?? 0)
+  const incoming = hasSnapshot ? item.incoming_qty : (liveStats?.incoming_qty ?? 0)
+  const avg = hasSnapshot
+    ? (avgWindow === 7 ? Number(item.avg_sales_7d ?? 0) : Number(item.avg_sales ?? 0))
+    : (avgWindow === 7 ? (liveStats?.avg_sales_7d ?? 0) : (liveStats?.avg_sales_30d ?? 0))
+  const doi = avg > 0 ? Math.round((soh + incoming) / avg) : null
+
+  return (
+    <div className={`ml-3 flex flex-wrap gap-3 pb-1.5 pt-0.5 text-xs text-muted-foreground ${editMode ? 'opacity-50' : ''}`}>
+      {hasSnapshot && (
+        <span className="text-muted-foreground/60 italic">at order time:</span>
+      )}
+      <span>SOH: <strong className="text-foreground">{soh}</strong></span>
+      <span>Incoming: <strong className="text-blue-600">{incoming}</strong></span>
+      <span>AVG {avgWindow}d: <strong className="text-foreground">{avg.toFixed(1)}/day</strong></span>
+      <span>
+        DOI:{' '}
+        <strong className={doi !== null && doi < 14 ? 'text-red-600' : 'text-foreground'}>
+          {doi !== null ? `${doi}d` : '\u221E'}
+        </strong>
+      </span>
+    </div>
+  )
+}
+
+function NewItemStockStrip({
+  variantId,
+  stockMap,
+  avgWindow,
+}: {
+  variantId: string
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 30
+}) {
+  const stats = stockMap.get(variantId)
+  if (!stats) return null
+  const avg = avgWindow === 7 ? stats.avg_sales_7d : stats.avg_sales_30d
+  const doi = avg > 0 ? Math.round((stats.stock_on_hand + stats.incoming_qty) / avg) : null
+  return (
+    <div className="ml-3 flex flex-wrap gap-3 pb-1.5 pt-0.5 text-xs text-muted-foreground">
+      <span>SOH: <strong className="text-foreground">{stats.stock_on_hand}</strong></span>
+      <span>Incoming: <strong className="text-blue-600">{stats.incoming_qty}</strong></span>
+      <span>AVG {avgWindow}d: <strong className="text-foreground">{avg.toFixed(1)}/day</strong></span>
+      <span>
+        DOI:{' '}
+        <strong className={doi !== null && doi < 14 ? 'text-red-600' : 'text-foreground'}>
+          {doi !== null ? `${doi}d` : '\u221E'}
+        </strong>
+      </span>
     </div>
   )
 }

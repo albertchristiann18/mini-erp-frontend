@@ -47,6 +47,7 @@ vi.mock('../../../hooks/usePurchasing', () => ({
     data: { can_transition: true, target_status: 'SHIPPED', missing_fields: [], warnings: [] },
     isPending: false,
   }),
+  useReplenishment: () => ({ data: { results: [] } }),
 }))
 
 const defaultPOData = {
@@ -111,6 +112,10 @@ const defaultPOData = {
       total_price_foreign: '250.000',
       discounted_total_price_foreign: '220.000',
       remarks: '',
+      avg_sales: null,
+      avg_sales_7d: null,
+      stock_on_hand: 0,
+      incoming_qty: 0,
     },
   ],
   company: 'c1',
