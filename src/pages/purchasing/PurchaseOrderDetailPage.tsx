@@ -287,7 +287,7 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const poExchangeRate = Number(po.exchange_rate ?? 0)
-  const effectiveShipping = po.shipping_fee ?? po.forecast_shipping_fee ?? 0
+  const effectiveShipping = po.shipping_fee || po.forecast_shipping_fee || 0
   const freightPerUnit = po.total_ordered_qty > 0
     ? Math.round(effectiveShipping / po.total_ordered_qty)
     : 0
