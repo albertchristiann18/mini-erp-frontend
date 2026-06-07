@@ -758,20 +758,20 @@ export default function PurchaseOrderDetailPage() {
                 <p className="text-sm font-semibold">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</p>
               </div>
               <EditableInfoItem
-                field="cbm"
-                label="CBM"
-                value={po.cbm != null ? `${formatDecimalUnit(po.cbm)} m³ (actual)` : po.forecast_cbm != null ? `${formatDecimalUnit(po.forecast_cbm)} m³ (forecast)` : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('cbm')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
                 field="weight"
                 label="Weight (kg)"
                 value={po.weight != null ? formatDecimalUnit(po.weight, 'kg') : null}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('weight')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="cbm"
+                label="CBM"
+                value={po.cbm != null ? `${formatDecimalUnit(po.cbm)} m³ (actual)` : po.forecast_cbm != null ? `${formatDecimalUnit(po.forecast_cbm)} m³ (forecast)` : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('cbm')}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
