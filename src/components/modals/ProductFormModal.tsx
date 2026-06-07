@@ -9,7 +9,6 @@ import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { useCategories, useCreateProduct, useUpdateProduct } from '../../hooks/useInventory'
-import { MASTER_CATEGORIES } from '../../constants/masterCategories'
 import { toast } from '../../lib/toast'
 import { PhotoUploadGrid } from '../inventory/PhotoUploadGrid'
 import type { Product, ProductPhoto } from '../../types/inventory'
@@ -18,7 +17,6 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   sku: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
-  master_category_key: z.string().optional(),
   description: z.string().min(25, 'Description must be at least 25 characters'),
   variant_name: z.string().optional(),
   variant_sku: z.string().optional(),
@@ -62,7 +60,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
       setValue('description', product.description)
       setValue('is_active', product.is_active)
       setValue('supplier_link', product.supplier_link ?? '')
-      setValue('master_category_key', product.master_category_key ?? '')
       setValue('weight', product.weight ?? 0)
       setValue('length', product.length ?? 0)
       setValue('width', product.width ?? 0)
@@ -151,19 +148,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
                 <SelectContent>
                   {categories.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField label="Master Category" error={errors.master_category_key?.message} required>
-              <Select
-                value={watch('master_category_key')}
-                onValueChange={(v) => setValue('master_category_key', v, { shouldValidate: true })}
-              >
-                <SelectTrigger><SelectValue placeholder="Select master category" /></SelectTrigger>
-                <SelectContent>
-                  {MASTER_CATEGORIES.map(c => (
-                    <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
