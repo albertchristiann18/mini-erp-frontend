@@ -33,6 +33,7 @@ export interface Product {
   weight: number
   is_active: boolean
   supplier_link: string | null
+  master_category_key: string | null
   photos?: ProductPhoto[]
   variants?: ProductVariant[]
   cdate: string

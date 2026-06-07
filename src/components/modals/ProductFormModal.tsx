@@ -62,6 +62,7 @@ export function ProductFormModal({ open, onClose, product }: Props) {
       setValue('description', product.description)
       setValue('is_active', product.is_active)
       setValue('supplier_link', product.supplier_link ?? '')
+      setValue('master_category_key', product.master_category_key ?? '')
       setValue('weight', product.weight ?? 0)
       setValue('length', product.length ?? 0)
       setValue('width', product.width ?? 0)
