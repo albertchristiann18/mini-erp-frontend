@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePurchaseOrder, useUpdatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
+import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
+import { useWarehouses } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
@@ -10,6 +11,7 @@ import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { ArrowLeft, ChevronDown, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../types/purchasing'
@@ -91,10 +93,18 @@ const HEADER_FIELD_CONFIG: Record<string, FieldInputConfig> = {
 export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { data: po, isLoading } = usePurchaseOrder(id!)
+  const isCreating = id === 'new'
+  const { data: po, isLoading } = usePurchaseOrder(isCreating ? '' : id!)
   const { user } = useAuth()
+  const createMutation = useCreatePurchaseOrder((newId: string) => {
+    toast.success('Purchase order created')
+    navigate(`/purchasing/orders/${newId}`)
+  })
+  const { data: warehouseData } = useWarehouses()
+  const warehouses = warehouseData?.results ?? []
   const [showAdvanceModal, setShowAdvanceModal] = useState(false)
-  const [editMode, setEditMode] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [editMode, setEditMode] = useState(isCreating)
   const [headerValues, setHeaderValues] = useState<Record<string, string | File>>({})
   const [detailValues, setDetailValues] = useState<Record<string, Record<string, string>>>({})
   const [deletedDetailIds, setDeletedDetailIds] = useState<Set<string>>(new Set())
@@ -140,27 +150,28 @@ export default function PurchaseOrderDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
-  if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
+  if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
+  if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
 
-  const canAddDeleteItems = po.status === 'DRAFT' || po.status === 'ORDERED'
+  const canAddDeleteItems = isCreating || po?.status === 'DRAFT' || po?.status === 'ORDERED'
 
-  const deliveryFeeIdr = Math.round(
-    Number(po.delivery_fee ?? 0) * Number(po.exchange_rate ?? 0)
+  const deliveryFeeIdr = isCreating ? 0 : Math.round(
+    Number(po?.delivery_fee ?? 0) * Number(po?.exchange_rate ?? 0)
   )
 
-  const attachments = [
-    { label: 'PO Invoice',     field: 'purchase_order_invoice_file',  url: po.purchase_order_invoice_file },
-    { label: 'Delivery Order', field: 'delivery_order_file',           url: po.delivery_order_file },
-    { label: 'DO Invoice',     field: 'delivery_order_invoice_file',   url: po.delivery_order_invoice_file },
-    { label: 'Packing List',   field: 'packing_list_file',             url: po.packing_list_file },
+  const attachments = isCreating ? [] : [
+    { label: 'PO Invoice',     field: 'purchase_order_invoice_file',  url: po!.purchase_order_invoice_file },
+    { label: 'Delivery Order', field: 'delivery_order_file',           url: po!.delivery_order_file },
+    { label: 'DO Invoice',     field: 'delivery_order_invoice_file',   url: po!.delivery_order_invoice_file },
+    { label: 'Packing List',   field: 'packing_list_file',             url: po!.packing_list_file },
   ]
 
   const enterEditMode = () => {
+    if (isCreating || !po) return
     const initial: Record<string, string | File> = {}
-    for (const field of po.editable_fields.header) {
+    for (const field of po!.editable_fields.header) {
       if (field === 'note') {
-        initial[field] = po.note ?? ''
+        initial[field] = po!.note ?? ''
         continue
       }
       if (['purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'].includes(field)) {
@@ -170,9 +181,9 @@ export default function PurchaseOrderDetailPage() {
       if (val != null && val !== '') initial[field] = String(val)
     }
     const initDetails: Record<string, Record<string, string>> = {}
-    for (const item of po.order_details ?? []) {
+    for (const item of po!.order_details ?? []) {
       const row: Record<string, string> = {}
-      for (const field of po.editable_fields.order_detail) {
+      for (const field of po!.editable_fields.order_detail) {
         const val = (item as unknown as Record<string, unknown>)[field]
         if (val != null) row[field] = String(val)
       }
@@ -225,14 +236,48 @@ export default function PurchaseOrderDetailPage() {
   const deleteExistingItem = (itemId: string) =>
     setDeletedDetailIds(prev => new Set([...prev, itemId]))
 
+  const handleCreate = async () => {
+    const errors: string[] = []
+    if (!headerValues.warehouse_id) errors.push('Warehouse is required')
+    const validItems = newItems.filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign !== '')
+    if (validItems.length === 0) errors.push('At least one order item with variant, quantity, and price is required')
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    const payload: Record<string, unknown> = { warehouse_id: headerValues.warehouse_id }
+    const optionalFields = ['currency', 'exchange_rate', 'supplier_name', 'forwarder_name',
+      'shop_services', 'commission_fee_pct', 'delivery_fee', 'forecast_delivery_date',
+      'forecast_cbm', 'forecast_shipping_fee_per_cbm', 'note']
+    const numericFields = ['exchange_rate', 'commission_fee_pct', 'delivery_fee', 'forecast_cbm', 'forecast_shipping_fee_per_cbm']
+    for (const field of optionalFields) {
+      const val = headerValues[field]
+      if (val != null && val !== '') payload[field] = numericFields.includes(field) ? Number(val) : val
+    }
+    payload.order_details = validItems.map(n => ({
+      product_variant_id: n.product_variant_id,
+      ordered_qty: Number(n.ordered_qty),
+      unit_price_foreign: Number(n.unit_price_foreign),
+      ...(hasDiscount && n.discounted_unit_price_foreign
+        ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
+        : {}),
+    }))
+    try {
+      await createMutation.mutateAsync(payload)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to create purchase order'
+      toast.error(msg)
+    }
+  }
+
   const handleSave = async () => {
     const payload: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(headerValues)) {
       if (value !== '' && value !== null && value !== undefined) payload[key] = value
     }
-    const canAddDel = po.status === 'DRAFT' || po.status === 'ORDERED'
+    const canAddDel = po!.status === 'DRAFT' || po!.status === 'ORDERED'
     if (canAddDel && (deletedDetailIds.size > 0 || newItems.length > 0)) {
-      const keptExisting = (po.order_details ?? [])
+      const keptExisting = (po!.order_details ?? [])
         .filter(item => !deletedDetailIds.has(item.id))
         .map(item => {
           const changes = { ...(detailValues[item.id] ?? {}) }
@@ -258,7 +303,7 @@ export default function PurchaseOrderDetailPage() {
     }
     if (Object.keys(payload).length === 0) { cancelEditMode(); return }
     try {
-      await updateMutation.mutateAsync({ id: po.id, data: payload })
+      await updateMutation.mutateAsync({ id: po!.id, data: payload })
       toast.success('Purchase order updated')
       cancelEditMode()
     } catch (err: unknown) {
@@ -267,10 +312,12 @@ export default function PurchaseOrderDetailPage() {
     }
   }
 
-  const computedGoodsAmount = (po.order_details ?? []).reduce((s, i) => {
-    if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
-    return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
-  }, 0)
+  const computedGoodsAmount = isCreating
+    ? 0
+    : (po?.order_details ?? []).reduce((s, i) => {
+        if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
+        return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
+      }, 0)
 
   const getItemStockData = (item: PurchaseOrderDetail) => {
     const hasSnapshot = item.avg_sales !== null
@@ -286,17 +333,21 @@ export default function PurchaseOrderDetailPage() {
     return { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot }
   }
 
-  const poExchangeRate = Number(po.exchange_rate ?? 0)
-  const effectiveShipping = po.shipping_fee || po.forecast_shipping_fee || 0
-  const freightPerUnit = po.total_ordered_qty > 0
-    ? Math.round(effectiveShipping / po.total_ordered_qty)
-    : 0
-  const commissionPerUnit = po.total_ordered_qty > 0
-    ? Math.round((po.commission_fee ?? 0) / po.total_ordered_qty)
-    : 0
+  const poExchangeRate = isCreating
+    ? Number(headerValues.exchange_rate || 0)
+    : Number(po?.exchange_rate ?? 0)
+  const effectiveShipping = isCreating ? 0 : (po?.shipping_fee || po?.forecast_shipping_fee || 0)
+  const freightPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
+    ? Math.round(effectiveShipping / po!.total_ordered_qty)
+    : 0)
+  const commissionPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
+    ? Math.round((po!.commission_fee ?? 0) / po!.total_ordered_qty)
+    : 0)
 
   const orderItemsContent = (() => {
-    const visibleDetails = (po.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
+    const visibleDetails = isCreating
+      ? []
+      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
 
     type DisplayGroup = {
       groupKey: string
@@ -342,7 +393,7 @@ export default function PurchaseOrderDetailPage() {
     }
 
     return Array.from(groupMap.values()).map(group => {
-    const showRemarks = po.editable_fields.order_detail.includes('remarks') && editMode
+    const showRemarks = !isCreating && editMode && (po?.editable_fields.order_detail.includes('remarks') ?? false)
 
     const groupStockData = group.existingItems.map(item => getItemStockData(item))
     const sumSOH = groupStockData.reduce((s, d) => s + d.soh, 0)
@@ -410,7 +461,7 @@ export default function PurchaseOrderDetailPage() {
           {hasDiscount && <td className="px-3 py-2" />}
           <td className="px-3 py-2" />
           <td className="px-3 py-2 whitespace-nowrap">
-            {sumTotalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(sumTotalForeign)}` : '—'}
+            {sumTotalForeign > 0 ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(sumTotalForeign)}` : '—'}
           </td>
           <td className="px-3 py-2 whitespace-nowrap">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</td>
           <td className="px-3 py-2" />
@@ -422,7 +473,7 @@ export default function PurchaseOrderDetailPage() {
         {group.existingItems.map(item => {
           const rowChanges = detailValues[item.id] ?? {}
           const isDetailEditable = (field: string) =>
-            editMode && po.editable_fields.order_detail.includes(field)
+            editMode && (isCreating || (po?.editable_fields.order_detail.includes(field) ?? false))
           const { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot } = getItemStockData(item)
 
           const effectiveUnitForeign = hasDiscount
@@ -472,7 +523,7 @@ export default function PurchaseOrderDetailPage() {
                       setDetailField(item.id, 'unit_price_foreign', e.target.value)
                       if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
                     }} />
-                ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
+                ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
               </td>
               {hasDiscount && (
                 <td className="px-3 py-1.5 whitespace-nowrap">
@@ -480,11 +531,11 @@ export default function PurchaseOrderDetailPage() {
                     <Input type="number" step="0.001" className="h-7 w-20 text-xs"
                       value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
                       onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                  ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                  ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
                 </td>
               )}
               <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
               <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
               <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
               <td className="px-3 py-1.5">
@@ -569,7 +620,7 @@ export default function PurchaseOrderDetailPage() {
                 </td>
               )}
               <td className="px-3 py-1.5 whitespace-nowrap">{unitIdr > 0 ? formatIDR(unitIdr) : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</td>
               <td className="px-3 py-1.5 whitespace-nowrap font-medium">{unitIdr * ordQty > 0 ? formatIDR(unitIdr * ordQty) : '—'}</td>
               <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
               <td className="px-3 py-1.5" />
@@ -599,17 +650,33 @@ export default function PurchaseOrderDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold font-mono">{po.purchase_order_number}</h1>
-              <Badge variant={statusVariant[po.status]}>{po.status}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Invoice {po.invoice_date ? formatDate(po.invoice_date) : '—'} · {po.supplier_name ?? '—'}
-            </p>
+            {isCreating ? (
+              <h1 className="text-2xl font-bold">New Purchase Order</h1>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold font-mono">{po!.purchase_order_number}</h1>
+                  <Badge variant={statusVariant[po!.status]}>{po!.status}</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Invoice {po!.invoice_date ? formatDate(po!.invoice_date) : '—'} · {po!.supplier_name ?? '—'}
+                </p>
+              </>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
-          {editMode ? (
+          {isCreating ? (
+            <>
+              <Button size="sm" variant="outline" onClick={() => navigate('/purchasing/orders')} disabled={createMutation.isPending}>
+                <XIcon className="h-4 w-4 mr-1" /> Cancel
+              </Button>
+              <Button size="sm" onClick={handleCreate} disabled={createMutation.isPending}>
+                <Save className="h-4 w-4 mr-1" />
+                {createMutation.isPending ? 'Creating...' : 'Create PO'}
+              </Button>
+            </>
+          ) : editMode ? (
             <>
               <Button size="sm" variant="outline" onClick={cancelEditMode} disabled={updateMutation.isPending}>
                 <XIcon className="h-4 w-4 mr-1" /> Cancel
@@ -621,14 +688,14 @@ export default function PurchaseOrderDetailPage() {
             </>
           ) : (
             <>
-              {user?.is_staff && po.status !== 'CANCELLED' && (
+              {user?.is_staff && po!.status !== 'CANCELLED' && (
                 <Button size="sm" variant="outline" onClick={enterEditMode}>
                   <Pencil className="h-4 w-4 mr-1" /> Edit
                 </Button>
               )}
-              {user?.is_staff && po.next_status && (
+              {user?.is_staff && po!.next_status && (
                 <Button size="sm" onClick={() => setShowAdvanceModal(true)}>
-                  → {po.next_status}
+                  → {po!.next_status}
                 </Button>
               )}
             </>
@@ -643,174 +710,200 @@ export default function PurchaseOrderDetailPage() {
           <div className="rounded-lg border bg-card p-4">
             <h2 className="text-base font-semibold mb-3">Purchase Order Information</h2>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  Warehouse{isCreating && <span className="text-red-500 ml-0.5">*</span>}
+                </p>
+                {isCreating ? (
+                  <Select
+                    value={String(headerValues.warehouse_id ?? '')}
+                    onValueChange={val => setHeaderField('warehouse_id', val)}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder="Select warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((w: { id: string; name: string }) => (
+                        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm font-semibold">{po?.warehouse_name ?? '—'}</p>
+                )}
+              </div>
+              {!isCreating && (<>
               <EditableInfoItem
                 field="supplier_name"
                 label="Supplier"
-                value={po.supplier_name}
+                value={po?.supplier_name}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('supplier_name')}
+                editable={po?.editable_fields?.header?.includes('supplier_name') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="forwarder_name"
                 label="Forwarder"
-                value={po.forwarder_name}
+                value={po?.forwarder_name}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forwarder_name')}
+                editable={po?.editable_fields?.header?.includes('forwarder_name') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="shop_services"
                 label="Jasa Belanja"
-                value={po.shop_services}
+                value={po?.shop_services}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('shop_services')}
+                editable={po?.editable_fields?.header?.includes('shop_services') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="invoice_number"
                 label="Invoice No."
-                value={po.invoice_number}
+                value={po?.invoice_number}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('invoice_number')}
+                editable={po?.editable_fields?.header?.includes('invoice_number') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="invoice_date"
                 label="Invoice Date"
-                value={po.invoice_date ? formatDate(po.invoice_date) : null}
+                value={po?.invoice_date ? formatDate(po?.invoice_date) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('invoice_date')}
+                editable={po?.editable_fields?.header?.includes('invoice_date') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="delivery_order_number"
                 label="Delivery Order No."
-                value={po.delivery_order_number}
+                value={po?.delivery_order_number}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_order_number')}
+                editable={po?.editable_fields?.header?.includes('delivery_order_number') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="delivery_date"
                 label="Delivery Date"
-                value={po.delivery_date ? formatDate(po.delivery_date) : null}
+                value={po?.delivery_date ? formatDate(po?.delivery_date) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_date')}
+                editable={po?.editable_fields?.header?.includes('delivery_date') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="forecast_delivery_date"
                 label="Forecast Delivery"
-                value={po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : null}
+                value={po?.forecast_delivery_date ? formatDate(po?.forecast_delivery_date) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_delivery_date')}
+                editable={po?.editable_fields?.header?.includes('forecast_delivery_date') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
+            </>)}
             </div>
+            {!isCreating && (<>
             <div className="border-t pt-3 grid grid-cols-2 gap-x-6 gap-y-3">
               <EditableInfoItem
                 field="currency"
                 label="Currency"
-                value={po.currency}
+                value={po?.currency}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('currency')}
+                editable={po?.editable_fields?.header?.includes('currency') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="exchange_rate"
                 label="Exchange Rate"
-                value={po.exchange_rate != null ? `Rp ${Number(po.exchange_rate).toLocaleString('id-ID')}` : null}
+                value={po?.exchange_rate != null ? `Rp ${Number(po?.exchange_rate).toLocaleString('id-ID')}` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('exchange_rate')}
+                editable={po?.editable_fields?.header?.includes('exchange_rate') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="commission_fee_pct"
                 label="Commission %"
-                value={po.commission_fee_pct != null ? `${po.commission_fee_pct}%` : null}
+                value={po?.commission_fee_pct != null ? `${po?.commission_fee_pct}%` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('commission_fee_pct')}
+                editable={po?.editable_fields?.header?.includes('commission_fee_pct') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="delivery_fee"
                 label="Delivery Fee (RMB)"
-                value={po.delivery_fee != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(po.delivery_fee)}` : null}
+                value={po?.delivery_fee != null ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(po?.delivery_fee)}` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_fee')}
+                editable={po?.editable_fields?.header?.includes('delivery_fee') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Commission (IDR)</p>
-                <p className="text-sm font-semibold">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</p>
+                <p className="text-sm font-semibold">{po?.commission_fee != null ? formatIDR(po?.commission_fee) : '—'}</p>
               </div>
               <EditableInfoItem
                 field="weight"
                 label="Weight (kg)"
-                value={po.weight != null ? formatDecimalUnit(po.weight, 'kg') : null}
+                value={po?.weight != null ? formatDecimalUnit(po?.weight, 'kg') : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('weight')}
+                editable={po?.editable_fields?.header?.includes('weight') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="cbm"
                 label="CBM"
-                value={po.cbm != null ? `${formatDecimalUnit(po.cbm)} m³ (actual)` : po.forecast_cbm != null ? `${formatDecimalUnit(po.forecast_cbm)} m³ (forecast)` : null}
+                value={po?.cbm != null ? `${formatDecimalUnit(po?.cbm)} m³ (actual)` : po?.forecast_cbm != null ? `${formatDecimalUnit(po?.forecast_cbm)} m³ (forecast)` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('cbm')}
+                editable={po?.editable_fields?.header?.includes('cbm') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="shipping_fee_per_cbm"
                 label="Shipping Fee / CBM"
-                value={po.shipping_fee_per_cbm != null ? formatIDR(po.shipping_fee_per_cbm) : null}
+                value={po?.shipping_fee_per_cbm != null ? formatIDR(po?.shipping_fee_per_cbm) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('shipping_fee_per_cbm')}
+                editable={po?.editable_fields?.header?.includes('shipping_fee_per_cbm') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="forecast_cbm"
                 label="Forecast CBM"
-                value={po.forecast_cbm != null ? formatDecimalUnit(po.forecast_cbm, 'm3') : null}
+                value={po?.forecast_cbm != null ? formatDecimalUnit(po?.forecast_cbm, 'm3') : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_cbm')}
+                editable={po?.editable_fields?.header?.includes('forecast_cbm') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="forecast_shipping_fee_per_cbm"
                 label="Forecast Shipping/CBM"
-                value={po.forecast_shipping_fee_per_cbm != null ? formatIDR(po.forecast_shipping_fee_per_cbm) : null}
+                value={po?.forecast_shipping_fee_per_cbm != null ? formatIDR(po?.forecast_shipping_fee_per_cbm) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_shipping_fee_per_cbm')}
+                editable={po?.editable_fields?.header?.includes('forecast_shipping_fee_per_cbm') ?? false}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
 
             </div>
+            </>)}
           </div>
           {/* Attachments card */}
-          <div className="rounded-lg border bg-card p-4">
+          {!isCreating && <div className="rounded-lg border bg-card p-4">
             <h2 className="text-sm font-semibold mb-3">Attachments</h2>
             <div className="grid grid-cols-4 gap-3">
               {attachments.map(({ label, field, url }) => {
-                const isFileEditable = editMode && po.editable_fields.header.includes(field)
+                const isFileEditable = (editMode && po?.editable_fields?.header?.includes(field)) ?? false
                 const fileSelected = !!headerValues[field]
                 return (
                   <div key={label} className="flex flex-col items-center gap-2 rounded-lg border p-3 text-center">
@@ -857,62 +950,94 @@ export default function PurchaseOrderDetailPage() {
                 )
               })}
             </div>
-          </div>
+          </div>}
         </div>
         {/* Summary + Attachments sidebar — 1 col */}
         <div className="space-y-4">
           {/* Financial Summary card */}
           <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Financial Summary</h2>
-            <div className="space-y-3 text-sm">
-              <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
-              <SummaryRow label="Commission" value={po.commission_fee != null ? formatIDR(po.commission_fee) : '—'} />
-              <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
-              <SummaryRow label="Freight" value={po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'} />
-              <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
-                <span>Total Amount</span>
-                <span>{formatIDR(po.total_amount)}</span>
-              </div>
-            </div>
-            <div className="border-t pt-3 mt-3 space-y-3">
-              <StatBox label="COGS Ratio" value={po.cost_ratio_cogs != null ? `${po.cost_ratio_cogs.toFixed(2)}%` : '—'} />
-            </div>
+            <h2 className="text-base font-semibold mb-4">
+              {isCreating ? 'Estimated Summary' : 'Financial Summary'}
+            </h2>
+            {isCreating ? (() => {
+              const estGoods = newItems.reduce((s, n) => {
+                const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
+                return s + price * (Number(n.ordered_qty) || 0)
+              }, 0) * poExchangeRate
+              const commPct = Number(headerValues.commission_fee_pct) || 0
+              const estCommission = Math.round(newItems.reduce((s, n) => {
+                const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
+                return s + price * (Number(n.ordered_qty) || 0)
+              }, 0) * (commPct / 100) * poExchangeRate)
+              const estFreight = Math.round((Number(headerValues.forecast_cbm) || 0) * (Number(headerValues.forecast_shipping_fee_per_cbm) || 0))
+              const estTotal = Math.round(estGoods) + estCommission + estFreight
+              const totalUnits = newItems.reduce((s, n) => s + (Number(n.ordered_qty) || 0), 0)
+              const totalSkus = newItems.filter(n => n.product_variant_id).length
+              return (
+                <div className="space-y-3 text-sm">
+                  <SummaryRow label="Goods" value={estGoods > 0 ? formatIDR(Math.round(estGoods)) : '—'} />
+                  <SummaryRow label="Commission" value={estCommission > 0 ? formatIDR(estCommission) : '—'} />
+                  <SummaryRow label="Forecast Freight" value={estFreight > 0 ? formatIDR(estFreight) : '—'} />
+                  <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                    <span>Est. Total</span>
+                    <span>{estTotal > 0 ? formatIDR(estTotal) : '—'}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground pt-1">{totalUnits} units · {totalSkus} SKUs</p>
+                </div>
+              )
+            })() : (
+              <>
+                <div className="space-y-3 text-sm">
+                  <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
+                  <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
+                  <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
+                  <SummaryRow label="Freight" value={po!.shipping_fee != null ? formatIDR(po!.shipping_fee) : '—'} />
+                  <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                    <span>Total Amount</span>
+                    <span>{formatIDR(po!.total_amount)}</span>
+                  </div>
+                </div>
+                <div className="border-t pt-3 mt-3 space-y-3">
+                  <StatBox label="COGS Ratio" value={po!.cost_ratio_cogs != null ? `${po!.cost_ratio_cogs.toFixed(2)}%` : '—'} />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Order Summary card */}
-          <div className="rounded-lg border bg-card p-6">
+          {!isCreating && <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Order Summary</h2>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Ordered</span>
-                <span className="font-semibold">{po.total_ordered_qty} units</span>
+                <span className="font-semibold">{po!.total_ordered_qty} units</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Received</span>
-                <span className="font-semibold">{po.total_received_qty} units</span>
+                <span className="font-semibold">{po!.total_received_qty} units</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Line Items</span>
-                <span className="font-semibold">{po.order_details?.length ?? 0} SKUs</span>
+                <span className="font-semibold">{po!.order_details?.length ?? 0} SKUs</span>
               </div>
-              {po.cbm && (
+              {po!.cbm && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">CBM</span>
-                  <span className="font-semibold">{po.cbm} m³</span>
+                  <span className="font-semibold">{po!.cbm} m³</span>
                 </div>
               )}
             </div>
-          </div>
+          </div>}
           {/* Status History card */}
-          {po.status_history && po.status_history.length > 0 && (
+          {!isCreating && po?.status_history && po.status_history.length > 0 && (
             <div className="rounded-lg border bg-card p-4">
               <h2 className="text-sm font-semibold mb-3">Status History</h2>
               <div className="space-y-3">
-                {po.status_history.map((entry, i) => (
+                {po!.status_history.map((entry, i) => (
                   <div key={entry.id} className="flex gap-2">
                     <div className="flex flex-col items-center">
                       <div className="h-2 w-2 rounded-full bg-primary mt-1 shrink-0" />
-                      {i < po.status_history.length - 1 && (
+                      {i < po!.status_history.length - 1 && (
                         <div className="w-px flex-1 bg-border mt-1" />
                       )}
                     </div>
@@ -947,7 +1072,7 @@ export default function PurchaseOrderDetailPage() {
           />
         ) : (
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-            {po.note || 'No notes'}
+            {(isCreating ? String(headerValues.note ?? '') : po?.note) || 'No notes'}
           </p>
         )}
       </div>
@@ -1014,14 +1139,18 @@ export default function PurchaseOrderDetailPage() {
           </table>
         </div>
       </div>
-      {po.next_status && (
+      {!isCreating && po?.next_status && (
         <StatusAdvanceModal
           open={showAdvanceModal}
           onClose={() => setShowAdvanceModal(false)}
-          po={po}
-          targetStatus={po.next_status}
+          po={po!}
+          targetStatus={po!.next_status}
         />
       )}
+      <ValidationModal
+        errors={validationErrors}
+        onClose={() => setValidationErrors([])}
+      />
     </div>
   )
 }
@@ -1119,5 +1248,29 @@ function StatBox({ label, value, highlight }: { label: string; value: string; hi
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className={cn("text-sm font-bold", highlight && "text-primary")}>{value}</p>
     </div>
+  )
+}
+
+function ValidationModal({ errors, onClose }: { errors: string[]; onClose: () => void }) {
+  if (errors.length === 0) return null
+  return (
+    <Dialog open={errors.length > 0} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Required Fields Missing</DialogTitle>
+        </DialogHeader>
+        <ul className="space-y-2 py-2">
+          {errors.map((e, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-red-600">
+              <span className="shrink-0">•</span>
+              <span>{e}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button size="sm" onClick={onClose}>OK</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

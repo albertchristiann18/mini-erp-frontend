@@ -8,7 +8,6 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
-import { PurchaseOrderFormModal } from '../../components/modals/PurchaseOrderFormModal'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import type { POStatus } from '../../types/purchasing'
@@ -63,7 +62,6 @@ export default function PurchaseOrdersPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [ordering, setOrdering] = useState('-delivery_date')
-  const [showModal, setShowModal] = useState(false)
   const [pendingSearch, setPendingSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [hasSearched, setHasSearched] = useState(true)
@@ -135,7 +133,7 @@ export default function PurchaseOrdersPage() {
           <Button size="sm" onClick={handleApply}>Apply</Button>
         </div>
         {user?.is_staff && (
-          <Button size="sm" onClick={() => setShowModal(true)}>
+          <Button size="sm" onClick={() => navigate('/purchasing/orders/new')}>
             <Plus className="h-4 w-4 mr-1" /> New PO
           </Button>
         )}
@@ -223,7 +221,6 @@ export default function PurchaseOrdersPage() {
           </SelectContent>
         </Select>
       </Pagination>
-      <PurchaseOrderFormModal open={showModal} onClose={() => setShowModal(false)} />
     </div>
   )
 }
