@@ -394,25 +394,25 @@ export default function PurchaseOrderDetailPage() {
             )}
           </div>
 
-          <span className="text-right">{sumOrdered}</span>
+          <span className="text-left">{sumOrdered}</span>
 
-          <span className="text-right text-muted-foreground">{sumReceived || '—'}</span>
+          <span className="text-left text-muted-foreground">{sumReceived || '—'}</span>
 
-          <span className="text-right">{sumSOH}</span>
+          <span className="text-left">{sumSOH}</span>
 
-          <span className="text-right text-blue-600">{sumIncoming}</span>
+          <span className="text-left text-blue-600">{sumIncoming}</span>
 
-          <span className="text-right">{sumUpcoming}</span>
+          <span className="text-left">{sumUpcoming}</span>
 
-          <span className="text-right text-muted-foreground font-normal">
+          <span className="text-left text-muted-foreground font-normal">
             {sumAvg > 0 ? `${sumAvg.toFixed(1)}/d` : '—'}
           </span>
 
-          <span className={`text-right ${groupDoi !== null && groupDoi < 14 ? 'text-red-600' : groupDoi !== null && groupDoi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+          <span className={`text-left ${groupDoi !== null && groupDoi < 14 ? 'text-red-600' : groupDoi !== null && groupDoi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
             {groupDoi !== null ? `${groupDoi}d` : '—'}
           </span>
 
-          <span className={`text-right ${groupDoiAfter !== null && groupDoiAfter < 14 ? 'text-red-600' : groupDoiAfter !== null && groupDoiAfter <= 30 ? 'text-amber-600' : 'text-green-600'}`}>
+          <span className={`text-left ${groupDoiAfter !== null && groupDoiAfter < 14 ? 'text-red-600' : groupDoiAfter !== null && groupDoiAfter <= 30 ? 'text-amber-600' : 'text-green-600'}`}>
             {groupDoiAfter !== null ? `${groupDoiAfter}d` : '—'}
           </span>
 
@@ -422,11 +422,11 @@ export default function PurchaseOrderDetailPage() {
 
           <span />
 
-          <span className="text-right">
+          <span className="text-left">
             {sumTotalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(sumTotalForeign)}` : '—'}
           </span>
 
-          <span className="text-right">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</span>
+          <span className="text-left">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</span>
 
           <span />
 
@@ -455,44 +455,44 @@ export default function PurchaseOrderDetailPage() {
             <div key={item.id} className={`grid ${colTemplate} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0 min-w-max`}>
               <span className="font-mono font-medium truncate" title={item.product_variant_name}>{item.product_variant_name}</span>
 
-              <span className="text-right">
+              <span className="text-left">
                 {isDetailEditable('ordered_qty') ? (
-                  <Input type="number" className="h-7 w-12 text-xs text-right"
+                  <Input type="number" className="h-7 w-12 text-xs text-left"
                     value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
                     onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
                 ) : item.ordered_qty}
               </span>
 
-              <span className="text-right">
+              <span className="text-left">
                 {isDetailEditable('received_qty') ? (
-                  <Input type="number" className="h-7 w-12 text-xs text-right"
+                  <Input type="number" className="h-7 w-12 text-xs text-left"
                     value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
                     onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
                 ) : (item.received_qty ?? '—')}
               </span>
 
-              <span className="text-right text-muted-foreground">{soh}</span>
+              <span className="text-left text-muted-foreground">{soh}</span>
 
-              <span className="text-right text-blue-600">{incoming}</span>
+              <span className="text-left text-blue-600">{incoming}</span>
 
-              <span className="text-right font-medium text-foreground">{upcoming}</span>
+              <span className="text-left font-medium text-foreground">{upcoming}</span>
 
-              <span className="text-right text-muted-foreground">
+              <span className="text-left text-muted-foreground">
                 {avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
                 {hasSnapshot && <span className="text-[10px] text-muted-foreground/50 ml-0.5">*</span>}
               </span>
 
-              <span className={`text-right font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              <span className={`text-left font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
                 {doi !== null ? `${doi}d` : '\u221E'}
               </span>
 
-              <span className={`text-right font-medium ${doiAfter !== null && doi !== null && doiAfter > doi ? 'text-green-600' : 'text-muted-foreground'}`}>
+              <span className={`text-left font-medium ${doiAfter !== null && doi !== null && doiAfter > doi ? 'text-green-600' : 'text-muted-foreground'}`}>
                 {doiAfter !== null ? `${doiAfter}d` : '\u221E'}
               </span>
 
-              <span className="text-right">
+              <span className="text-left">
                 {isDetailEditable('unit_price_foreign') ? (
-                  <Input type="number" step="0.001" className="h-7 w-14 text-xs text-right"
+                  <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
                     value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
                     onChange={e => {
                       setDetailField(item.id, 'unit_price_foreign', e.target.value)
@@ -502,22 +502,22 @@ export default function PurchaseOrderDetailPage() {
               </span>
 
               {hasDiscount && (
-                <span className="text-right">
+                <span className="text-left">
                   {isDetailEditable('discounted_unit_price_foreign') ? (
-                    <Input type="number" step="0.001" className="h-7 w-14 text-xs text-right"
+                    <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
                       value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
                       onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
                   ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
                 </span>
               )}
 
-              <span className="text-right">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</span>
+              <span className="text-left">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</span>
 
-              <span className="text-right">{totalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</span>
+              <span className="text-left">{totalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</span>
 
-              <span className="text-right font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</span>
+              <span className="text-left font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</span>
 
-              <span className="text-right font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</span>
+              <span className="text-left font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</span>
 
               {showRemarks ? (
                 <Input className="h-7 text-xs" placeholder="Remarks..."
@@ -564,30 +564,30 @@ export default function PurchaseOrderDetailPage() {
                 placeholder="Select variant"
               />
 
-              <Input type="number" className="h-7 w-12 text-xs text-right"
+              <Input type="number" className="h-7 w-12 text-xs text-left"
                 value={n.ordered_qty}
                 onChange={e => updateNewItem(n._tempId, 'ordered_qty', e.target.value)} />
 
               <span />
 
-              <span className="text-right text-muted-foreground">{liveStats ? liveSoh : '—'}</span>
-              <span className="text-right text-blue-600">{liveStats ? liveIncoming : '—'}</span>
-              <span className="text-right font-medium">{liveUpcoming !== null ? liveUpcoming : '—'}</span>
+              <span className="text-left text-muted-foreground">{liveStats ? liveSoh : '—'}</span>
+              <span className="text-left text-blue-600">{liveStats ? liveIncoming : '—'}</span>
+              <span className="text-left font-medium">{liveUpcoming !== null ? liveUpcoming : '—'}</span>
 
-              <span className="text-right text-muted-foreground">
+              <span className="text-left text-muted-foreground">
                 {liveStats && avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
               </span>
 
-              <span className={`text-right font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              <span className={`text-left font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
                 {doi !== null ? `${doi}d` : (liveStats ? '\u221E' : '—')}
               </span>
 
-              <span className={`text-right font-medium ${doiAfter !== null && doi !== null && doiAfter > doi ? 'text-green-600' : 'text-muted-foreground'}`}>
+              <span className={`text-left font-medium ${doiAfter !== null && doi !== null && doiAfter > doi ? 'text-green-600' : 'text-muted-foreground'}`}>
                 {doiAfter !== null ? `${doiAfter}d` : (liveStats && ordQty > 0 ? '\u221E' : '—')}
               </span>
 
               <div className="flex justify-end">
-                <Input type="number" step="0.001" className="h-7 w-14 text-xs text-right"
+                <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
                   value={n.unit_price_foreign}
                   onChange={e => {
                     updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)
@@ -597,16 +597,16 @@ export default function PurchaseOrderDetailPage() {
 
               {hasDiscount && (
                 <div className="flex justify-end">
-                  <Input type="number" step="0.001" className="h-7 w-14 text-xs text-right"
+                  <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
                     value={n.discounted_unit_price_foreign}
                     onChange={e => updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)} />
                 </div>
               )}
 
-              <span className="text-right">{unitIdr > 0 ? formatIDR(unitIdr) : '—'}</span>
-              <span className="text-right">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</span>
-              <span className="text-right font-medium">{unitIdr * ordQty > 0 ? formatIDR(unitIdr * ordQty) : '—'}</span>
-              <span className="text-right font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</span>
+              <span className="text-left">{unitIdr > 0 ? formatIDR(unitIdr) : '—'}</span>
+              <span className="text-left">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</span>
+              <span className="text-left font-medium">{unitIdr * ordQty > 0 ? formatIDR(unitIdr * ordQty) : '—'}</span>
+              <span className="text-left font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</span>
               <span />
 
               <Button type="button" size="icon" variant="ghost"
@@ -1024,20 +1024,20 @@ export default function PurchaseOrderDetailPage() {
         <div className="overflow-x-auto">
           <div className={`grid ${colTemplate} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30 min-w-max`}>
             <span>Variant</span>
-            <span className="text-right">Ordered</span>
-            <span className="text-right">Recv</span>
-            <span className="text-right">SOH</span>
-            <span className="text-right">Incoming</span>
-            <span className="text-right">Upcoming</span>
-            <span className="text-right">AVG</span>
-            <span className="text-right">DOI</span>
-            <span className="text-right">DOI+</span>
-            <span className="text-right">Unit Price</span>
-            {hasDiscount && <span className="text-right">Disc. Price</span>}
-            <span className="text-right">Unit Rp</span>
-            <span className="text-right">Total</span>
-            <span className="text-right">Total Rp</span>
-            <span className="text-right">COGS/u</span>
+            <span className="text-left">Ordered</span>
+            <span className="text-left">Recv</span>
+            <span className="text-left">SOH</span>
+            <span className="text-left">Incoming</span>
+            <span className="text-left">Upcoming</span>
+            <span className="text-left">AVG</span>
+            <span className="text-left">DOI</span>
+            <span className="text-left">DOI+</span>
+            <span className="text-left">Unit Price</span>
+            {hasDiscount && <span className="text-left">Disc. Price</span>}
+            <span className="text-left">Unit Rp</span>
+            <span className="text-left">Total</span>
+            <span className="text-left">Total Rp</span>
+            <span className="text-left">COGS/u</span>
             <span>Remarks</span>
             <span />
           </div>
