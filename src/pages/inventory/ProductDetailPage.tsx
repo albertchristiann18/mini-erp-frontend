@@ -74,7 +74,7 @@ export default function ProductDetailPage() {
                   <p className="text-sm text-muted-foreground">Dimensions / Weight</p>
                   <p className="text-sm">
                     {product.length && product.width && product.height
-                      ? `${product.length} x ${product.width} x ${product.height} mm`
+                      ? `${product.length} x ${product.width} x ${product.height} cm`
                       : '—'}
                     {product.weight ? ` / ${product.weight} g` : ''}
                   </p>

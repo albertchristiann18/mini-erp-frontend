@@ -20,6 +20,7 @@ export interface Product {
   id: string
   company: string
   category: string
+  category_id: string
   category_name: string
   name: string
   sku_code: string

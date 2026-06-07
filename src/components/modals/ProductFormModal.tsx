@@ -25,6 +25,10 @@ const schema = z.object({
   selling_price: z.number().optional(),
   is_active: z.boolean().optional(),
   supplier_link: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  weight: z.number().int().min(0).optional(),
+  length: z.number().int().min(0).optional(),
+  width: z.number().int().min(0).optional(),
+  height: z.number().int().min(0).optional(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -54,10 +58,14 @@ export function ProductFormModal({ open, onClose, product }: Props) {
     if (product && open) {
       setValue('name', product.name)
       setValue('sku', product.sku_code)
-      setValue('category', product.category)
+      setValue('category', product.category_id)
       setValue('description', product.description)
       setValue('is_active', product.is_active)
       setValue('supplier_link', product.supplier_link ?? '')
+      setValue('weight', product.weight ?? 0)
+      setValue('length', product.length ?? 0)
+      setValue('width', product.width ?? 0)
+      setValue('height', product.height ?? 0)
       setPhotos(product.photos || [])
     }
   }, [product, open, setValue])
@@ -80,6 +88,10 @@ export function ProductFormModal({ open, onClose, product }: Props) {
             category: values.category,
             is_active: values.is_active,
             supplier_link: values.supplier_link || null,
+            weight: values.weight ?? 0,
+            length: values.length ?? 0,
+            width: values.width ?? 0,
+            height: values.height ?? 0,
           },
         })
         toast.success('Product updated')
@@ -169,6 +181,20 @@ export function ProductFormModal({ open, onClose, product }: Props) {
               type="url"
             />
           </FormField>
+          <div className="grid grid-cols-4 gap-3">
+            <FormField label="Length (cm)" error={errors.length?.message}>
+              <Input type="number" min="0" {...register('length', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Width (cm)" error={errors.width?.message}>
+              <Input type="number" min="0" {...register('width', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Height (cm)" error={errors.height?.message}>
+              <Input type="number" min="0" {...register('height', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Weight (g)" error={errors.weight?.message}>
+              <Input type="number" min="0" {...register('weight', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+          </div>
           {isEditing && (
             <FormField label="Status">
               <Select

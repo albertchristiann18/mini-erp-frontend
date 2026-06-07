@@ -19,6 +19,7 @@ const mockProduct = {
   name: 'Test Product',
   company: 'c1',
   category: 'cat1',
+  category_id: 'cat1',
   category_name: 'Category 1',
   sku_code: 'TP-001',
   description: 'Test description',
