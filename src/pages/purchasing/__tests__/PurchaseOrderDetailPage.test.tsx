@@ -273,14 +273,15 @@ it('renders Shipping Fee / CBM label in PO info card', async () => {
 
 it('shows product group headers with supplier link in order items', async () => {
   renderPage()
-  expect(await screen.findByText('T-Shirt')).toBeInTheDocument()
-  const supplierLink = screen.getByRole('link', { name: /supplier/i })
-  expect(supplierLink).toHaveAttribute('href', 'https://supplier.example.com/product/1')
+  const tshirts = await screen.findAllByText('T-Shirt')
+  expect(tshirts.length).toBeGreaterThanOrEqual(1)
+  const supplierLink = document.querySelector('a[href="https://supplier.example.com/product/1"]')
+  expect(supplierLink).toBeInTheDocument()
 })
 
 it('shows correct group qty and cost totals', async () => {
   renderPage()
-  await screen.findByText('T-Shirt')
+  await screen.findAllByText('T-Shirt')
   expect(screen.getAllByText('10')[0]).toBeInTheDocument()
   expect(screen.getAllByText(/Rp/).length).toBeGreaterThanOrEqual(1)
 })

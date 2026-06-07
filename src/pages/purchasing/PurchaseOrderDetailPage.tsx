@@ -338,40 +338,101 @@ export default function PurchaseOrderDetailPage() {
     }
 
     return Array.from(groupMap.values()).map(group => {
-    const groupQty = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
-      group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
-    const groupCost = group.existingItems.reduce((s, i) => {
-      if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
-      return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
-    }, 0)
     const showRemarks = po.editable_fields.order_detail.includes('remarks') && editMode
+
+    const groupStockData = group.existingItems.map(item => getItemStockData(item))
+    const sumSOH = groupStockData.reduce((s, d) => s + d.soh, 0)
+    const sumIncoming = groupStockData.reduce((s, d) => s + d.incoming, 0)
+    const sumUpcoming = groupStockData.reduce((s, d) => s + d.upcoming, 0)
+    const sumAvg = groupStockData.reduce((s, d) => s + d.avg, 0)
+    const groupDoi = sumAvg > 0 ? Math.round((sumSOH + sumIncoming) / sumAvg) : null
+    const groupDoiAfter = sumAvg > 0 ? Math.round(sumUpcoming / sumAvg) : null
+    const sumOrdered = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
+      group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
+    const sumReceived = group.existingItems.reduce((s, i) => s + (i.received_qty ?? 0), 0)
+    const sumTotalForeign = group.existingItems.reduce((s, i) => {
+      const unitF = hasDiscount
+        ? Number(i.discounted_unit_price_foreign ?? i.unit_price_foreign ?? 0)
+        : Number(i.unit_price_foreign ?? 0)
+      return s + unitF * i.ordered_qty
+    }, 0)
+    const sumTotalIdr = group.existingItems.reduce((s, i) => {
+      const base = hasDiscount
+        ? (i.discounted_total_price_base ?? i.total_price_base ?? 0)
+        : (i.total_price_base ?? i.discounted_total_price_base ?? 0)
+      return s + base
+    }, 0)
 
     return (
       <div key={group.groupKey}>
         <div
-          className="flex items-center gap-2 px-3 py-2.5 bg-muted/50 border-b cursor-pointer hover:bg-muted/70 transition-colors min-w-max"
+          className={`grid ${colTemplate} gap-2 items-center px-3 py-2 text-sm font-semibold bg-muted/40 border-b cursor-pointer hover:bg-muted/60 transition-colors min-w-max`}
           onClick={() => toggleGroupCollapse(group.groupKey)}
         >
-          <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
-          {group.productPhotoUrl ? (
-            <img src={group.productPhotoUrl} alt={group.productName}
-              className="h-7 w-7 rounded object-cover shrink-0 border border-border" />
-          ) : (
-            <div className="h-7 w-7 rounded bg-muted shrink-0" />
-          )}
-          <span className="text-sm font-bold text-foreground">{group.productName}</span>
-          {group.productSupplierLink && (
-            <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              className="flex items-center gap-0.5 text-blue-500 hover:text-blue-600 text-xs font-medium shrink-0">
-              <ExternalLink className="h-3 w-3" />
-              <span>Supplier</span>
-            </a>
-          )}
-          <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
-            <span>Qty: <strong className="text-foreground">{groupQty}</strong></span>
-            <span>Total: <strong className="text-foreground">{groupCost > 0 ? formatIDR(groupCost) : '—'}</strong></span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
+            {group.productPhotoUrl ? (
+              <img
+                src={group.productPhotoUrl}
+                alt={group.productName}
+                className="h-6 w-6 rounded object-cover shrink-0 border border-border"
+              />
+            ) : (
+              <div className="h-6 w-6 rounded bg-muted shrink-0" />
+            )}
+            <span className="font-bold text-foreground truncate">{group.productName}</span>
+            {group.productSupplierLink && (
+              <a
+                href={group.productSupplierLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-0.5 text-blue-500 hover:text-blue-600 text-xs shrink-0"
+              >
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+
+          <span className="text-right">{sumOrdered}</span>
+
+          <span className="text-right text-muted-foreground">{sumReceived || '—'}</span>
+
+          <span className="text-right">{sumSOH}</span>
+
+          <span className="text-right text-blue-600">{sumIncoming}</span>
+
+          <span className="text-right">{sumUpcoming}</span>
+
+          <span className="text-right text-muted-foreground font-normal">
+            {sumAvg > 0 ? `${sumAvg.toFixed(1)}/d` : '—'}
           </span>
+
+          <span className={`text-right ${groupDoi !== null && groupDoi < 14 ? 'text-red-600' : groupDoi !== null && groupDoi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+            {groupDoi !== null ? `${groupDoi}d` : '—'}
+          </span>
+
+          <span className={`text-right ${groupDoiAfter !== null && groupDoiAfter < 14 ? 'text-red-600' : groupDoiAfter !== null && groupDoiAfter <= 30 ? 'text-amber-600' : 'text-green-600'}`}>
+            {groupDoiAfter !== null ? `${groupDoiAfter}d` : '—'}
+          </span>
+
+          <span />
+
+          {hasDiscount && <span />}
+
+          <span />
+
+          <span className="text-right">
+            {sumTotalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(sumTotalForeign)}` : '—'}
+          </span>
+
+          <span className="text-right">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</span>
+
+          <span />
+
+          <span />
+
+          {editMode && canAddDeleteItems && <span />}
         </div>
         {!collapsedGroups.has(group.groupKey) && (
         <>
@@ -437,7 +498,7 @@ export default function PurchaseOrderDetailPage() {
                       setDetailField(item.id, 'unit_price_foreign', e.target.value)
                       if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
                     }} />
-                ) : (item.unit_price_foreign != null ? formatForeignAmount(item.unit_price_foreign) : '—')}
+                ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
               </span>
 
               {hasDiscount && (
@@ -446,13 +507,13 @@ export default function PurchaseOrderDetailPage() {
                     <Input type="number" step="0.001" className="h-7 w-14 text-xs text-right"
                       value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
                       onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                  ) : (item.discounted_unit_price_foreign != null ? formatForeignAmount(item.discounted_unit_price_foreign) : '—')}
+                  ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
                 </span>
               )}
 
               <span className="text-right">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</span>
 
-              <span className="text-right">{totalForeign > 0 ? formatForeignAmount(totalForeign) : '—'}</span>
+              <span className="text-right">{totalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</span>
 
               <span className="text-right font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</span>
 
@@ -543,7 +604,7 @@ export default function PurchaseOrderDetailPage() {
               )}
 
               <span className="text-right">{unitIdr > 0 ? formatIDR(unitIdr) : '—'}</span>
-              <span className="text-right">{unitForeign * ordQty > 0 ? formatForeignAmount(unitForeign * ordQty) : '—'}</span>
+              <span className="text-right">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</span>
               <span className="text-right font-medium">{unitIdr * ordQty > 0 ? formatIDR(unitIdr * ordQty) : '—'}</span>
               <span className="text-right font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</span>
               <span />
@@ -971,10 +1032,10 @@ export default function PurchaseOrderDetailPage() {
             <span className="text-right">AVG</span>
             <span className="text-right">DOI</span>
             <span className="text-right">DOI+</span>
-            <span className="text-right">Unit {getCurrencySymbol(po.currency)}</span>
-            {hasDiscount && <span className="text-right">Disc.{getCurrencySymbol(po.currency)}</span>}
+            <span className="text-right">Unit Price</span>
+            {hasDiscount && <span className="text-right">Disc. Price</span>}
             <span className="text-right">Unit Rp</span>
-            <span className="text-right">Total {getCurrencySymbol(po.currency)}</span>
+            <span className="text-right">Total</span>
             <span className="text-right">Total Rp</span>
             <span className="text-right">COGS/u</span>
             <span>Remarks</span>
