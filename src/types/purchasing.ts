@@ -11,7 +11,7 @@ export interface StatusHistoryItem {
 
 export interface PurchaseOrderDetail {
   id: string
-  product_variant: string
+  variant_id: string
   product_variant_name: string
   product_id: string
   product_name: string

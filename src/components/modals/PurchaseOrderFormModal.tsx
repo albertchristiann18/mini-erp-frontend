@@ -273,7 +273,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                           </Button>
                         </div>
                         {variantId && (
-                          <VariantStockStrip variantId={variantId} stockMap={stockMap} avgWindow={avgWindow} />
+                          <VariantStockStrip variantId={variantId} stockMap={stockMap} avgWindow={avgWindow} orderedQty={watch(`order_details.${i}.ordered_qty`) || 0} />
                         )}
                       </div>
                     )
@@ -299,15 +299,18 @@ function VariantStockStrip({
   variantId,
   stockMap,
   avgWindow,
+  orderedQty,
 }: {
   variantId: string
   stockMap: Map<string, ReplenishmentItem>
   avgWindow: 7 | 30
+  orderedQty: number
 }) {
   const stats = stockMap.get(variantId)
   if (!stats) return null
   const avg = avgWindow === 7 ? stats.avg_sales_7d : stats.avg_sales_30d
   const doi = avg > 0 ? Math.round((stats.stock_on_hand + stats.incoming_qty) / avg) : null
+  const doiAfter = avg > 0 ? Math.round((stats.stock_on_hand + stats.incoming_qty + orderedQty) / avg) : null
   return (
     <div className="ml-2 flex flex-wrap gap-3 pb-1.5 text-xs text-muted-foreground">
       <span>SOH: <strong className="text-foreground">{stats.stock_on_hand}</strong></span>
@@ -317,6 +320,12 @@ function VariantStockStrip({
         DOI:{' '}
         <strong className={doi !== null && doi < 14 ? 'text-red-600' : 'text-foreground'}>
           {doi !== null ? `${doi}d` : '∞'}
+        </strong>
+      </span>
+      <span>
+        DOI after:{' '}
+        <strong className={doiAfter !== null && doi !== null && doiAfter > doi ? 'text-green-600' : 'text-foreground'}>
+          {doiAfter !== null ? `${doiAfter}d` : '∞'}
         </strong>
       </span>
     </div>

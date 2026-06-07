@@ -95,7 +95,7 @@ const defaultPOData = {
   order_details: [
     {
       id: 'det1',
-      product_variant: 'v1',
+      variant_id: 'v1',
       product_variant_name: 'Blue / M',
       product_id: 'prod1',
       product_name: 'T-Shirt',
@@ -293,20 +293,17 @@ it('shows currency as select in edit mode', async () => {
   expect(comboboxes.length).toBeGreaterThanOrEqual(1)
 })
 
-it('expands cost analysis panel when toggle button is clicked', async () => {
+it('shows stock intel columns inline (SOH, Incoming, Upcoming, AVG, DOI, DOI+)', async () => {
   renderPage()
-  const costBtn = await screen.findByText('Cost Analysis')
-  await userEvent.click(costBtn)
-  expect(await screen.findByText('Unit IDR')).toBeInTheDocument()
+  expect(await screen.findByText('SOH')).toBeInTheDocument()
+  expect(await screen.findByText('Incoming')).toBeInTheDocument()
+  expect(await screen.findByText('Upcoming')).toBeInTheDocument()
+  expect(await screen.findByText('AVG')).toBeInTheDocument()
+  expect(await screen.findByText('DOI')).toBeInTheDocument()
+  expect(await screen.findByText('DOI+')).toBeInTheDocument()
 })
 
-it('shows COGS forecast column when cogs_ratio_forecast is set', async () => {
-  vi.mocked(usePurchaseOrder).mockReturnValue({
-    data: { ...defaultPOData, cogs_ratio_forecast: '15.00' },
-    isLoading: false,
-  } as UseQueryResult<PurchaseOrder, Error>)
+it('shows COGS/u column header', async () => {
   renderPage()
-  const costBtn = await screen.findByText('Cost Analysis')
-  await userEvent.click(costBtn)
-  expect(await screen.findByText('COGS Forecast/unit')).toBeInTheDocument()
+  expect(await screen.findByText('COGS/u')).toBeInTheDocument()
 })

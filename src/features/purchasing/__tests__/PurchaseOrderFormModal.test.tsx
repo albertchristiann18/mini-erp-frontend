@@ -132,5 +132,5 @@ it('shows stock intel strip with SOH, AVG, DOI when variant is selected', async 
   expect(screen.getByText(/SOH:/)).toBeInTheDocument()
   expect(screen.getByText(/Incoming:/)).toBeInTheDocument()
   expect(screen.getByText(/AVG/)).toBeInTheDocument()
-  expect(screen.getByText(/DOI:/)).toBeInTheDocument()
+  expect(screen.getAllByText(/DOI:/).length).toBeGreaterThanOrEqual(1)
 })
