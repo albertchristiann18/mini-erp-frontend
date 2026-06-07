@@ -64,7 +64,6 @@ export interface PurchaseOrder {
   procure_amount: number | null
   refund_amount: number | null
   cost_ratio_cogs: number
-  cogs_ratio_forecast: string | null
   shipping_per_qty: number
   invoice_number: string | null
   invoice_date: string | null
@@ -73,6 +72,7 @@ export interface PurchaseOrder {
   forecast_delivery_date: string | null
   forecast_cbm: string | null
   forecast_shipping_fee: number | null
+  forecast_shipping_fee_per_cbm: number | null
   purchase_order_invoice_file: string | null
   delivery_order_file: string | null
   delivery_order_invoice_file: string | null

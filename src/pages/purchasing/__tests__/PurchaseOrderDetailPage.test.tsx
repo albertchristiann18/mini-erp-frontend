@@ -138,7 +138,7 @@ const defaultPOData = {
   total_item_amount: 4950000,
   total_order_amount: 5200000,
   delivery_fee_idr: null,
-  cogs_ratio_forecast: null,
+  forecast_shipping_fee_per_cbm: null,
   cdate: '2026-05-01T00:00:00Z',
   udate: '2026-05-01T00:00:00Z',
 }

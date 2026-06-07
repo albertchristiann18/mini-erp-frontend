@@ -69,7 +69,7 @@ const HEADER_FIELD_CONFIG: Record<string, FieldInputConfig> = {
   ] },
   exchange_rate:               { label: 'Exchange Rate',       inputType: 'number', step: '0.001' },
   commission_fee_pct:          { label: 'Commission %',        inputType: 'number' },
-  cogs_ratio_forecast:         { label: 'COGS Forecast %',    inputType: 'number', step: '0.01' },
+  forecast_shipping_fee_per_cbm: { label: 'Forecast Shipping/CBM', inputType: 'number' },
   delivery_fee:               { label: 'Delivery Fee (RMB)',  inputType: 'number', step: '0.001' },
   commission_fee_rmb:          { label: 'Commission (RMB)',    inputType: 'number', step: '0.001' },
   invoice_number:              { label: 'Invoice No.',         inputType: 'text' },
@@ -745,15 +745,6 @@ export default function PurchaseOrderDetailPage() {
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
-                field="cogs_ratio_forecast"
-                label="COGS Forecast %"
-                value={po.cogs_ratio_forecast != null ? `${po.cogs_ratio_forecast}%` : null}
-                editMode={editMode}
-                editable={po.editable_fields.header.includes('cogs_ratio_forecast')}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
-              <EditableInfoItem
                 field="delivery_fee"
                 label="Delivery Fee (RMB)"
                 value={po.delivery_fee != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(po.delivery_fee)}` : null}
@@ -799,6 +790,15 @@ export default function PurchaseOrderDetailPage() {
                 value={po.forecast_cbm != null ? formatDecimalUnit(po.forecast_cbm, 'm3') : null}
                 editMode={editMode}
                 editable={po.editable_fields.header.includes('forecast_cbm')}
+                headerValues={headerValues}
+                setHeaderField={setHeaderField}
+              />
+              <EditableInfoItem
+                field="forecast_shipping_fee_per_cbm"
+                label="Forecast Shipping/CBM"
+                value={po.forecast_shipping_fee_per_cbm != null ? formatIDR(po.forecast_shipping_fee_per_cbm) : null}
+                editMode={editMode}
+                editable={po.editable_fields.header.includes('forecast_shipping_fee_per_cbm')}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
