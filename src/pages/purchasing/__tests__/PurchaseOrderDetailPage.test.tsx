@@ -247,7 +247,7 @@ it('shows delete button per row in edit mode for ORDERED status', async () => {
   renderPage()
   const editBtn = await screen.findByText('Edit')
   await userEvent.click(editBtn)
-  const rowEl = await screen.findByText('Blue / M').then(el => el.closest('[class*="grid"]')!)
+  const rowEl = await screen.findByText('Blue / M').then(el => el.closest('tr')!)
   const deleteBtn = rowEl.querySelector('button')
   expect(deleteBtn).toBeInTheDocument()
 })

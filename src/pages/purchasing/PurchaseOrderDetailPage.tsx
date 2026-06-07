@@ -34,6 +34,14 @@ function formatDecimalUnit(val: string | number | null | undefined, unit?: strin
   return unit ? `${formatted} ${unit}` : formatted
 }
 
+function doiAfterColor(days: number | null): string {
+  if (days === null) return 'text-muted-foreground'
+  if (days < 30) return 'text-red-600'
+  if (days < 80) return 'text-amber-600'
+  if (days <= 120) return 'text-green-600'
+  return 'text-red-600'
+}
+
 const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   DRAFT: 'secondary', ORDERED: 'info', SHIPPED: 'warning',
   DELIVERED: 'success', COMPLETED: 'success', CANCELLED: 'destructive',
@@ -264,10 +272,6 @@ export default function PurchaseOrderDetailPage() {
     return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
   }, 0)
 
-  const colTemplate = hasDiscount
-    ? 'grid-cols-[minmax(110px,2fr)_50px_50px_50px_55px_65px_68px_48px_55px_75px_75px_82px_75px_98px_98px_minmax(55px,1fr)_32px]'
-    : 'grid-cols-[minmax(110px,2fr)_50px_50px_50px_55px_65px_68px_48px_55px_75px_82px_75px_98px_98px_minmax(55px,1fr)_32px]'
-
   const getItemStockData = (item: PurchaseOrderDetail) => {
     const hasSnapshot = item.avg_sales !== null
     const liveStats = !hasSnapshot ? stockMap.get(item.variant_id) : undefined
@@ -364,76 +368,55 @@ export default function PurchaseOrderDetailPage() {
     }, 0)
 
     return (
-      <div key={group.groupKey}>
-        <div
-          className={`grid ${colTemplate} gap-2 items-center px-3 py-2 text-sm font-semibold bg-muted/40 border-b cursor-pointer hover:bg-muted/60 transition-colors min-w-max`}
+      <tbody key={group.groupKey}>
+        <tr
+          className="bg-muted/40 border-b cursor-pointer hover:bg-muted/60 transition-colors font-semibold text-sm"
           onClick={() => toggleGroupCollapse(group.groupKey)}
         >
-          <div className="flex items-center gap-1.5 min-w-0">
-            <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
-            {group.productPhotoUrl ? (
-              <img
-                src={group.productPhotoUrl}
-                alt={group.productName}
-                className="h-6 w-6 rounded object-cover shrink-0 border border-border"
-              />
-            ) : (
-              <div className="h-6 w-6 rounded bg-muted shrink-0" />
-            )}
-            <span className="font-bold text-foreground truncate">{group.productName}</span>
-            {group.productSupplierLink && (
-              <a
-                href={group.productSupplierLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={e => e.stopPropagation()}
-                className="flex items-center gap-0.5 text-blue-500 hover:text-blue-600 text-xs shrink-0"
-              >
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-
-          <span className="text-left">{sumOrdered}</span>
-
-          <span className="text-left text-muted-foreground">{sumReceived || '—'}</span>
-
-          <span className="text-left">{sumSOH}</span>
-
-          <span className="text-left text-blue-600">{sumIncoming}</span>
-
-          <span className="text-left">{sumUpcoming}</span>
-
-          <span className="text-left text-muted-foreground font-normal">
+          <td className="px-3 py-2 whitespace-nowrap">
+            <div className="flex items-center gap-1.5">
+              <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
+              {group.productPhotoUrl ? (
+                <img src={group.productPhotoUrl} alt={group.productName}
+                  className="h-6 w-6 rounded object-cover shrink-0 border border-border" />
+              ) : (
+                <div className="h-6 w-6 rounded bg-muted shrink-0" />
+              )}
+              <span className="font-bold text-foreground">{group.productName}</span>
+              {group.productSupplierLink && (
+                <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="flex items-center gap-0.5 text-blue-500 hover:text-blue-600 text-xs shrink-0">
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          </td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumOrdered}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{sumReceived || '—'}</td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumSOH}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-blue-600">{sumIncoming}</td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumUpcoming}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground font-normal">
             {sumAvg > 0 ? `${sumAvg.toFixed(1)}/d` : '—'}
-          </span>
-
-          <span className={`text-left ${groupDoi !== null && groupDoi < 14 ? 'text-red-600' : groupDoi !== null && groupDoi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+          </td>
+          <td className={`px-3 py-2 whitespace-nowrap ${groupDoi !== null && groupDoi < 14 ? 'text-red-600' : groupDoi !== null && groupDoi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
             {groupDoi !== null ? `${groupDoi}d` : '—'}
-          </span>
-
-          <span className={`text-left ${groupDoiAfter !== null && groupDoiAfter < 14 ? 'text-red-600' : groupDoiAfter !== null && groupDoiAfter <= 30 ? 'text-amber-600' : 'text-green-600'}`}>
+          </td>
+          <td className={`px-3 py-2 whitespace-nowrap ${doiAfterColor(groupDoiAfter)}`}>
             {groupDoiAfter !== null ? `${groupDoiAfter}d` : '—'}
-          </span>
-
-          <span />
-
-          {hasDiscount && <span />}
-
-          <span />
-
-          <span className="text-left">
+          </td>
+          <td className="px-3 py-2" />
+          {hasDiscount && <td className="px-3 py-2" />}
+          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap">
             {sumTotalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(sumTotalForeign)}` : '—'}
-          </span>
-
-          <span className="text-left">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</span>
-
-          <span />
-
-          <span />
-
-          {editMode && canAddDeleteItems && <span />}
-        </div>
+          </td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</td>
+          <td className="px-3 py-2" />
+          <td className="px-3 py-2" />
+          {editMode && canAddDeleteItems && <td />}
+        </tr>
         {!collapsedGroups.has(group.groupKey) && (
         <>
         {group.existingItems.map(item => {
@@ -452,87 +435,74 @@ export default function PurchaseOrderDetailPage() {
           const cogsPerUnit = unitPriceIdr + freightPerUnit + commissionPerUnit
 
           return (
-            <div key={item.id} className={`grid ${colTemplate} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0 min-w-max`}>
-              <span className="font-mono font-medium truncate" title={item.product_variant_name}>{item.product_variant_name}</span>
-
-              <span className="text-left">
+            <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
+              <td className="pl-6 pr-3 py-1.5 whitespace-nowrap font-mono font-medium">{item.product_variant_name}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">
                 {isDetailEditable('ordered_qty') ? (
-                  <Input type="number" className="h-7 w-12 text-xs text-left"
+                  <Input type="number" className="h-7 w-14 text-xs"
                     value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
                     onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
                 ) : item.ordered_qty}
-              </span>
-
-              <span className="text-left">
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap">
                 {isDetailEditable('received_qty') ? (
-                  <Input type="number" className="h-7 w-12 text-xs text-left"
+                  <Input type="number" className="h-7 w-14 text-xs"
                     value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
                     onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
                 ) : (item.received_qty ?? '—')}
-              </span>
-
-              <span className="text-left text-muted-foreground">{soh}</span>
-
-              <span className="text-left text-blue-600">{incoming}</span>
-
-              <span className="text-left font-medium text-foreground">{upcoming}</span>
-
-              <span className="text-left text-muted-foreground">
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{soh}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{incoming}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{upcoming}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
                 {avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
                 {hasSnapshot && <span className="text-[10px] text-muted-foreground/50 ml-0.5">*</span>}
-              </span>
-
-              <span className={`text-left font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : doi !== null && doi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
                 {doi !== null ? `${doi}d` : '\u221E'}
-              </span>
-
-              <span className={`text-left font-medium ${doiAfter !== null && doi !== null && doiAfter > doi ? 'text-green-600' : 'text-muted-foreground'}`}>
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
                 {doiAfter !== null ? `${doiAfter}d` : '\u221E'}
-              </span>
-
-              <span className="text-left">
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap">
                 {isDetailEditable('unit_price_foreign') ? (
-                  <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
+                  <Input type="number" step="0.001" className="h-7 w-20 text-xs"
                     value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
                     onChange={e => {
                       setDetailField(item.id, 'unit_price_foreign', e.target.value)
                       if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
                     }} />
                 ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
-              </span>
-
+              </td>
               {hasDiscount && (
-                <span className="text-left">
+                <td className="px-3 py-1.5 whitespace-nowrap">
                   {isDetailEditable('discounted_unit_price_foreign') ? (
-                    <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
+                    <Input type="number" step="0.001" className="h-7 w-20 text-xs"
                       value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
                       onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
                   ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
-                </span>
+                </td>
               )}
-
-              <span className="text-left">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</span>
-
-              <span className="text-left">{totalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</span>
-
-              <span className="text-left font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</span>
-
-              <span className="text-left font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</span>
-
-              {showRemarks ? (
-                <Input className="h-7 text-xs" placeholder="Remarks..."
-                  value={rowChanges.remarks ?? String(item.remarks ?? '')}
-                  onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
-              ) : <span className="text-muted-foreground truncate">{item.remarks || ''}</span>}
-
-              {editMode && canAddDeleteItems ? (
-                <Button type="button" size="icon" variant="ghost"
-                  className="h-7 w-7 text-red-500 hover:text-red-600"
-                  onClick={() => deleteExistingItem(item.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              ) : <span />}
-            </div>
+              <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
+              <td className="px-3 py-1.5">
+                {showRemarks ? (
+                  <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
+                    value={rowChanges.remarks ?? String(item.remarks ?? '')}
+                    onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
+                ) : <span className="text-muted-foreground">{item.remarks || ''}</span>}
+              </td>
+              {editMode && canAddDeleteItems && (
+                <td className="px-2 py-1 w-8">
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600"
+                    onClick={() => deleteExistingItem(item.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </td>
+              )}
+            </tr>
           )
         })}
         {editMode && canAddDeleteItems && group.newItemsList.map(n => {
@@ -549,77 +519,73 @@ export default function PurchaseOrderDetailPage() {
           const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
 
           return (
-            <div key={n._tempId} className={`grid ${colTemplate} gap-2 items-center px-3 py-1.5 text-xs border-b last:border-b-0 min-w-max`}>
-              <VariantSearchSelect
-                value={n.product_variant_id}
-                selectedLabel={n.product_variant_label}
-                onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) => {
-                  updateNewItem(n._tempId, 'product_variant_id', id)
-                  updateNewItem(n._tempId, 'product_variant_label', label)
-                  updateNewItem(n._tempId, 'product_id', productId)
-                  updateNewItem(n._tempId, 'product_name', productName)
-                  updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
-                  updateNewItem(n._tempId, 'product_photo_url', productPhotoUrl ?? '')
-                }}
-                placeholder="Select variant"
-              />
-
-              <Input type="number" className="h-7 w-12 text-xs text-left"
-                value={n.ordered_qty}
-                onChange={e => updateNewItem(n._tempId, 'ordered_qty', e.target.value)} />
-
-              <span />
-
-              <span className="text-left text-muted-foreground">{liveStats ? liveSoh : '—'}</span>
-              <span className="text-left text-blue-600">{liveStats ? liveIncoming : '—'}</span>
-              <span className="text-left font-medium">{liveUpcoming !== null ? liveUpcoming : '—'}</span>
-
-              <span className="text-left text-muted-foreground">
+            <tr key={n._tempId} className="border-b last:border-b-0">
+              <td className="px-2 py-1 min-w-[160px]">
+                <VariantSearchSelect
+                  value={n.product_variant_id}
+                  selectedLabel={n.product_variant_label}
+                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) => {
+                    updateNewItem(n._tempId, 'product_variant_id', id)
+                    updateNewItem(n._tempId, 'product_variant_label', label)
+                    updateNewItem(n._tempId, 'product_id', productId)
+                    updateNewItem(n._tempId, 'product_name', productName)
+                    updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
+                    updateNewItem(n._tempId, 'product_photo_url', productPhotoUrl ?? '')
+                  }}
+                  placeholder="Select variant"
+                />
+              </td>
+              <td className="px-2 py-1">
+                <Input type="number" className="h-7 w-14 text-xs"
+                  value={n.ordered_qty}
+                  onChange={e => updateNewItem(n._tempId, 'ordered_qty', e.target.value)} />
+              </td>
+              <td className="px-2 py-1" />
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{liveStats ? liveSoh : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{liveStats ? liveIncoming : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{liveUpcoming !== null ? liveUpcoming : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
                 {liveStats && avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
-              </span>
-
-              <span className={`text-left font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
                 {doi !== null ? `${doi}d` : (liveStats ? '\u221E' : '—')}
-              </span>
-
-              <span className={`text-left font-medium ${doiAfter !== null && doi !== null && doiAfter > doi ? 'text-green-600' : 'text-muted-foreground'}`}>
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
                 {doiAfter !== null ? `${doiAfter}d` : (liveStats && ordQty > 0 ? '\u221E' : '—')}
-              </span>
-
-              <div className="flex justify-end">
-                <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
+              </td>
+              <td className="px-2 py-1">
+                <Input type="number" step="0.001" className="h-7 w-20 text-xs"
                   value={n.unit_price_foreign}
                   onChange={e => {
                     updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)
                     if (hasDiscount) updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)
                   }} />
-              </div>
-
+              </td>
               {hasDiscount && (
-                <div className="flex justify-end">
-                  <Input type="number" step="0.001" className="h-7 w-14 text-xs text-left"
+                <td className="px-2 py-1">
+                  <Input type="number" step="0.001" className="h-7 w-20 text-xs"
                     value={n.discounted_unit_price_foreign}
                     onChange={e => updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)} />
-                </div>
+                </td>
               )}
-
-              <span className="text-left">{unitIdr > 0 ? formatIDR(unitIdr) : '—'}</span>
-              <span className="text-left">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</span>
-              <span className="text-left font-medium">{unitIdr * ordQty > 0 ? formatIDR(unitIdr * ordQty) : '—'}</span>
-              <span className="text-left font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</span>
-              <span />
-
-              <Button type="button" size="icon" variant="ghost"
-                className="h-7 w-7 text-red-500 hover:text-red-600"
-                onClick={() => removeNewItem(n._tempId)}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+              <td className="px-3 py-1.5 whitespace-nowrap">{unitIdr > 0 ? formatIDR(unitIdr) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{unitIdr * ordQty > 0 ? formatIDR(unitIdr * ordQty) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
+              <td className="px-3 py-1.5" />
+              <td className="px-2 py-1 w-8">
+                <Button type="button" size="icon" variant="ghost"
+                  className="h-7 w-7 text-red-500 hover:text-red-600"
+                  onClick={() => removeNewItem(n._tempId)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </td>
+            </tr>
           )
         })}
         </>
       )}
-      </div>
+      </tbody>
     )
     })
   })()
@@ -1022,26 +988,30 @@ export default function PurchaseOrderDetailPage() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <div className={`grid ${colTemplate} gap-2 px-3 py-2 text-xs font-medium text-muted-foreground border-b bg-muted/30 min-w-max`}>
-            <span>Variant</span>
-            <span className="text-left">Ordered</span>
-            <span className="text-left">Recv</span>
-            <span className="text-left">SOH</span>
-            <span className="text-left">Incoming</span>
-            <span className="text-left">Upcoming</span>
-            <span className="text-left">AVG</span>
-            <span className="text-left">DOI</span>
-            <span className="text-left">DOI+</span>
-            <span className="text-left">Unit Price</span>
-            {hasDiscount && <span className="text-left">Disc. Price</span>}
-            <span className="text-left">Unit Rp</span>
-            <span className="text-left">Total</span>
-            <span className="text-left">Total Rp</span>
-            <span className="text-left">COGS/u</span>
-            <span>Remarks</span>
-            <span />
-          </div>
-          {orderItemsContent}
+          <table className="w-full min-w-max text-xs border-collapse">
+            <thead>
+              <tr className="border-b bg-muted/30 text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap min-w-[160px]">Variant</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Order</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Receive</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">SOH</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Incoming</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Upcoming</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">AVG</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">DOI</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">DOI+</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Unit Price</th>
+                {hasDiscount && <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Disc. Price</th>}
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Unit Rp</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Total</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Total Rp</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">COGS/u</th>
+                <th className="px-3 py-2 text-left font-medium">Remarks</th>
+                {editMode && canAddDeleteItems && <th className="w-8" />}
+              </tr>
+            </thead>
+            {orderItemsContent}
+          </table>
         </div>
       </div>
       {po.next_status && (
