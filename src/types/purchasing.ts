@@ -125,5 +125,6 @@ export interface ReplenishmentItem {
   stock_on_hand: number
   incoming_qty: number
   avg_sales_7d: number
+  avg_sales_14d: number
   avg_sales_30d: number
 }

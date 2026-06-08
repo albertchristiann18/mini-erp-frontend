@@ -134,7 +134,7 @@ export default function PurchaseOrderDetailPage() {
       return next
     })
 
-  const [avgWindow, setAvgWindow] = useState<7 | 30>(30)
+  const [avgWindow, setAvgWindow] = useState<7 | 14 | 30>(30)
   const { data: replenishData } = useReplenishment()
   const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
     const m = new Map<string, ReplenishmentItem>()
@@ -358,7 +358,7 @@ export default function PurchaseOrderDetailPage() {
     const incoming = hasSnapshot ? item.incoming_qty : (liveStats?.incoming_qty ?? 0)
     const avg = hasSnapshot
       ? (avgWindow === 7 ? Number(item.avg_sales_7d ?? 0) : Number(item.avg_sales ?? 0))
-      : (avgWindow === 7 ? (liveStats?.avg_sales_7d ?? 0) : (liveStats?.avg_sales_30d ?? 0))
+      : (avgWindow === 7 ? (liveStats?.avg_sales_7d ?? 0) : avgWindow === 14 ? (liveStats?.avg_sales_14d ?? 0) : (liveStats?.avg_sales_30d ?? 0))
     const upcoming = soh + incoming + item.ordered_qty
     const doi = avg > 0 ? Math.round((soh + incoming) / avg) : null
     const doiAfter = avg > 0 ? Math.round(upcoming / avg) : null
@@ -594,7 +594,7 @@ export default function PurchaseOrderDetailPage() {
           const liveSoh = liveStats?.stock_on_hand ?? 0
           const liveIncoming = liveStats?.incoming_qty ?? 0
           const liveUpcoming = liveStats ? liveSoh + liveIncoming + ordQty : null
-          const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : liveStats.avg_sales_30d) : 0
+          const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
           const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
           const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
           const unitForeign = Number(n.unit_price_foreign) || 0
@@ -1123,6 +1123,11 @@ export default function PurchaseOrderDetailPage() {
               >7d</button>
               <button
                 type="button"
+                className={`px-2 ${avgWindow === 14 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                onClick={() => setAvgWindow(14)}
+              >14d</button>
+              <button
+                type="button"
                 className={`px-2 ${avgWindow === 30 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
                 onClick={() => setAvgWindow(30)}
               >30d</button>
@@ -1322,7 +1327,7 @@ function AddItemModal({
   }) => void
   hasDiscount: boolean
   stockMap: Map<string, ReplenishmentItem>
-  avgWindow: 7 | 30
+  avgWindow: 7 | 14 | 30
   poExchangeRate: number
   freightPerUnit: number
   commissionPerUnit: number
@@ -1356,7 +1361,7 @@ function AddItemModal({
   const ordQty = Number(draft.ordered_qty) || 0
   const liveSoh = liveStats?.stock_on_hand ?? 0
   const liveIncoming = liveStats?.incoming_qty ?? 0
-  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : liveStats.avg_sales_30d) : 0
+  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
   const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
   const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
   const unitForeign = Number(draft.unit_price_foreign) || 0
