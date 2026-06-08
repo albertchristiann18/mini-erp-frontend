@@ -20,6 +20,7 @@ export interface Product {
   id: string
   company: string
   category: string
+  category_id: string
   category_name: string
   name: string
   sku_code: string
@@ -31,6 +32,8 @@ export interface Product {
   height: number
   weight: number
   is_active: boolean
+  supplier_link: string | null
+  master_category_key: string | null
   photos?: ProductPhoto[]
   variants?: ProductVariant[]
   cdate: string
@@ -45,6 +48,8 @@ export interface ProductVariant {
   name: string
   sku: string
   sku_variant_code: string
+  product_supplier_link: string | null
+  product_photo_url: string | null
   base_price: number
   total_available_qty: number
   total_incoming_qty: number
@@ -100,6 +105,8 @@ export interface ProductVariantStock {
   product_name: string
   product_sku: string
   category_name: string
+  product_supplier_link: string | null
+  product_photo_url: string | null
   base_price: number
   total_available_qty: number
   physical_qty: number

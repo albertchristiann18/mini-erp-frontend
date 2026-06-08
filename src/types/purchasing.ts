@@ -11,8 +11,12 @@ export interface StatusHistoryItem {
 
 export interface PurchaseOrderDetail {
   id: string
-  product_variant: string
+  variant_id: string
   product_variant_name: string
+  product_id: string
+  product_name: string
+  product_supplier_link: string | null
+  product_photo_url: string | null
   ordered_qty: number
   received_qty: number | null
   unit_price_foreign: string | null
@@ -24,6 +28,10 @@ export interface PurchaseOrderDetail {
   discounted_total_price_foreign: string | null
   discounted_total_price_base: number | null
   remarks: string
+  avg_sales: string | null
+  avg_sales_7d: string | null
+  stock_on_hand: number
+  incoming_qty: number
 }
 
 export interface PurchaseOrder {
@@ -64,6 +72,7 @@ export interface PurchaseOrder {
   forecast_delivery_date: string | null
   forecast_cbm: string | null
   forecast_shipping_fee: number | null
+  forecast_shipping_fee_per_cbm: number | null
   purchase_order_invoice_file: string | null
   delivery_order_file: string | null
   delivery_order_invoice_file: string | null
@@ -116,5 +125,6 @@ export interface ReplenishmentItem {
   stock_on_hand: number
   incoming_qty: number
   avg_sales_7d: number
+  avg_sales_14d: number
   avg_sales_30d: number
 }

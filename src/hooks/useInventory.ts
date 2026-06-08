@@ -27,8 +27,11 @@ export const useProducts = (page = 1, pageSize = 20, search?: string) => {
 export const useCreateProduct = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: unknown) => createProduct(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['products'] }),
+    mutationFn: (data: unknown) => createProduct(data).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] })
+      qc.invalidateQueries({ queryKey: ['variant-search'] })
+    },
   })
 }
 
@@ -44,6 +47,16 @@ export const useProductVariants = (page = 1, pageSize = 100) =>
   useQuery({
     queryKey: ['product-variants', page, pageSize],
     queryFn: () => getProductVariants({ page, page_size: pageSize }).then(r => r.data),
+  })
+
+export const useVariantSearch = (
+  params: { search?: string; page_size?: number },
+  enabled = true,
+) =>
+  useQuery({
+    queryKey: ['variant-search', params],
+    queryFn: () => getProductVariantStocks({ ...params }).then(r => r.data),
+    enabled,
   })
 
 export const useWarehouses = (page = 1, pageSize = 100) =>

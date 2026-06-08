@@ -10,8 +10,20 @@ export const getProducts = (params?: Record<string, string | number>) =>
 export const getProductVariantStocks = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<ProductVariantStock>>('/product-variants/', { params })
 
+export interface CreatedProductVariant {
+  id: string
+  name: string
+  sku_variant_code: string
+}
+
+export interface CreatedProduct {
+  id: string
+  name: string
+  variants: CreatedProductVariant[]
+}
+
 export const createProduct = (data: unknown) =>
-  client.post('/product/', data)
+  client.post<CreatedProduct>('/product/', data)
 
 export const updateProduct = (id: string, data: unknown) =>
   client.patch(`/product/${id}/`, data)

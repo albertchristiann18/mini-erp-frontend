@@ -9,7 +9,6 @@ import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { useCategories, useCreateProduct, useUpdateProduct } from '../../hooks/useInventory'
-import { MASTER_CATEGORIES } from '../../constants/masterCategories'
 import { toast } from '../../lib/toast'
 import { PhotoUploadGrid } from '../inventory/PhotoUploadGrid'
 import type { Product, ProductPhoto } from '../../types/inventory'
@@ -18,12 +17,16 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   sku: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
-  master_category_key: z.string().optional(),
   description: z.string().min(25, 'Description must be at least 25 characters'),
   variant_name: z.string().optional(),
   variant_sku: z.string().optional(),
   selling_price: z.number().optional(),
   is_active: z.boolean().optional(),
+  supplier_link: z.string().url('Must be a valid URL').optional().or(z.literal('')),
+  weight: z.number().int().min(0).optional(),
+  length: z.number().int().min(0).optional(),
+  width: z.number().int().min(0).optional(),
+  height: z.number().int().min(0).optional(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -53,9 +56,14 @@ export function ProductFormModal({ open, onClose, product }: Props) {
     if (product && open) {
       setValue('name', product.name)
       setValue('sku', product.sku_code)
-      setValue('category', product.category)
+      setValue('category', product.category_id)
       setValue('description', product.description)
       setValue('is_active', product.is_active)
+      setValue('supplier_link', product.supplier_link ?? '')
+      setValue('weight', product.weight ?? 0)
+      setValue('length', product.length ?? 0)
+      setValue('width', product.width ?? 0)
+      setValue('height', product.height ?? 0)
       setPhotos(product.photos || [])
     }
   }, [product, open, setValue])
@@ -77,6 +85,11 @@ export function ProductFormModal({ open, onClose, product }: Props) {
             description: values.description,
             category: values.category,
             is_active: values.is_active,
+            supplier_link: values.supplier_link || null,
+            weight: values.weight ?? 0,
+            length: values.length ?? 0,
+            width: values.width ?? 0,
+            height: values.height ?? 0,
           },
         })
         toast.success('Product updated')
@@ -91,6 +104,7 @@ export function ProductFormModal({ open, onClose, product }: Props) {
       sku: values.sku,
       category: values.category,
       description: values.description,
+      supplier_link: values.supplier_link || null,
       variants: [{
         name: values.variant_name,
         sku: `${values.sku}-${values.variant_sku}`,
@@ -138,19 +152,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="Master Category" error={errors.master_category_key?.message} required>
-              <Select
-                value={watch('master_category_key')}
-                onValueChange={(v) => setValue('master_category_key', v, { shouldValidate: true })}
-              >
-                <SelectTrigger><SelectValue placeholder="Select master category" /></SelectTrigger>
-                <SelectContent>
-                  {MASTER_CATEGORIES.map(c => (
-                    <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FormField>
           </div>
           <FormField label="Description" error={errors.description?.message} required>
             <Textarea {...register('description')} placeholder="Enter product description (min 25 characters)" />
@@ -158,6 +159,27 @@ export function ProductFormModal({ open, onClose, product }: Props) {
               {watch('description')?.length || 0}/25 minimum characters
             </p>
           </FormField>
+          <FormField label="Supplier Link" error={errors.supplier_link?.message}>
+            <Input
+              {...register('supplier_link')}
+              placeholder="https://..."
+              type="url"
+            />
+          </FormField>
+          <div className="grid grid-cols-4 gap-3">
+            <FormField label="Length (cm)" error={errors.length?.message}>
+              <Input type="number" min="0" {...register('length', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Width (cm)" error={errors.width?.message}>
+              <Input type="number" min="0" {...register('width', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Height (cm)" error={errors.height?.message}>
+              <Input type="number" min="0" {...register('height', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Weight (g)" error={errors.weight?.message}>
+              <Input type="number" min="0" {...register('weight', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+          </div>
           {isEditing && (
             <FormField label="Status">
               <Select

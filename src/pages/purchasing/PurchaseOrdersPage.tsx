@@ -8,7 +8,6 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
-import { PurchaseOrderFormModal } from '../../components/modals/PurchaseOrderFormModal'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import type { POStatus } from '../../types/purchasing'
@@ -62,13 +61,17 @@ export default function PurchaseOrdersPage() {
   const [appliedDateTo, setAppliedDateTo] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [ordering, setOrdering] = useState('-cdate')
-  const [showModal, setShowModal] = useState(false)
+  const [ordering, setOrdering] = useState('-delivery_date')
+  const [pendingSearch, setPendingSearch] = useState('')
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [hasSearched, setHasSearched] = useState(true)
 
   const handleApply = () => {
     setAppliedStatus(pendingStatus)
     setAppliedDateFrom(pendingDateFrom)
     setAppliedDateTo(pendingDateTo)
+    setAppliedSearch(pendingSearch)
+    setHasSearched(true)
     setPage(1)
   }
 
@@ -76,8 +79,9 @@ export default function PurchaseOrdersPage() {
   if (appliedStatus !== 'ALL') queryParams.status = appliedStatus
   if (appliedDateFrom) queryParams.date_from = appliedDateFrom
   if (appliedDateTo) queryParams.date_to = appliedDateTo
+  if (appliedSearch) queryParams.search = appliedSearch
 
-  const { data, isLoading } = usePurchaseOrdersFiltered(queryParams)
+  const { data, isLoading } = usePurchaseOrdersFiltered(queryParams, { enabled: hasSearched })
   const totalPages = data ? Math.ceil(data.count / pageSize) : 1
 
   const summaryParams: Record<string, string> = {}
@@ -94,6 +98,14 @@ export default function PurchaseOrdersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
+          <Input
+            type="text"
+            placeholder="Search PO#, Invoice#, DO#..."
+            value={pendingSearch}
+            onChange={e => setPendingSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleApply() }}
+            className="w-56"
+          />
           <Select value={pendingStatus} onValueChange={v => setPendingStatus(v as POStatus | 'ALL')}>
             <SelectTrigger className="w-36">
               <SelectValue placeholder="All Status" />
@@ -119,20 +131,9 @@ export default function PurchaseOrdersPage() {
             className="w-36"
           />
           <Button size="sm" onClick={handleApply}>Apply</Button>
-          <span className="text-sm text-muted-foreground">{data?.count ?? 0} orders</span>
-          <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setPage(1) }}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[10, 25, 50, 100].map(n => (
-                <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
         {user?.is_staff && (
-          <Button size="sm" onClick={() => setShowModal(true)}>
+          <Button size="sm" onClick={() => navigate('/purchasing/orders/new')}>
             <Plus className="h-4 w-4 mr-1" /> New PO
           </Button>
         )}
@@ -165,48 +166,61 @@ export default function PurchaseOrdersPage() {
             <TableRow>
               <SortableHead field="purchase_order_number" label="PO Number" ordering={ordering} onSort={handleSort} />
               <TableHead>Status</TableHead>
+              <TableHead>Invoice #</TableHead>
+              <TableHead>DO #</TableHead>
+              <SortableHead field="cdate" label="Created Date" ordering={ordering} onSort={handleSort} />
               <SortableHead field="invoice_date" label="Invoice Date" ordering={ordering} onSort={handleSort} />
               <SortableHead field="delivery_date" label="Delivery Date" ordering={ordering} onSort={handleSort} />
-              <TableHead className="text-right">Exch. Rate</TableHead>
-              <TableHead className="text-right">CBM</TableHead>
-              <SortableHead field="total_ordered_qty" label="QTY" ordering={ordering} onSort={handleSort} className="text-right" />
-              <SortableHead field="total_item_amount" label="Goods" ordering={ordering} onSort={handleSort} className="text-right" />
-              <SortableHead field="commission_fee" label="Commission" ordering={ordering} onSort={handleSort} className="text-right" />
-              <TableHead className="text-right">Supplier Delivery</TableHead>
-              <SortableHead field="shipping_fee" label="Freight" ordering={ordering} onSort={handleSort} className="text-right" />
-              <TableHead className="text-right">Ship/QTY</TableHead>
+              <TableHead>Exchange Rate</TableHead>
+              <TableHead>CBM</TableHead>
+              <SortableHead field="total_ordered_qty" label="QTY" ordering={ordering} onSort={handleSort} />
+              <SortableHead field="total_amount" label="Total" ordering={ordering} onSort={handleSort} />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-            ) : data?.results.map(po => (
-              <TableRow
-                key={po.id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => navigate(`/purchasing/orders/${po.id}`)}
-              >
+            {!hasSearched ? (
+              <TableRow>
+                <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
+                  Enter a search term and press Enter (or click Apply) to find purchase orders
+                </TableCell>
+              </TableRow>
+            ) : isLoading ? (
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+            ) : !data?.results.length ? (
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No purchase orders found</TableCell></TableRow>
+            ) : data.results.map(po => (
+              <TableRow key={po.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/purchasing/orders/${po.id}`)}>
                 <TableCell className="font-mono text-xs font-medium">{po.purchase_order_number}</TableCell>
                 <TableCell><Badge variant={statusVariant[po.status]}>{po.status}</Badge></TableCell>
+                <TableCell className="text-xs">{po.invoice_number ?? '—'}</TableCell>
+                <TableCell className="text-xs">{po.delivery_order_number ?? '—'}</TableCell>
+                <TableCell className="text-xs">{po.cdate ? formatDate(po.cdate) : '—'}</TableCell>
                 <TableCell className="text-xs">{po.invoice_date ? formatDate(po.invoice_date) : '—'}</TableCell>
                 <TableCell className="text-xs">{po.delivery_date ? formatDate(po.delivery_date) : '—'}</TableCell>
-                <TableCell className="text-right text-xs">{po.exchange_rate ?? '—'}</TableCell>
-                <TableCell className="text-right text-xs">
-                  {po.cbm ?? (po.forecast_cbm ? `${po.forecast_cbm}*` : '—')}
-                </TableCell>
-                <TableCell className="text-right">{po.total_ordered_qty}</TableCell>
-                <TableCell className="text-right text-xs">{po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'}</TableCell>
-                <TableCell className="text-right text-xs">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</TableCell>
-                <TableCell className="text-right text-xs">{po.delivery_fee_idr != null ? formatIDR(po.delivery_fee_idr) : '—'}</TableCell>
-                <TableCell className="text-right text-xs">{po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'}</TableCell>
-                <TableCell className="text-right text-xs">{po.shipping_per_qty != null ? formatIDR(po.shipping_per_qty) : '—'}</TableCell>
+                <TableCell className="text-xs">{po.exchange_rate != null ? formatIDR(parseFloat(po.exchange_rate)) : '—'}</TableCell>
+                <TableCell className="text-xs">{po.cbm ?? (po.forecast_cbm ? `${po.forecast_cbm}*` : '—')}</TableCell>
+                <TableCell>{po.total_ordered_qty}</TableCell>
+                <TableCell className="text-xs">{po.total_amount != null ? formatIDR(po.total_amount) : '—'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
-      <PurchaseOrderFormModal open={showModal} onClose={() => setShowModal(false)} />
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading}>
+        {hasSearched && (
+          <span className="text-sm text-muted-foreground">{data?.count ?? 0} orders</span>
+        )}
+        <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setPage(1) }}>
+          <SelectTrigger className="w-24 h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[10, 25, 50, 100].map(n => (
+              <SelectItem key={n} value={String(n)}>{n} / page</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Pagination>
     </div>
   )
 }

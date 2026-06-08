@@ -1,17 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../hooks/usePurchasing'
+import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
+import { useWarehouses } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
+import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
+import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
-import { ArrowLeft, ExternalLink, Pencil, Save, X as XIcon } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+import { ArrowLeft, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
-import type { POStatus } from '../../types/purchasing'
+import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
 
 function getCurrencySymbol(currency: string | null | undefined): string {
@@ -33,6 +37,14 @@ function formatDecimalUnit(val: string | number | null | undefined, unit?: strin
   return unit ? `${formatted} ${unit}` : formatted
 }
 
+function doiAfterColor(days: number | null): string {
+  if (days === null) return 'text-muted-foreground'
+  if (days < 30) return 'text-red-600'
+  if (days < 80) return 'text-amber-600'
+  if (days <= 120) return 'text-green-600'
+  return 'text-red-600'
+}
+
 const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   DRAFT: 'secondary', ORDERED: 'info', SHIPPED: 'warning',
   DELIVERED: 'success', COMPLETED: 'success', CANCELLED: 'destructive',
@@ -40,18 +52,27 @@ const statusVariant: Record<POStatus, BadgeProps['variant']> = {
 
 type FieldInputConfig = {
   label: string
-  inputType: 'text' | 'number' | 'date' | 'file'
+  inputType: 'text' | 'number' | 'date' | 'file' | 'select'
   step?: string
   suffix?: string
+  options?: { value: string; label: string }[]
 }
 
 const HEADER_FIELD_CONFIG: Record<string, FieldInputConfig> = {
   supplier_name:               { label: 'Supplier',            inputType: 'text' },
   forwarder_name:              { label: 'Forwarder',           inputType: 'text' },
   shop_services:               { label: 'Jasa Belanja',        inputType: 'text' },
-  currency:                    { label: 'Currency',            inputType: 'text' },
+  currency:                    { label: 'Currency',            inputType: 'select', options: [
+    { value: 'CNY', label: 'CNY (¥ Yuan)' },
+    { value: 'USD', label: 'USD ($ Dollar)' },
+    { value: 'EUR', label: 'EUR (€ Euro)' },
+    { value: 'SGD', label: 'SGD (S$ Singapore)' },
+    { value: 'MYR', label: 'MYR (RM Ringgit)' },
+    { value: 'IDR', label: 'IDR (Rp Rupiah)' },
+  ] },
   exchange_rate:               { label: 'Exchange Rate',       inputType: 'number', step: '0.001' },
   commission_fee_pct:          { label: 'Commission %',        inputType: 'number' },
+  forecast_shipping_fee_per_cbm: { label: 'Forecast Shipping/CBM', inputType: 'number' },
   delivery_fee:               { label: 'Delivery Fee (RMB)',  inputType: 'number', step: '0.001' },
   commission_fee_rmb:          { label: 'Commission (RMB)',    inputType: 'number', step: '0.001' },
   invoice_number:              { label: 'Invoice No.',         inputType: 'text' },
@@ -73,36 +94,98 @@ const HEADER_FIELD_CONFIG: Record<string, FieldInputConfig> = {
 export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { data: po, isLoading } = usePurchaseOrder(id!)
+  const isCreating = id === 'new'
+  const { data: po, isLoading } = usePurchaseOrder(isCreating ? '' : id!)
   const { user } = useAuth()
+  const createMutation = useCreatePurchaseOrder((newId: string) => {
+    toast.success('Purchase order created')
+    navigate(`/purchasing/orders/${newId}`)
+  })
+  const { data: warehouseData } = useWarehouses()
+  const warehouses = warehouseData?.results ?? []
+  const [exportModalOpen, setExportModalOpen] = useState(false)
   const [showAdvanceModal, setShowAdvanceModal] = useState(false)
-  const [editMode, setEditMode] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [editMode, setEditMode] = useState(isCreating)
   const [headerValues, setHeaderValues] = useState<Record<string, string | File>>({})
   const [detailValues, setDetailValues] = useState<Record<string, Record<string, string>>>({})
+  const [deletedDetailIds, setDeletedDetailIds] = useState<Set<string>>(new Set())
+  const [newItems, setNewItems] = useState<Array<{
+    _tempId: string
+    product_variant_id: string
+    product_variant_label: string
+    product_id: string
+    product_name: string
+    product_supplier_link: string | null
+    product_photo_url: string | null
+    ordered_qty: string
+    unit_price_foreign: string
+    discounted_unit_price_foreign: string
+  }>>([])
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
+  const [hasDiscount, setHasDiscount] = useState(false)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  const toggleGroupCollapse = (key: string) =>
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
-  if (!po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
+  const [avgWindow, setAvgWindow] = useState<7 | 14 | 30>(30)
+  const { data: replenishData } = useReplenishment()
+  const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
+    const m = new Map<string, ReplenishmentItem>()
+    for (const item of replenishData?.results ?? []) m.set(item.variant_id, item)
+    return m
+  }, [replenishData])
 
-  const deliveryFeeIdr = Math.round(
-    Number(po.delivery_fee ?? 0) * Number(po.exchange_rate ?? 0)
+  const usedVariantIds = useMemo<Set<string>>(() => {
+    const ids = new Set<string>()
+    for (const item of (po?.order_details ?? [])) {
+      if (!deletedDetailIds.has(item.id)) ids.add(item.variant_id)
+    }
+    for (const n of newItems) {
+      if (n.product_variant_id) ids.add(n.product_variant_id)
+    }
+    return ids
+  }, [po?.order_details, deletedDetailIds, newItems])
+
+  useEffect(() => {
+    if (!po) return
+    const anyDiscounted = (po.order_details ?? []).some(item =>
+      item.discounted_unit_price_foreign != null &&
+      item.discounted_unit_price_foreign !== item.unit_price_foreign
+    )
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasDiscount(anyDiscounted)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
+  }, [po?.id])
+
+  if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
+  if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
+
+  const canAddDeleteItems = isCreating || po?.status === 'DRAFT' || po?.status === 'ORDERED'
+
+  const deliveryFeeIdr = isCreating ? 0 : Math.round(
+    Number(po?.delivery_fee ?? 0) * Number(po?.exchange_rate ?? 0)
   )
 
-  const attachments = [
-    { label: 'PO Invoice',     field: 'purchase_order_invoice_file',  url: po.purchase_order_invoice_file },
-    { label: 'Delivery Order', field: 'delivery_order_file',           url: po.delivery_order_file },
-    { label: 'DO Invoice',     field: 'delivery_order_invoice_file',   url: po.delivery_order_invoice_file },
-    { label: 'Packing List',   field: 'packing_list_file',             url: po.packing_list_file },
+  const attachments = isCreating ? [] : [
+    { label: 'PO Invoice',     field: 'purchase_order_invoice_file',  url: po!.purchase_order_invoice_file },
+    { label: 'Delivery Order', field: 'delivery_order_file',           url: po!.delivery_order_file },
+    { label: 'DO Invoice',     field: 'delivery_order_invoice_file',   url: po!.delivery_order_invoice_file },
+    { label: 'Packing List',   field: 'packing_list_file',             url: po!.packing_list_file },
   ]
 
-  const getFilename = (url: string) =>
-    decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? 'file')
-
   const enterEditMode = () => {
+    if (isCreating || !po) return
     const initial: Record<string, string | File> = {}
-    for (const field of po.editable_fields.header) {
+    for (const field of po!.editable_fields.header) {
       if (field === 'note') {
-        initial[field] = po.note ?? ''
+        initial[field] = po!.note ?? ''
         continue
       }
       if (['purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'].includes(field)) {
@@ -112,9 +195,9 @@ export default function PurchaseOrderDetailPage() {
       if (val != null && val !== '') initial[field] = String(val)
     }
     const initDetails: Record<string, Record<string, string>> = {}
-    for (const item of po.order_details ?? []) {
+    for (const item of po!.order_details ?? []) {
       const row: Record<string, string> = {}
-      for (const field of po.editable_fields.order_detail) {
+      for (const field of po!.editable_fields.order_detail) {
         const val = (item as unknown as Record<string, unknown>)[field]
         if (val != null) row[field] = String(val)
       }
@@ -123,12 +206,16 @@ export default function PurchaseOrderDetailPage() {
     setHeaderValues(initial)
     setDetailValues(initDetails)
     setEditMode(true)
+    setDeletedDetailIds(new Set())
+    setNewItems([])
   }
 
   const cancelEditMode = () => {
     setEditMode(false)
     setHeaderValues({})
     setDetailValues({})
+    setDeletedDetailIds(new Set())
+    setNewItems([])
   }
 
   const setHeaderField = (field: string, value: string | File) =>
@@ -140,18 +227,115 @@ export default function PurchaseOrderDetailPage() {
       [itemId]: { ...(prev[itemId] ?? {}), [field]: value }
     }))
 
+  const addNewItem = () =>
+    setNewItems(prev => [...prev, {
+      _tempId: `new-${Date.now()}-${prev.length}`,
+      product_variant_id: '',
+      product_variant_label: '',
+      product_id: '',
+      product_name: '',
+      product_supplier_link: null,
+      product_photo_url: null,
+      ordered_qty: '1',
+      unit_price_foreign: '',
+      discounted_unit_price_foreign: '',
+    }])
+  void addNewItem
+
+  const removeNewItem = (_tempId: string) =>
+    setNewItems(prev => prev.filter(n => n._tempId !== _tempId))
+
+  const updateNewItem = (_tempId: string, field: string, value: string) =>
+    setNewItems(prev => prev.map(n => n._tempId === _tempId ? { ...n, [field]: value } : n))
+
+  const handleAddItemFromModal = (draft: {
+    product_variant_id: string
+    product_variant_label: string
+    product_id: string
+    product_name: string
+    product_supplier_link: string | null
+    product_photo_url: string | null
+    ordered_qty: string
+    unit_price_foreign: string
+    discounted_unit_price_foreign: string
+  }) => {
+    setNewItems(prev => [...prev, {
+      ...draft,
+      _tempId: `new-${Date.now()}-${prev.length}`,
+    }])
+  }
+
+  const deleteExistingItem = (itemId: string) =>
+    setDeletedDetailIds(prev => new Set([...prev, itemId]))
+
+  const handleCreate = async () => {
+    const errors: string[] = []
+    if (!headerValues.warehouse_id) errors.push('Warehouse is required')
+    const validItems = newItems.filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign !== '')
+    if (validItems.length === 0) errors.push('At least one order item with variant, quantity, and price is required')
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+    const payload: Record<string, unknown> = { warehouse_id: headerValues.warehouse_id }
+    const optionalFields = ['currency', 'exchange_rate', 'supplier_name', 'forwarder_name',
+      'shop_services', 'commission_fee_pct', 'delivery_fee', 'forecast_delivery_date',
+      'forecast_cbm', 'forecast_shipping_fee_per_cbm', 'note']
+    const numericFields = ['exchange_rate', 'commission_fee_pct', 'delivery_fee', 'forecast_cbm', 'forecast_shipping_fee_per_cbm']
+    for (const field of optionalFields) {
+      const val = headerValues[field]
+      if (val != null && val !== '') payload[field] = numericFields.includes(field) ? Number(val) : val
+    }
+    payload.order_details = validItems.map(n => ({
+      product_variant_id: n.product_variant_id,
+      ordered_qty: Number(n.ordered_qty),
+      unit_price_foreign: Number(n.unit_price_foreign),
+      ...(hasDiscount && n.discounted_unit_price_foreign
+        ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
+        : {}),
+    }))
+    try {
+      await createMutation.mutateAsync(payload)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to create purchase order'
+      toast.error(msg)
+    }
+  }
+
   const handleSave = async () => {
     const payload: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(headerValues)) {
       if (value !== '' && value !== null && value !== undefined) payload[key] = value
     }
-    const changedDetails = Object.entries(detailValues)
-      .map(([itemId, changes]) => ({ id: itemId, ...changes }))
-      .filter(item => Object.keys(item).length > 1)
-    if (changedDetails.length > 0) payload.order_details = changedDetails
+    const canAddDel = po!.status === 'DRAFT' || po!.status === 'ORDERED'
+    if (canAddDel && (deletedDetailIds.size > 0 || newItems.length > 0)) {
+      const keptExisting = (po!.order_details ?? [])
+        .filter(item => !deletedDetailIds.has(item.id))
+        .map(item => {
+          const changes = { ...(detailValues[item.id] ?? {}) }
+          if (!hasDiscount) delete changes.discounted_unit_price_foreign
+          return { id: item.id, ...changes }
+        })
+      const newItemsPayload = newItems
+        .filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign)
+        .map(n => ({
+          product_variant_id: n.product_variant_id,
+          ordered_qty: Number(n.ordered_qty),
+          unit_price_foreign: Number(n.unit_price_foreign),
+          ...(hasDiscount && n.discounted_unit_price_foreign
+            ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
+            : {}),
+        }))
+      payload.order_details = [...keptExisting, ...newItemsPayload]
+    } else {
+      const changedDetails = Object.entries(detailValues)
+        .map(([itemId, changes]) => ({ id: itemId, ...changes }))
+        .filter(item => Object.keys(item).length > 1)
+      if (changedDetails.length > 0) payload.order_details = changedDetails
+    }
     if (Object.keys(payload).length === 0) { cancelEditMode(); return }
     try {
-      await updateMutation.mutateAsync({ id: po.id, data: payload })
+      await updateMutation.mutateAsync({ id: po!.id, data: payload })
       toast.success('Purchase order updated')
       cancelEditMode()
     } catch (err: unknown) {
@@ -159,6 +343,335 @@ export default function PurchaseOrderDetailPage() {
       toast.error(msg)
     }
   }
+
+  const computedGoodsAmount = isCreating
+    ? 0
+    : (po?.order_details ?? []).reduce((s, i) => {
+        if (hasDiscount) return s + (i.discounted_total_price_base ?? i.total_price_base ?? 0)
+        return s + (i.total_price_base ?? i.discounted_total_price_base ?? 0)
+      }, 0)
+
+  const getItemStockData = (item: PurchaseOrderDetail) => {
+    const hasSnapshot = item.avg_sales !== null
+    const liveStats = !hasSnapshot ? stockMap.get(item.variant_id) : undefined
+    const soh = hasSnapshot ? item.stock_on_hand : (liveStats?.stock_on_hand ?? 0)
+    const incoming = hasSnapshot ? item.incoming_qty : (liveStats?.incoming_qty ?? 0)
+    const avg = hasSnapshot
+      ? (avgWindow === 7 ? Number(item.avg_sales_7d ?? 0) : Number(item.avg_sales ?? 0))
+      : (avgWindow === 7 ? (liveStats?.avg_sales_7d ?? 0) : avgWindow === 14 ? (liveStats?.avg_sales_14d ?? 0) : (liveStats?.avg_sales_30d ?? 0))
+    const upcoming = soh + incoming + item.ordered_qty
+    const doi = avg > 0 ? Math.round((soh + incoming) / avg) : null
+    const doiAfter = avg > 0 ? Math.round(upcoming / avg) : null
+    return { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot }
+  }
+
+  const poExchangeRate = isCreating
+    ? Number(headerValues.exchange_rate || 0)
+    : Number(po?.exchange_rate ?? 0)
+  const effectiveShipping = isCreating ? 0 : (po?.shipping_fee || po?.forecast_shipping_fee || 0)
+  const freightPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
+    ? Math.round(effectiveShipping / po!.total_ordered_qty)
+    : 0)
+  const commissionPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
+    ? Math.round((po!.commission_fee ?? 0) / po!.total_ordered_qty)
+    : 0)
+
+  const orderItemsContent = (() => {
+    const visibleDetails = isCreating
+      ? []
+      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
+
+    type DisplayGroup = {
+      groupKey: string
+      productName: string
+      productSupplierLink: string | null
+      productPhotoUrl: string | null
+      existingItems: PurchaseOrderDetail[]
+      newItemsList: typeof newItems
+    }
+
+    const groupMap = new Map<string, DisplayGroup>()
+
+    for (const item of visibleDetails) {
+      const key = item.product_id || 'unknown'
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          groupKey: key,
+          productName: item.product_name || 'Unknown Product',
+          productSupplierLink: item.product_supplier_link,
+          productPhotoUrl: item.product_photo_url ?? null,
+          existingItems: [],
+          newItemsList: [],
+        })
+      }
+      groupMap.get(key)!.existingItems.push(item)
+    }
+
+    if (editMode && canAddDeleteItems) {
+      for (const n of newItems) {
+        const key = n.product_id || `new-${n._tempId}`
+        if (!groupMap.has(key)) {
+          groupMap.set(key, {
+            groupKey: key,
+            productName: n.product_name || 'Unknown Product',
+            productSupplierLink: n.product_supplier_link,
+            productPhotoUrl: n.product_photo_url ?? null,
+            existingItems: [],
+            newItemsList: [],
+          })
+        }
+        groupMap.get(key)!.newItemsList.push(n)
+      }
+    }
+
+    return Array.from(groupMap.values()).map(group => {
+    const showRemarks = !isCreating && editMode && (po?.editable_fields.order_detail.includes('remarks') ?? false)
+
+    const groupStockData = group.existingItems.map(item => getItemStockData(item))
+    const sumSOH = groupStockData.reduce((s, d) => s + d.soh, 0)
+    const sumIncoming = groupStockData.reduce((s, d) => s + d.incoming, 0)
+    const sumUpcoming = groupStockData.reduce((s, d) => s + d.upcoming, 0)
+    const sumAvg = groupStockData.reduce((s, d) => s + d.avg, 0)
+    const groupDoi = sumAvg > 0 ? Math.round((sumSOH + sumIncoming) / sumAvg) : null
+    const groupDoiAfter = sumAvg > 0 ? Math.round(sumUpcoming / sumAvg) : null
+    const sumOrdered = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
+      group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
+    const sumReceived = group.existingItems.reduce((s, i) => s + (i.received_qty ?? 0), 0)
+    const sumTotalForeign = group.existingItems.reduce((s, i) => {
+      const unitF = hasDiscount
+        ? Number(i.discounted_unit_price_foreign ?? i.unit_price_foreign ?? 0)
+        : Number(i.unit_price_foreign ?? 0)
+      return s + unitF * i.ordered_qty
+    }, 0)
+    const sumTotalIdr = group.existingItems.reduce((s, i) => {
+      const base = hasDiscount
+        ? (i.discounted_total_price_base ?? i.total_price_base ?? 0)
+        : (i.total_price_base ?? i.discounted_total_price_base ?? 0)
+      return s + base
+    }, 0)
+
+    return (
+      <tbody key={group.groupKey}>
+        <tr
+          className="bg-muted/40 border-b cursor-pointer hover:bg-muted/60 transition-colors font-semibold text-sm"
+          onClick={() => toggleGroupCollapse(group.groupKey)}
+        >
+          <td className="px-3 py-2 whitespace-nowrap">
+            <div className="flex items-center gap-1.5">
+              <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
+              {group.productPhotoUrl ? (
+                <img src={group.productPhotoUrl} alt={group.productName}
+                  className="h-6 w-6 rounded object-cover shrink-0 border border-border" />
+              ) : (
+                <div className="h-6 w-6 rounded bg-muted shrink-0" />
+              )}
+              <span className="font-bold text-foreground">{group.productName}</span>
+              {group.productSupplierLink && (
+                <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="flex items-center gap-0.5 text-blue-500 hover:text-blue-600 text-xs shrink-0">
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          </td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumOrdered}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{sumReceived || '—'}</td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumSOH}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-blue-600">{sumIncoming}</td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumUpcoming}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground font-normal">
+            {sumAvg > 0 ? `${sumAvg.toFixed(1)}/d` : '—'}
+          </td>
+          <td className={`px-3 py-2 whitespace-nowrap ${groupDoi !== null && groupDoi < 14 ? 'text-red-600' : groupDoi !== null && groupDoi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+            {groupDoi !== null ? `${groupDoi}d` : '—'}
+          </td>
+          <td className={`px-3 py-2 whitespace-nowrap ${doiAfterColor(groupDoiAfter)}`}>
+            {groupDoiAfter !== null ? `${groupDoiAfter}d` : '—'}
+          </td>
+          <td className="px-3 py-2" />
+          {hasDiscount && <td className="px-3 py-2" />}
+          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap">
+            {sumTotalForeign > 0 ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(sumTotalForeign)}` : '—'}
+          </td>
+          <td className="px-3 py-2 whitespace-nowrap">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</td>
+          <td className="px-3 py-2" />
+          <td className="px-3 py-2" />
+          {editMode && canAddDeleteItems && <td />}
+        </tr>
+        {!collapsedGroups.has(group.groupKey) && (
+        <>
+        {group.existingItems.map(item => {
+          const rowChanges = detailValues[item.id] ?? {}
+          const isDetailEditable = (field: string) =>
+            editMode && (isCreating || (po?.editable_fields.order_detail.includes(field) ?? false))
+          const { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot } = getItemStockData(item)
+
+          const effectiveUnitForeign = hasDiscount
+            ? Number(rowChanges.discounted_unit_price_foreign ?? item.discounted_unit_price_foreign ?? item.unit_price_foreign ?? 0)
+            : Number(rowChanges.unit_price_foreign ?? item.unit_price_foreign ?? 0)
+          const effectiveQty = Number(rowChanges.ordered_qty ?? item.ordered_qty ?? 0)
+          const unitPriceIdr = Math.round(effectiveUnitForeign * poExchangeRate)
+          const totalForeign = effectiveUnitForeign * effectiveQty
+          const totalIdr = unitPriceIdr * effectiveQty
+          const cogsPerUnit = unitPriceIdr + freightPerUnit + commissionPerUnit
+
+          return (
+            <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
+              <td className="pl-6 pr-3 py-1.5 whitespace-nowrap font-mono font-medium">{item.product_variant_name}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">
+                {isDetailEditable('ordered_qty') ? (
+                  <Input type="number" className="h-7 w-14 text-xs"
+                    value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
+                    onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
+                ) : item.ordered_qty}
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap">
+                {isDetailEditable('received_qty') ? (
+                  <Input type="number" className="h-7 w-14 text-xs"
+                    value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
+                    onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
+                ) : (item.received_qty ?? '—')}
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{soh}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{incoming}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{upcoming}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
+                {avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
+                {hasSnapshot && <span className="text-[10px] text-muted-foreground/50 ml-0.5">*</span>}
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : doi !== null && doi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                {doi !== null ? `${doi}d` : '\u221E'}
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
+                {doiAfter !== null ? `${doiAfter}d` : '\u221E'}
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap">
+                {isDetailEditable('unit_price_foreign') ? (
+                  <Input type="number" step="0.001" className="h-7 w-20 text-xs"
+                    value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
+                    onChange={e => {
+                      setDetailField(item.id, 'unit_price_foreign', e.target.value)
+                      if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
+                    }} />
+                ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
+              </td>
+              {hasDiscount && (
+                <td className="px-3 py-1.5 whitespace-nowrap">
+                  {isDetailEditable('discounted_unit_price_foreign') ? (
+                    <Input type="number" step="0.001" className="h-7 w-20 text-xs"
+                      value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
+                      onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
+                  ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                </td>
+              )}
+              <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
+              <td className="px-3 py-1.5">
+                {showRemarks ? (
+                  <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
+                    value={rowChanges.remarks ?? String(item.remarks ?? '')}
+                    onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
+                ) : <span className="text-muted-foreground">{item.remarks || ''}</span>}
+              </td>
+              {editMode && canAddDeleteItems && (
+                <td className="px-2 py-1 w-8">
+                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600"
+                    onClick={() => deleteExistingItem(item.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </td>
+              )}
+            </tr>
+          )
+        })}
+        {editMode && canAddDeleteItems && group.newItemsList.map(n => {
+          const liveStats = n.product_variant_id ? stockMap.get(n.product_variant_id) : undefined
+          const ordQty = Number(n.ordered_qty) || 0
+          const liveSoh = liveStats?.stock_on_hand ?? 0
+          const liveIncoming = liveStats?.incoming_qty ?? 0
+          const liveUpcoming = liveStats ? liveSoh + liveIncoming + ordQty : null
+          const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+          const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
+          const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
+          const unitForeign = Number(n.unit_price_foreign) || 0
+          const unitIdr = Math.round(unitForeign * poExchangeRate)
+          const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
+
+          return (
+            <tr key={n._tempId} className="border-b last:border-b-0">
+              <td className="px-2 py-1 min-w-[160px]">
+                <VariantSearchSelect
+                  value={n.product_variant_id}
+                  selectedLabel={n.product_variant_label}
+                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) => {
+                    updateNewItem(n._tempId, 'product_variant_id', id)
+                    updateNewItem(n._tempId, 'product_variant_label', label)
+                    updateNewItem(n._tempId, 'product_id', productId)
+                    updateNewItem(n._tempId, 'product_name', productName)
+                    updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
+                    updateNewItem(n._tempId, 'product_photo_url', productPhotoUrl ?? '')
+                  }}
+                  placeholder="Select variant"
+                />
+              </td>
+              <td className="px-2 py-1">
+                <Input type="number" className="h-7 w-14 text-xs"
+                  value={n.ordered_qty}
+                  onChange={e => updateNewItem(n._tempId, 'ordered_qty', e.target.value)} />
+              </td>
+              <td className="px-2 py-1" />
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{liveStats ? liveSoh : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{liveStats ? liveIncoming : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{liveUpcoming !== null ? liveUpcoming : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
+                {liveStats && avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                {doi !== null ? `${doi}d` : (liveStats ? '\u221E' : '—')}
+              </td>
+              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
+                {doiAfter !== null ? `${doiAfter}d` : (liveStats && ordQty > 0 ? '\u221E' : '—')}
+              </td>
+              <td className="px-2 py-1">
+                <Input type="number" step="0.001" className="h-7 w-20 text-xs"
+                  value={n.unit_price_foreign}
+                  onChange={e => {
+                    updateNewItem(n._tempId, 'unit_price_foreign', e.target.value)
+                    if (hasDiscount) updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)
+                  }} />
+              </td>
+              {hasDiscount && (
+                <td className="px-2 py-1">
+                  <Input type="number" step="0.001" className="h-7 w-20 text-xs"
+                    value={n.discounted_unit_price_foreign}
+                    onChange={e => updateNewItem(n._tempId, 'discounted_unit_price_foreign', e.target.value)} />
+                </td>
+              )}
+              <td className="px-3 py-1.5 whitespace-nowrap">{unitIdr > 0 ? formatIDR(unitIdr) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap">{unitForeign * ordQty > 0 ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(unitForeign * ordQty)}` : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{unitIdr * ordQty > 0 ? formatIDR(unitIdr * ordQty) : '—'}</td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
+              <td className="px-3 py-1.5" />
+              <td className="px-2 py-1 w-8">
+                <Button type="button" size="icon" variant="ghost"
+                  className="h-7 w-7 text-red-500 hover:text-red-600"
+                  onClick={() => removeNewItem(n._tempId)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </td>
+            </tr>
+          )
+        })}
+        </>
+      )}
+      </tbody>
+    )
+    })
+  })()
 
   return (
     <div className="space-y-6">
@@ -169,17 +682,33 @@ export default function PurchaseOrderDetailPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold font-mono">{po.purchase_order_number}</h1>
-              <Badge variant={statusVariant[po.status]}>{po.status}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Invoice {po.invoice_date ? formatDate(po.invoice_date) : '—'} · {po.supplier_name ?? '—'}
-            </p>
+            {isCreating ? (
+              <h1 className="text-2xl font-bold">New Purchase Order</h1>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold font-mono">{po!.purchase_order_number}</h1>
+                  <Badge variant={statusVariant[po!.status]}>{po!.status}</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Invoice {po!.invoice_date ? formatDate(po!.invoice_date) : '—'} · {po!.supplier_name ?? '—'}
+                </p>
+              </>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
-          {editMode ? (
+          {isCreating ? (
+            <>
+              <Button size="sm" variant="outline" onClick={() => navigate('/purchasing/orders')} disabled={createMutation.isPending}>
+                <XIcon className="h-4 w-4 mr-1" /> Cancel
+              </Button>
+              <Button size="sm" onClick={handleCreate} disabled={createMutation.isPending}>
+                <Save className="h-4 w-4 mr-1" />
+                {createMutation.isPending ? 'Creating...' : 'Create PO'}
+              </Button>
+            </>
+          ) : editMode ? (
             <>
               <Button size="sm" variant="outline" onClick={cancelEditMode} disabled={updateMutation.isPending}>
                 <XIcon className="h-4 w-4 mr-1" /> Cancel
@@ -191,14 +720,19 @@ export default function PurchaseOrderDetailPage() {
             </>
           ) : (
             <>
-              {user?.is_staff && po.status !== 'CANCELLED' && (
+              {!isCreating && (
+                <Button size="sm" variant="outline" onClick={() => setExportModalOpen(true)}>
+                  <FileDown className="h-4 w-4 mr-1" /> Export PDF
+                </Button>
+              )}
+              {user?.is_staff && po!.status !== 'CANCELLED' && (
                 <Button size="sm" variant="outline" onClick={enterEditMode}>
                   <Pencil className="h-4 w-4 mr-1" /> Edit
                 </Button>
               )}
-              {user?.is_staff && po.next_status && (
+              {user?.is_staff && po!.next_status && (
                 <Button size="sm" onClick={() => setShowAdvanceModal(true)}>
-                  → {po.next_status}
+                  → {po!.next_status}
                 </Button>
               )}
             </>
@@ -206,330 +740,230 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
-      {/* Two-column grid */}
-      <div className="grid grid-cols-3 gap-6">
-        {/* LEFT COLUMN — 2 cols wide */}
-        <div className="col-span-2 space-y-6">
-          {/* Card 1 — PO Information */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Purchase Order Information</h2>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-5">
+      {/* Section 1 — header row */}
+      <div className="grid grid-cols-4 gap-6">
+        {/* PO Information — 3 cols */}
+        <div className="col-span-3 space-y-4">
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="text-base font-semibold mb-3">Purchase Order Information</h2>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  Warehouse{isCreating && <span className="text-red-500 ml-0.5">*</span>}
+                </p>
+                {isCreating ? (
+                  <Select
+                    value={String(headerValues.warehouse_id ?? '')}
+                    onValueChange={val => setHeaderField('warehouse_id', val)}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder="Select warehouse..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((w: { id: string; name: string }) => (
+                        <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm font-semibold">{po?.warehouse_name ?? '—'}</p>
+                )}
+              </div>
               <EditableInfoItem
                 field="supplier_name"
                 label="Supplier"
-                value={po.supplier_name}
+                value={po?.supplier_name}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('supplier_name')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('supplier_name') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="forwarder_name"
                 label="Forwarder"
-                value={po.forwarder_name}
+                value={po?.forwarder_name}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forwarder_name')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forwarder_name') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="shop_services"
                 label="Jasa Belanja"
-                value={po.shop_services}
+                value={po?.shop_services}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('shop_services')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('shop_services') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="invoice_number"
                 label="Invoice No."
-                value={po.invoice_number}
+                value={po?.invoice_number}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('invoice_number')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('invoice_number') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="invoice_date"
                 label="Invoice Date"
-                value={po.invoice_date ? formatDate(po.invoice_date) : null}
+                value={po?.invoice_date ? formatDate(po?.invoice_date) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('invoice_date')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('invoice_date') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="delivery_order_number"
                 label="Delivery Order No."
-                value={po.delivery_order_number}
+                value={po?.delivery_order_number}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_order_number')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('delivery_order_number') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="delivery_date"
                 label="Delivery Date"
-                value={po.delivery_date ? formatDate(po.delivery_date) : null}
+                value={po?.delivery_date ? formatDate(po?.delivery_date) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_date')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('delivery_date') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="forecast_delivery_date"
                 label="Forecast Delivery"
-                value={po.forecast_delivery_date ? formatDate(po.forecast_delivery_date) : null}
+                value={po?.forecast_delivery_date ? formatDate(po?.forecast_delivery_date) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_delivery_date')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forecast_delivery_date') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
             </div>
-            <div className="border-t pt-4 grid grid-cols-2 gap-x-8 gap-y-4">
+            <div className="border-t pt-3 grid grid-cols-2 gap-x-6 gap-y-3">
               <EditableInfoItem
                 field="currency"
                 label="Currency"
-                value={po.currency}
+                value={po?.currency}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('currency')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('currency') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="exchange_rate"
                 label="Exchange Rate"
-                value={po.exchange_rate != null ? `Rp ${Number(po.exchange_rate).toLocaleString('id-ID')}` : null}
+                value={po?.exchange_rate != null ? `Rp ${Number(po?.exchange_rate).toLocaleString('id-ID')}` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('exchange_rate')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('exchange_rate') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="commission_fee_pct"
                 label="Commission %"
-                value={po.commission_fee_pct != null ? `${po.commission_fee_pct}%` : null}
+                value={po?.commission_fee_pct != null ? `${po?.commission_fee_pct}%` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('commission_fee_pct')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('commission_fee_pct') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="delivery_fee"
                 label="Delivery Fee (RMB)"
-                value={po.delivery_fee != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(po.delivery_fee)}` : null}
+                value={po?.delivery_fee != null ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(po?.delivery_fee)}` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('delivery_fee')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('delivery_fee') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Commission (IDR)</p>
-                <p className="text-sm font-semibold">{po.commission_fee != null ? formatIDR(po.commission_fee) : '—'}</p>
+                <p className="text-sm font-semibold">{po?.commission_fee != null ? formatIDR(po?.commission_fee) : '—'}</p>
               </div>
               <EditableInfoItem
-                field="cbm"
-                label="CBM"
-                value={po.cbm != null ? `${formatDecimalUnit(po.cbm)} m³ (actual)` : po.forecast_cbm != null ? `${formatDecimalUnit(po.forecast_cbm)} m³ (forecast)` : null}
+                field="weight"
+                label="Weight (kg)"
+                value={po?.weight != null ? formatDecimalUnit(po?.weight, 'kg') : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('cbm')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('weight') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
-                field="weight"
-                label="Weight (kg)"
-                value={po.weight != null ? formatDecimalUnit(po.weight, 'kg') : null}
+                field="cbm"
+                label="CBM"
+                value={po?.cbm != null ? `${formatDecimalUnit(po?.cbm)} m³ (actual)` : po?.forecast_cbm != null ? `${formatDecimalUnit(po?.forecast_cbm)} m³ (forecast)` : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('weight')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="shipping_fee_per_cbm"
                 label="Shipping Fee / CBM"
-                value={po.shipping_fee_per_cbm != null ? formatIDR(po.shipping_fee_per_cbm) : null}
+                value={po?.shipping_fee_per_cbm != null ? formatIDR(po?.shipping_fee_per_cbm) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('shipping_fee_per_cbm')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('shipping_fee_per_cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
                 field="forecast_cbm"
                 label="Forecast CBM"
-                value={po.forecast_cbm != null ? formatDecimalUnit(po.forecast_cbm, 'm3') : null}
+                value={po?.forecast_cbm != null ? formatDecimalUnit(po?.forecast_cbm, 'm3') : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_cbm')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forecast_cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
               <EditableInfoItem
-                field="forecast_shipping_fee"
-                label="Forecast Shipping"
-                value={po.forecast_shipping_fee != null ? formatIDR(po.forecast_shipping_fee) : null}
+                field="forecast_shipping_fee_per_cbm"
+                label="Forecast Shipping/CBM"
+                value={po?.forecast_shipping_fee_per_cbm != null ? formatIDR(po?.forecast_shipping_fee_per_cbm) : null}
                 editMode={editMode}
-                editable={po.editable_fields.header.includes('forecast_shipping_fee')}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forecast_shipping_fee_per_cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
+
             </div>
           </div>
-
-          {/* Notes card */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-3">Notes</h2>
-            {editMode ? (
-              <Textarea
-                className="min-h-[80px] text-sm"
-                placeholder="Add notes..."
-                value={String(headerValues['note'] ?? '')}
-                onChange={e => setHeaderField('note', e.target.value)}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {po.note || 'No notes'}
-              </p>
-            )}
-          </div>
-
-          {/* Card 2 — Order Items + summary box */}
-          <div className="rounded-lg border bg-card">
-            <div className="px-6 py-4 border-b flex items-center justify-between">
-              <h2 className="text-base font-semibold">Order Items</h2>
-              {po.currency && (
-                <span className="text-xs text-muted-foreground">
-                  {getCurrencySymbol(po.currency)} {po.currency}
-                </span>
-              )}
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Variant</TableHead>
-                  <TableHead className="text-right">Ordered</TableHead>
-                  <TableHead className="text-right">Received</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Disc. Price</TableHead>
-                  <TableHead className="text-right">Total (IDR)</TableHead>
-                  {po.editable_fields.order_detail.includes('remarks') && editMode && (
-                    <TableHead>Remarks</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(po.order_details ?? []).map(item => {
-                  const rowChanges = detailValues[item.id] ?? {}
-                  const isDetailEditable = (field: string) =>
-                    editMode && po.editable_fields.order_detail.includes(field)
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs font-medium">{item.product_variant_name}</TableCell>
-                      <TableCell className="text-right">
-                        {isDetailEditable('ordered_qty') ? (
-                          <Input type="number" className="h-7 w-16 text-xs text-right"
-                            value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
-                            onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
-                        ) : item.ordered_qty}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {isDetailEditable('received_qty') ? (
-                          <Input type="number" className="h-7 w-16 text-xs text-right"
-                            value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
-                            onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
-                        ) : (item.received_qty ?? '—')}
-                      </TableCell>
-                      <TableCell className="text-right text-xs">
-                        {isDetailEditable('unit_price_foreign') ? (
-                          <div className="flex items-center gap-1 justify-end">
-                            <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                            <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                              value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
-                              onChange={e => setDetailField(item.id, 'unit_price_foreign', e.target.value)} />
-                          </div>
-                        ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
-                      </TableCell>
-                      <TableCell className="text-right text-xs">
-                        {isDetailEditable('discounted_unit_price_foreign') ? (
-                          <div className="flex items-center gap-1 justify-end">
-                            <span className="text-xs text-muted-foreground">{getCurrencySymbol(po.currency)}</span>
-                            <Input type="number" step="0.001" className="h-7 w-20 text-xs text-right"
-                              value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
-                              onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                          </div>
-                        ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po.currency)} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
-                      </TableCell>
-                      <TableCell className="text-right text-xs">
-                        {item.discounted_total_price_base != null ? formatIDR(item.discounted_total_price_base) : '—'}
-                      </TableCell>
-                      {po.editable_fields.order_detail.includes('remarks') && editMode && (
-                        <TableCell>
-                          <Input className="h-7 text-xs" placeholder="Remarks..."
-                            value={rowChanges.remarks ?? String(item.remarks ?? '')}
-                            onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-            {/* Summary box — bottom right */}
-            <div className="flex justify-end px-6 py-5 border-t">
-              <div className="w-72 space-y-2 text-sm">
-                <SummaryRow label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
-                <SummaryRow label="Commission" value={po.commission_fee != null ? formatIDR(po.commission_fee) : '—'} />
-                <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
-                <SummaryRow label="Freight" value={po.shipping_fee != null ? formatIDR(po.shipping_fee) : '—'} />
-                <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
-                  <span>Total Amount</span>
-                  <span>{formatIDR(po.total_amount)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* RIGHT SIDEBAR — 1 col */}
-        <div className="space-y-6">
-          {/* Sidebar Card 1 — Attachments */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Attachments</h2>
-            <div className="space-y-3">
+          {/* Attachments card */}
+          {!isCreating && <div className="rounded-lg border bg-card p-4">
+            <h2 className="text-sm font-semibold mb-3">Attachments</h2>
+            <div className="grid grid-cols-4 gap-3">
               {attachments.map(({ label, field, url }) => {
-                const isFileEditable = editMode && po.editable_fields.header.includes(field)
+                const isFileEditable = (editMode && po?.editable_fields?.header?.includes(field)) ?? false
                 const fileSelected = !!headerValues[field]
                 return (
-                  <div key={label} className="flex items-center justify-between rounded-lg border p-4">
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "flex h-12 w-12 items-center justify-center rounded-lg text-xs font-bold text-white",
-                        url || fileSelected ? "bg-red-600" : "bg-muted"
-                      )}>
-                        PDF
-                      </div>
-                      <div>
-                        <p className={cn("text-sm font-semibold", !url && !fileSelected && "text-muted-foreground")}>
-                          {label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {fileSelected
-                            ? 'Ready to upload'
-                            : url ? getFilename(url) : 'Not uploaded'}
-                        </p>
-                      </div>
+                  <div key={label} className="flex flex-col items-center gap-2 rounded-lg border p-3 text-center">
+                    <div className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-lg text-xs font-bold text-white",
+                      url || fileSelected ? "bg-red-600" : "bg-muted"
+                    )}>
+                      PDF
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="space-y-0.5">
+                      <p className={cn("text-xs font-semibold leading-tight", !url && !fileSelected && "text-muted-foreground")}>
+                        {label}
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-tight">
+                        {fileSelected ? 'Ready' : url ? 'Uploaded' : 'Not uploaded'}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1 w-full">
                       {url && !fileSelected && (
                         <a href={url} target="_blank" rel="noopener noreferrer">
-                          <Button size="sm" variant="outline">
-                            <ExternalLink className="h-3.5 w-3.5 mr-1" /> View
+                          <Button size="sm" variant="outline" className="w-full text-xs h-7">
+                            <ExternalLink className="h-3 w-3 mr-1" /> View
                           </Button>
                         </a>
                       )}
                       {isFileEditable && (
-                        <label className="cursor-pointer">
+                        <label className="cursor-pointer w-full">
                           <input
                             type="file"
                             className="hidden"
@@ -539,7 +973,7 @@ export default function PurchaseOrderDetailPage() {
                               if (file) setHeaderField(field, file)
                             }}
                           />
-                          <Button size="sm" variant="outline" asChild>
+                          <Button size="sm" variant="outline" className="w-full text-xs h-7" asChild>
                             <span>{fileSelected ? '\u2713 Ready' : url ? 'Replace' : 'Upload'}</span>
                           </Button>
                         </label>
@@ -549,89 +983,106 @@ export default function PurchaseOrderDetailPage() {
                 )
               })}
             </div>
+          </div>}
+        </div>
+        {/* Summary + Attachments sidebar — 1 col */}
+        <div className="space-y-4">
+          {/* Financial Summary card */}
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-base font-semibold mb-4">
+              {isCreating ? 'Estimated Summary' : 'Financial Summary'}
+            </h2>
+            {isCreating ? (() => {
+              const estGoods = newItems.reduce((s, n) => {
+                const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
+                return s + price * (Number(n.ordered_qty) || 0)
+              }, 0) * poExchangeRate
+              const commPct = Number(headerValues.commission_fee_pct) || 0
+              const estCommission = Math.round(newItems.reduce((s, n) => {
+                const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
+                return s + price * (Number(n.ordered_qty) || 0)
+              }, 0) * (commPct / 100) * poExchangeRate)
+              const estFreight = Math.round((Number(headerValues.forecast_cbm) || 0) * (Number(headerValues.forecast_shipping_fee_per_cbm) || 0))
+              const estTotal = Math.round(estGoods) + estCommission + estFreight
+              const totalUnits = newItems.reduce((s, n) => s + (Number(n.ordered_qty) || 0), 0)
+              const totalSkus = newItems.filter(n => n.product_variant_id).length
+              return (
+                <div className="space-y-3 text-sm">
+                  <SummaryRow label="Goods" value={estGoods > 0 ? formatIDR(Math.round(estGoods)) : '—'} />
+                  <SummaryRow label="Commission" value={estCommission > 0 ? formatIDR(estCommission) : '—'} />
+                  <SummaryRow label="Forecast Freight" value={estFreight > 0 ? formatIDR(estFreight) : '—'} />
+                  <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                    <span>Est. Total</span>
+                    <span>{estTotal > 0 ? formatIDR(estTotal) : '—'}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground pt-1">{totalUnits} units · {totalSkus} SKUs</p>
+                </div>
+              )
+            })() : (
+              <>
+                <div className="space-y-3 text-sm">
+                  <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
+                  <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
+                  <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
+                  <SummaryRow label="Freight" value={po!.shipping_fee != null ? formatIDR(po!.shipping_fee) : '—'} />
+                  <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                    <span>Total Amount</span>
+                    <span>{formatIDR(po!.total_amount)}</span>
+                  </div>
+                </div>
+                <div className="border-t pt-3 mt-3 space-y-3">
+                  <StatBox label="COGS Ratio" value={po!.cost_ratio_cogs != null ? `${po!.cost_ratio_cogs.toFixed(2)}%` : '—'} />
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Sidebar Card 2 — Supplier & Logistics */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Supplier & Logistics</h2>
-            <div className="rounded-lg bg-muted/40 p-4 space-y-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Supplier</p>
-                <p className="text-sm font-semibold">{po.supplier_name ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Forwarder</p>
-                <p className="text-sm font-semibold">{po.forwarder_name ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Jasa Belanja</p>
-                <p className="text-sm font-semibold">{po.shop_services ?? '—'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Exchange Rate</p>
-                <p className="text-sm font-semibold">{po.exchange_rate ? `Rp ${Number(po.exchange_rate).toLocaleString('id-ID')}` : '—'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar Card 3 — Financial Summary */}
-          <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-base font-semibold mb-4">Financial Summary</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <StatBox label="Total Amount" value={formatIDR(po.total_amount)} highlight />
-              <StatBox label="Goods" value={po.total_item_amount != null ? formatIDR(po.total_item_amount) : '—'} />
-              <StatBox label="COGS Ratio" value={po.cost_ratio_cogs != null ? `${po.cost_ratio_cogs.toFixed(2)}%` : '—'} />
-              <StatBox label="Ship / QTY" value={po.shipping_per_qty != null ? formatIDR(po.shipping_per_qty) : '—'} />
-            </div>
-          </div>
-
-          {/* Sidebar Card 4 — Order Summary */}
-          <div className="rounded-lg border bg-card p-6">
+          {/* Order Summary card */}
+          {!isCreating && <div className="rounded-lg border bg-card p-6">
             <h2 className="text-base font-semibold mb-4">Order Summary</h2>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Ordered</span>
-                <span className="font-semibold">{po.total_ordered_qty} units</span>
+                <span className="font-semibold">{po!.total_ordered_qty} units</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Received</span>
-                <span className="font-semibold">{po.total_received_qty} units</span>
+                <span className="font-semibold">{po!.total_received_qty} units</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Line Items</span>
-                <span className="font-semibold">{po.order_details?.length ?? 0} SKUs</span>
+                <span className="font-semibold">{po!.order_details?.length ?? 0} SKUs</span>
               </div>
-              {po.cbm && (
+              {po!.cbm && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">CBM</span>
-                  <span className="font-semibold">{po.cbm} m³</span>
+                  <span className="font-semibold">{po!.cbm} m³</span>
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Sidebar Card 5 — Status History */}
-          {po.status_history && po.status_history.length > 0 && (
-            <div className="rounded-lg border bg-card p-6">
-              <h2 className="text-base font-semibold mb-4">Status History</h2>
-              <div className="space-y-4">
-                {po.status_history.map((entry, i) => (
-                  <div key={entry.id} className="flex gap-3">
+          </div>}
+          {/* Status History card */}
+          {!isCreating && po?.status_history && po.status_history.length > 0 && (
+            <div className="rounded-lg border bg-card p-4">
+              <h2 className="text-sm font-semibold mb-3">Status History</h2>
+              <div className="space-y-3">
+                {po!.status_history.map((entry, i) => (
+                  <div key={entry.id} className="flex gap-2">
                     <div className="flex flex-col items-center">
-                      <div className="h-2.5 w-2.5 rounded-full bg-primary mt-1 shrink-0" />
-                      {i < po.status_history.length - 1 && (
+                      <div className="h-2 w-2 rounded-full bg-primary mt-1 shrink-0" />
+                      {i < po!.status_history.length - 1 && (
                         <div className="w-px flex-1 bg-border mt-1" />
                       )}
                     </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="pb-3">
+                      <div className="flex items-center gap-1.5 mb-0.5">
                         <Badge variant={statusVariant[entry.to_status]}>{entry.to_status}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {entry.changed_by_name ?? 'System'} · {formatDate(entry.cdate)}
                       </p>
                       {entry.note && (
-                        <p className="text-xs text-muted-foreground mt-1">{entry.note}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{entry.note}</p>
                       )}
                     </div>
                   </div>
@@ -642,14 +1093,122 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
 
-      {po.next_status && (
+      {/* Section 2 — Notes (full width) */}
+      <div className="rounded-lg border bg-card p-4">
+        <h2 className="text-base font-semibold mb-3">Notes</h2>
+        {editMode ? (
+          <Textarea
+            className="min-h-[80px] text-sm"
+            placeholder="Add notes..."
+            value={String(headerValues['note'] ?? '')}
+            onChange={e => setHeaderField('note', e.target.value)}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {(isCreating ? String(headerValues.note ?? '') : po?.note) || 'No notes'}
+          </p>
+        )}
+      </div>
+
+      {/* Section 3 — Order Items (full width) */}
+      <div className="rounded-lg border bg-card">
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h2 className="text-base font-semibold">Order Items</h2>
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-md border overflow-hidden text-xs h-6">
+              <button
+                type="button"
+                className={`px-2 ${avgWindow === 7 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                onClick={() => setAvgWindow(7)}
+              >7d</button>
+              <button
+                type="button"
+                className={`px-2 ${avgWindow === 14 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                onClick={() => setAvgWindow(14)}
+              >14d</button>
+              <button
+                type="button"
+                className={`px-2 ${avgWindow === 30 ? 'bg-primary text-primary-foreground' : 'bg-background'}`}
+                onClick={() => setAvgWindow(30)}
+              >30d</button>
+            </div>
+            {editMode && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hasDiscount}
+                  onChange={e => setHasDiscount(e.target.checked)}
+                  className="h-3.5 w-3.5"
+                />
+                Has Discount
+              </label>
+            )}
+            {editMode && canAddDeleteItems && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setAddItemModalOpen(true)}>
+                <Plus className="h-3 w-3 mr-1" /> Add Item
+              </Button>
+            )}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-max text-xs border-collapse">
+            <thead>
+              <tr className="border-b bg-muted/30 text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap min-w-[160px]">Variant</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Order</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Receive</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">SOH</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Incoming</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Upcoming</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">AVG</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">DOI</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">DOI+</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Unit Price</th>
+                {hasDiscount && <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Disc. Price</th>}
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Unit Rp</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Total</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Total Rp</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">COGS/u</th>
+                <th className="px-3 py-2 text-left font-medium">Remarks</th>
+                {editMode && canAddDeleteItems && <th className="w-8" />}
+              </tr>
+            </thead>
+            {orderItemsContent}
+          </table>
+        </div>
+      </div>
+      {!isCreating && po?.next_status && (
         <StatusAdvanceModal
           open={showAdvanceModal}
           onClose={() => setShowAdvanceModal(false)}
-          po={po}
-          targetStatus={po.next_status}
+          po={po!}
+          targetStatus={po!.next_status}
         />
       )}
+      <AddItemModal
+        open={addItemModalOpen}
+        onClose={() => setAddItemModalOpen(false)}
+        onAdd={handleAddItemFromModal}
+        hasDiscount={hasDiscount}
+        stockMap={stockMap}
+        avgWindow={avgWindow}
+        poExchangeRate={poExchangeRate}
+        freightPerUnit={freightPerUnit}
+        commissionPerUnit={commissionPerUnit}
+        currency={po?.currency ?? String(headerValues.currency ?? '')}
+        excludeVariantIds={usedVariantIds}
+      />
+      {!isCreating && po && (
+        <PurchaseOrderExportModal
+          open={exportModalOpen}
+          onClose={() => setExportModalOpen(false)}
+          po={po}
+        />
+      )}
+      <ValidationModal
+        errors={validationErrors}
+        onClose={() => setValidationErrors([])}
+      />
     </div>
   )
 }
@@ -667,6 +1226,26 @@ function EditableInfoItem({
 }) {
   const cfg = HEADER_FIELD_CONFIG[field]
   if (editMode && editable && cfg) {
+    if (cfg.inputType === 'select' && cfg.options) {
+      return (
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+          <Select
+            value={String(headerValues[field] ?? value ?? '')}
+            onValueChange={val => setHeaderField(field, val)}
+          >
+            <SelectTrigger className="h-7 text-xs">
+              <SelectValue placeholder="Select..." />
+            </SelectTrigger>
+            <SelectContent>
+              {cfg.options.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )
+    }
     if (cfg.inputType === 'file') {
       const existingUrl = typeof value === 'string' && value ? value : null
       return (
@@ -727,5 +1306,224 @@ function StatBox({ label, value, highlight }: { label: string; value: string; hi
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className={cn("text-sm font-bold", highlight && "text-primary")}>{value}</p>
     </div>
+  )
+}
+
+function AddItemModal({
+  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, poExchangeRate, freightPerUnit, commissionPerUnit, currency, excludeVariantIds,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (draft: {
+    product_variant_id: string
+    product_variant_label: string
+    product_id: string
+    product_name: string
+    product_supplier_link: string | null
+    product_photo_url: string | null
+    ordered_qty: string
+    unit_price_foreign: string
+    discounted_unit_price_foreign: string
+  }) => void
+  hasDiscount: boolean
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 14 | 30
+  poExchangeRate: number
+  freightPerUnit: number
+  commissionPerUnit: number
+  currency: string
+  excludeVariantIds: Set<string>
+}) {
+  const emptyDraft = {
+    product_variant_id: '',
+    product_variant_label: '',
+    product_id: '',
+    product_name: '',
+    product_supplier_link: null as string | null,
+    product_photo_url: null as string | null,
+    ordered_qty: '1',
+    unit_price_foreign: '',
+    discounted_unit_price_foreign: '',
+  }
+  const [draft, setDraft] = useState({ ...emptyDraft })
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDraft({ ...emptyDraft })
+      setError('')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const liveStats = draft.product_variant_id ? stockMap.get(draft.product_variant_id) : undefined
+  const ordQty = Number(draft.ordered_qty) || 0
+  const liveSoh = liveStats?.stock_on_hand ?? 0
+  const liveIncoming = liveStats?.incoming_qty ?? 0
+  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+  const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
+  const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
+  const unitForeign = Number(draft.unit_price_foreign) || 0
+  const unitIdr = Math.round(unitForeign * poExchangeRate)
+  const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
+
+  const handleAdd = () => {
+    if (!draft.product_variant_id) { setError('Please select a variant'); return }
+    if (!draft.ordered_qty || Number(draft.ordered_qty) <= 0) { setError('Quantity must be greater than 0'); return }
+    onAdd(draft)
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add Item</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1.5">Variant <span className="text-red-500">*</span></p>
+            <VariantSearchSelect
+              value={draft.product_variant_id}
+              selectedLabel={draft.product_variant_label}
+              excludeVariantIds={excludeVariantIds}
+              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) =>
+                setDraft(prev => ({
+                  ...prev,
+                  product_variant_id: id,
+                  product_variant_label: label,
+                  product_id: productId,
+                  product_name: productName,
+                  product_supplier_link: productSupplierLink ?? null,
+                  product_photo_url: productPhotoUrl ?? null,
+                }))
+              }
+              placeholder="Search and select variant..."
+            />
+          </div>
+
+          {liveStats && (
+            <div className="grid grid-cols-4 gap-2 rounded-lg bg-muted/40 p-3 text-xs">
+              <div>
+                <p className="text-muted-foreground">SOH</p>
+                <p className="font-semibold">{liveSoh}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Incoming</p>
+                <p className="font-semibold text-blue-600">{liveIncoming}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">AVG ({avgWindow}d)</p>
+                <p className="font-semibold">{avg > 0 ? `${avg.toFixed(1)}/d` : '\u2014'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">DOI</p>
+                <p className={cn('font-semibold', doi !== null && doi < 14 ? 'text-red-600' : '')}>{doi !== null ? `${doi}d` : '\u221E'}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Quantity <span className="text-red-500">*</span></p>
+              <Input
+                type="number"
+                min="1"
+                className="h-8 text-sm"
+                value={draft.ordered_qty}
+                onChange={e => setDraft(prev => ({ ...prev, ordered_qty: e.target.value }))}
+              />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Unit Price ({getCurrencySymbol(currency)})</p>
+              <Input
+                type="number"
+                step="0.001"
+                className="h-8 text-sm"
+                value={draft.unit_price_foreign}
+                onChange={e => setDraft(prev => ({
+                  ...prev,
+                  unit_price_foreign: e.target.value,
+                  discounted_unit_price_foreign: hasDiscount ? e.target.value : prev.discounted_unit_price_foreign,
+                }))}
+              />
+            </div>
+          </div>
+
+          {hasDiscount && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Discounted Price ({getCurrencySymbol(currency)})</p>
+              <Input
+                type="number"
+                step="0.001"
+                className="h-8 text-sm"
+                value={draft.discounted_unit_price_foreign}
+                onChange={e => setDraft(prev => ({ ...prev, discounted_unit_price_foreign: e.target.value }))}
+              />
+            </div>
+          )}
+
+          {unitForeign > 0 && (
+            <div className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-xs">
+              <div>
+                <p className="text-muted-foreground">Unit Price (IDR)</p>
+                <p className="font-semibold">{formatIDR(unitIdr)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Total ({getCurrencySymbol(currency)})</p>
+                <p className="font-semibold">{getCurrencySymbol(currency)} {formatForeignAmount(unitForeign * ordQty)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Total (IDR)</p>
+                <p className="font-semibold">{formatIDR(unitIdr * ordQty)}</p>
+              </div>
+              {cogsPerUnit > 0 && (
+                <div>
+                  <p className="text-muted-foreground">COGS/unit</p>
+                  <p className="font-semibold text-amber-700">{formatIDR(cogsPerUnit)}</p>
+                </div>
+              )}
+              {doiAfter !== null && ordQty > 0 && (
+                <div className="col-span-2">
+                  <p className="text-muted-foreground">DOI after this order</p>
+                  <p className={cn('font-semibold', doiAfterColor(doiAfter))}>{doiAfter}d</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={handleAdd}>Add to Order</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ValidationModal({ errors, onClose }: { errors: string[]; onClose: () => void }) {
+  if (errors.length === 0) return null
+  return (
+    <Dialog open={errors.length > 0} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Required Fields Missing</DialogTitle>
+        </DialogHeader>
+        <ul className="space-y-2 py-2">
+          {errors.map((e, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm text-red-600">
+              <span className="shrink-0">•</span>
+              <span>{e}</span>
+            </li>
+          ))}
+        </ul>
+        <DialogFooter>
+          <Button size="sm" onClick={onClose}>OK</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
