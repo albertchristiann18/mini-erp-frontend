@@ -120,6 +120,7 @@ export default function PurchaseOrderDetailPage() {
     unit_price_foreign: string
     discounted_unit_price_foreign: string
   }>>([])
+  const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
   const [hasDiscount, setHasDiscount] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -138,6 +139,17 @@ export default function PurchaseOrderDetailPage() {
     for (const item of replenishData?.results ?? []) m.set(item.variant_id, item)
     return m
   }, [replenishData])
+
+  const usedVariantIds = useMemo<Set<string>>(() => {
+    const ids = new Set<string>()
+    for (const item of (po?.order_details ?? [])) {
+      if (!deletedDetailIds.has(item.id)) ids.add(item.variant_id)
+    }
+    for (const n of newItems) {
+      if (n.product_variant_id) ids.add(n.product_variant_id)
+    }
+    return ids
+  }, [po?.order_details, deletedDetailIds, newItems])
 
   useEffect(() => {
     if (!po) return
@@ -226,12 +238,30 @@ export default function PurchaseOrderDetailPage() {
       unit_price_foreign: '',
       discounted_unit_price_foreign: '',
     }])
+  void addNewItem
 
   const removeNewItem = (_tempId: string) =>
     setNewItems(prev => prev.filter(n => n._tempId !== _tempId))
 
   const updateNewItem = (_tempId: string, field: string, value: string) =>
     setNewItems(prev => prev.map(n => n._tempId === _tempId ? { ...n, [field]: value } : n))
+
+  const handleAddItemFromModal = (draft: {
+    product_variant_id: string
+    product_variant_label: string
+    product_id: string
+    product_name: string
+    product_supplier_link: string | null
+    product_photo_url: string | null
+    ordered_qty: string
+    unit_price_foreign: string
+    discounted_unit_price_foreign: string
+  }) => {
+    setNewItems(prev => [...prev, {
+      ...draft,
+      _tempId: `new-${Date.now()}-${prev.length}`,
+    }])
+  }
 
   const deleteExistingItem = (itemId: string) =>
     setDeletedDetailIds(prev => new Set([...prev, itemId]))
@@ -732,13 +762,12 @@ export default function PurchaseOrderDetailPage() {
                   <p className="text-sm font-semibold">{po?.warehouse_name ?? '—'}</p>
                 )}
               </div>
-              {!isCreating && (<>
               <EditableInfoItem
                 field="supplier_name"
                 label="Supplier"
                 value={po?.supplier_name}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('supplier_name') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('supplier_name') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -747,7 +776,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Forwarder"
                 value={po?.forwarder_name}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('forwarder_name') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forwarder_name') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -756,7 +785,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Jasa Belanja"
                 value={po?.shop_services}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('shop_services') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('shop_services') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -765,7 +794,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Invoice No."
                 value={po?.invoice_number}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('invoice_number') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('invoice_number') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -774,7 +803,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Invoice Date"
                 value={po?.invoice_date ? formatDate(po?.invoice_date) : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('invoice_date') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('invoice_date') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -783,7 +812,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Delivery Order No."
                 value={po?.delivery_order_number}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('delivery_order_number') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('delivery_order_number') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -792,7 +821,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Delivery Date"
                 value={po?.delivery_date ? formatDate(po?.delivery_date) : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('delivery_date') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('delivery_date') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -801,20 +830,18 @@ export default function PurchaseOrderDetailPage() {
                 label="Forecast Delivery"
                 value={po?.forecast_delivery_date ? formatDate(po?.forecast_delivery_date) : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('forecast_delivery_date') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forecast_delivery_date') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
-            </>)}
             </div>
-            {!isCreating && (<>
             <div className="border-t pt-3 grid grid-cols-2 gap-x-6 gap-y-3">
               <EditableInfoItem
                 field="currency"
                 label="Currency"
                 value={po?.currency}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('currency') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('currency') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -823,7 +850,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Exchange Rate"
                 value={po?.exchange_rate != null ? `Rp ${Number(po?.exchange_rate).toLocaleString('id-ID')}` : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('exchange_rate') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('exchange_rate') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -832,7 +859,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Commission %"
                 value={po?.commission_fee_pct != null ? `${po?.commission_fee_pct}%` : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('commission_fee_pct') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('commission_fee_pct') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -841,7 +868,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Delivery Fee (RMB)"
                 value={po?.delivery_fee != null ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(po?.delivery_fee)}` : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('delivery_fee') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('delivery_fee') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -854,7 +881,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Weight (kg)"
                 value={po?.weight != null ? formatDecimalUnit(po?.weight, 'kg') : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('weight') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('weight') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -863,7 +890,7 @@ export default function PurchaseOrderDetailPage() {
                 label="CBM"
                 value={po?.cbm != null ? `${formatDecimalUnit(po?.cbm)} m³ (actual)` : po?.forecast_cbm != null ? `${formatDecimalUnit(po?.forecast_cbm)} m³ (forecast)` : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('cbm') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -872,7 +899,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Shipping Fee / CBM"
                 value={po?.shipping_fee_per_cbm != null ? formatIDR(po?.shipping_fee_per_cbm) : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('shipping_fee_per_cbm') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('shipping_fee_per_cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -881,7 +908,7 @@ export default function PurchaseOrderDetailPage() {
                 label="Forecast CBM"
                 value={po?.forecast_cbm != null ? formatDecimalUnit(po?.forecast_cbm, 'm3') : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('forecast_cbm') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forecast_cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
@@ -890,13 +917,12 @@ export default function PurchaseOrderDetailPage() {
                 label="Forecast Shipping/CBM"
                 value={po?.forecast_shipping_fee_per_cbm != null ? formatIDR(po?.forecast_shipping_fee_per_cbm) : null}
                 editMode={editMode}
-                editable={po?.editable_fields?.header?.includes('forecast_shipping_fee_per_cbm') ?? false}
+                editable={isCreating || (po?.editable_fields?.header?.includes('forecast_shipping_fee_per_cbm') ?? false)}
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
 
             </div>
-            </>)}
           </div>
           {/* Attachments card */}
           {!isCreating && <div className="rounded-lg border bg-card p-4">
@@ -1106,7 +1132,7 @@ export default function PurchaseOrderDetailPage() {
               </label>
             )}
             {editMode && canAddDeleteItems && (
-              <Button type="button" size="sm" variant="outline" onClick={addNewItem}>
+              <Button type="button" size="sm" variant="outline" onClick={() => setAddItemModalOpen(true)}>
                 <Plus className="h-3 w-3 mr-1" /> Add Item
               </Button>
             )}
@@ -1147,6 +1173,19 @@ export default function PurchaseOrderDetailPage() {
           targetStatus={po!.next_status}
         />
       )}
+      <AddItemModal
+        open={addItemModalOpen}
+        onClose={() => setAddItemModalOpen(false)}
+        onAdd={handleAddItemFromModal}
+        hasDiscount={hasDiscount}
+        stockMap={stockMap}
+        avgWindow={avgWindow}
+        poExchangeRate={poExchangeRate}
+        freightPerUnit={freightPerUnit}
+        commissionPerUnit={commissionPerUnit}
+        currency={po?.currency ?? String(headerValues.currency ?? '')}
+        excludeVariantIds={usedVariantIds}
+      />
       <ValidationModal
         errors={validationErrors}
         onClose={() => setValidationErrors([])}
@@ -1248,6 +1287,201 @@ function StatBox({ label, value, highlight }: { label: string; value: string; hi
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className={cn("text-sm font-bold", highlight && "text-primary")}>{value}</p>
     </div>
+  )
+}
+
+function AddItemModal({
+  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, poExchangeRate, freightPerUnit, commissionPerUnit, currency, excludeVariantIds,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (draft: {
+    product_variant_id: string
+    product_variant_label: string
+    product_id: string
+    product_name: string
+    product_supplier_link: string | null
+    product_photo_url: string | null
+    ordered_qty: string
+    unit_price_foreign: string
+    discounted_unit_price_foreign: string
+  }) => void
+  hasDiscount: boolean
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 30
+  poExchangeRate: number
+  freightPerUnit: number
+  commissionPerUnit: number
+  currency: string
+  excludeVariantIds: Set<string>
+}) {
+  const emptyDraft = {
+    product_variant_id: '',
+    product_variant_label: '',
+    product_id: '',
+    product_name: '',
+    product_supplier_link: null as string | null,
+    product_photo_url: null as string | null,
+    ordered_qty: '1',
+    unit_price_foreign: '',
+    discounted_unit_price_foreign: '',
+  }
+  const [draft, setDraft] = useState({ ...emptyDraft })
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDraft({ ...emptyDraft })
+      setError('')
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  const liveStats = draft.product_variant_id ? stockMap.get(draft.product_variant_id) : undefined
+  const ordQty = Number(draft.ordered_qty) || 0
+  const liveSoh = liveStats?.stock_on_hand ?? 0
+  const liveIncoming = liveStats?.incoming_qty ?? 0
+  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : liveStats.avg_sales_30d) : 0
+  const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
+  const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
+  const unitForeign = Number(draft.unit_price_foreign) || 0
+  const unitIdr = Math.round(unitForeign * poExchangeRate)
+  const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
+
+  const handleAdd = () => {
+    if (!draft.product_variant_id) { setError('Please select a variant'); return }
+    if (!draft.ordered_qty || Number(draft.ordered_qty) <= 0) { setError('Quantity must be greater than 0'); return }
+    onAdd(draft)
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add Item</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1.5">Variant <span className="text-red-500">*</span></p>
+            <VariantSearchSelect
+              value={draft.product_variant_id}
+              selectedLabel={draft.product_variant_label}
+              excludeVariantIds={excludeVariantIds}
+              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) =>
+                setDraft(prev => ({
+                  ...prev,
+                  product_variant_id: id,
+                  product_variant_label: label,
+                  product_id: productId,
+                  product_name: productName,
+                  product_supplier_link: productSupplierLink ?? null,
+                  product_photo_url: productPhotoUrl ?? null,
+                }))
+              }
+              placeholder="Search and select variant..."
+            />
+          </div>
+
+          {liveStats && (
+            <div className="grid grid-cols-4 gap-2 rounded-lg bg-muted/40 p-3 text-xs">
+              <div>
+                <p className="text-muted-foreground">SOH</p>
+                <p className="font-semibold">{liveSoh}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Incoming</p>
+                <p className="font-semibold text-blue-600">{liveIncoming}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">AVG ({avgWindow}d)</p>
+                <p className="font-semibold">{avg > 0 ? `${avg.toFixed(1)}/d` : '\u2014'}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">DOI</p>
+                <p className={cn('font-semibold', doi !== null && doi < 14 ? 'text-red-600' : '')}>{doi !== null ? `${doi}d` : '\u221E'}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Quantity <span className="text-red-500">*</span></p>
+              <Input
+                type="number"
+                min="1"
+                className="h-8 text-sm"
+                value={draft.ordered_qty}
+                onChange={e => setDraft(prev => ({ ...prev, ordered_qty: e.target.value }))}
+              />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Unit Price ({getCurrencySymbol(currency)})</p>
+              <Input
+                type="number"
+                step="0.001"
+                className="h-8 text-sm"
+                value={draft.unit_price_foreign}
+                onChange={e => setDraft(prev => ({
+                  ...prev,
+                  unit_price_foreign: e.target.value,
+                  discounted_unit_price_foreign: hasDiscount ? e.target.value : prev.discounted_unit_price_foreign,
+                }))}
+              />
+            </div>
+          </div>
+
+          {hasDiscount && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Discounted Price ({getCurrencySymbol(currency)})</p>
+              <Input
+                type="number"
+                step="0.001"
+                className="h-8 text-sm"
+                value={draft.discounted_unit_price_foreign}
+                onChange={e => setDraft(prev => ({ ...prev, discounted_unit_price_foreign: e.target.value }))}
+              />
+            </div>
+          )}
+
+          {unitForeign > 0 && (
+            <div className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-xs">
+              <div>
+                <p className="text-muted-foreground">Unit Price (IDR)</p>
+                <p className="font-semibold">{formatIDR(unitIdr)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Total ({getCurrencySymbol(currency)})</p>
+                <p className="font-semibold">{getCurrencySymbol(currency)} {formatForeignAmount(unitForeign * ordQty)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Total (IDR)</p>
+                <p className="font-semibold">{formatIDR(unitIdr * ordQty)}</p>
+              </div>
+              {cogsPerUnit > 0 && (
+                <div>
+                  <p className="text-muted-foreground">COGS/unit</p>
+                  <p className="font-semibold text-amber-700">{formatIDR(cogsPerUnit)}</p>
+                </div>
+              )}
+              {doiAfter !== null && ordQty > 0 && (
+                <div className="col-span-2">
+                  <p className="text-muted-foreground">DOI after this order</p>
+                  <p className={cn('font-semibold', doiAfterColor(doiAfter))}>{doiAfter}d</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" onClick={handleAdd}>Add to Order</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

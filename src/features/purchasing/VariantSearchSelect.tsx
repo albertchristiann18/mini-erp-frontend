@@ -11,9 +11,10 @@ interface Props {
   selectedLabel?: string
   onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
   placeholder?: string
+  excludeVariantIds?: Set<string>
 }
 
-export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, placeholder = 'Select variant' }: Props) {
+export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, placeholder = 'Select variant', excludeVariantIds }: Props) {
   const [open, setOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
@@ -36,7 +37,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     open,
   )
 
-  const variants = data?.results ?? []
+  const variants = (data?.results ?? []).filter(v => !excludeVariantIds?.has(v.id))
 
   const handleSearch = () => setActiveSearch(searchInput)
 
