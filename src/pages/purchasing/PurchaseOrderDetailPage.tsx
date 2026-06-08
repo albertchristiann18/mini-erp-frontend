@@ -4,13 +4,14 @@ import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useRe
 import { useWarehouses } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
+import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, ChevronDown, ExternalLink, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
@@ -102,6 +103,7 @@ export default function PurchaseOrderDetailPage() {
   })
   const { data: warehouseData } = useWarehouses()
   const warehouses = warehouseData?.results ?? []
+  const [exportModalOpen, setExportModalOpen] = useState(false)
   const [showAdvanceModal, setShowAdvanceModal] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [editMode, setEditMode] = useState(isCreating)
@@ -718,6 +720,11 @@ export default function PurchaseOrderDetailPage() {
             </>
           ) : (
             <>
+              {!isCreating && (
+                <Button size="sm" variant="outline" onClick={() => setExportModalOpen(true)}>
+                  <FileDown className="h-4 w-4 mr-1" /> Export PDF
+                </Button>
+              )}
               {user?.is_staff && po!.status !== 'CANCELLED' && (
                 <Button size="sm" variant="outline" onClick={enterEditMode}>
                   <Pencil className="h-4 w-4 mr-1" /> Edit
@@ -1186,6 +1193,13 @@ export default function PurchaseOrderDetailPage() {
         currency={po?.currency ?? String(headerValues.currency ?? '')}
         excludeVariantIds={usedVariantIds}
       />
+      {!isCreating && po && (
+        <PurchaseOrderExportModal
+          open={exportModalOpen}
+          onClose={() => setExportModalOpen(false)}
+          po={po}
+        />
+      )}
       <ValidationModal
         errors={validationErrors}
         onClose={() => setValidationErrors([])}
