@@ -58,7 +58,7 @@ it('test_create_supplier_opens_modal', async () => {
 })
 
 it('test_create_supplier_submits', async () => {
-  mockMutateAsync.mockResolvedValue({ id: 's3' })
+  mockMutateAsync.mockResolvedValue({ id: 's3', name: 'Gamma Corp', is_active: true, contact_name: null, phone: null, country: 'China', notes: null, supplier_link: null, company_id: 'c1', cdate: '', udate: '' })
   renderPage()
   fireEvent.click(await screen.findByRole('button', { name: /New Supplier/ }))
 

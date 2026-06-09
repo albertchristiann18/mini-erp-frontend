@@ -1,31 +1,15 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { Search, Plus, Pencil } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useSuppliers, useCreateSupplier, useUpdateSupplier } from '../../hooks/useInventory'
+import { useSuppliers, useUpdateSupplier } from '../../hooks/useInventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
-import { Textarea } from '../../components/ui/textarea'
-import { FormField } from '../../components/ui/form'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { Pagination } from '../../components/Pagination'
+import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
 import { toast } from '../../lib/toast'
 import type { Supplier } from '../../types/inventory'
-
-const schema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  contact_name: z.string().optional(),
-  phone: z.string().optional(),
-  country: z.string().optional(),
-  notes: z.string().optional(),
-  supplier_link: z.string().url('Must be a valid URL').optional().or(z.literal('')),
-  is_active: z.boolean(),
-})
-type FormValues = z.infer<typeof schema>
 
 export default function SuppliersPage() {
   const { user } = useAuth()
@@ -38,7 +22,6 @@ export default function SuppliersPage() {
   const params: Record<string, string | number> = { page, page_size: 20 }
   if (search) params.search = search
   const { data, isLoading } = useSuppliers(params)
-  const createMutation = useCreateSupplier()
   const updateMutation = useUpdateSupplier()
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
@@ -135,91 +118,9 @@ export default function SuppliersPage() {
         open={showModal}
         onClose={() => { setShowModal(false); setEditing(undefined) }}
         supplier={editing}
-        createMutation={createMutation}
-        updateMutation={updateMutation}
       />
     </div>
   )
 }
 
-interface ModalProps {
-  open: boolean
-  onClose: () => void
-  supplier?: Supplier
-  createMutation: ReturnType<typeof useCreateSupplier>
-  updateMutation: ReturnType<typeof useUpdateSupplier>
-}
 
-function SupplierFormModal({ open, onClose, supplier, createMutation, updateMutation }: ModalProps) {
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: supplier
-      ? {
-          name: supplier.name,
-          contact_name: supplier.contact_name ?? '',
-          phone: supplier.phone ?? '',
-          country: supplier.country ?? '',
-          notes: supplier.notes ?? '',
-          supplier_link: supplier.supplier_link ?? '',
-          is_active: supplier.is_active,
-        }
-      : { name: '', contact_name: '', phone: '', country: 'China', notes: '', is_active: true, supplier_link: '' },
-  })
-
-  const handleClose = () => { reset(); onClose() }
-
-  const onSubmit = async (values: FormValues) => {
-    try {
-      if (supplier) {
-        await updateMutation.mutateAsync({ id: supplier.id, data: values })
-        toast.success('Supplier updated')
-      } else {
-        await createMutation.mutateAsync(values)
-        toast.success('Supplier created')
-      }
-      handleClose()
-    } catch {
-      toast.error('Failed to save supplier')
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{supplier ? 'Edit Supplier' : 'New Supplier'}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <FormField label="Name" error={errors.name?.message} required>
-            <Input {...register('name')} placeholder="Supplier name" />
-          </FormField>
-          <FormField label="Contact Name" error={errors.contact_name?.message}>
-            <Input {...register('contact_name')} placeholder="Contact person" />
-          </FormField>
-          <FormField label="Phone" error={errors.phone?.message}>
-            <Input {...register('phone')} placeholder="Phone number" />
-          </FormField>
-          <FormField label="Country" error={errors.country?.message}>
-            <Input {...register('country')} placeholder="Country" />
-          </FormField>
-          <FormField label="Supplier Link" error={errors.supplier_link?.message}>
-            <Input {...register('supplier_link')} placeholder="https://supplier-store.com/..." />
-          </FormField>
-          <FormField label="Notes" error={errors.notes?.message}>
-            <Textarea {...register('notes')} placeholder="Notes" />
-          </FormField>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="is_active" {...register('is_active')} className="h-4 w-4" />
-            <label htmlFor="is_active" className="text-sm font-medium text-foreground">Active</label>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : supplier ? 'Update' : 'Create'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}

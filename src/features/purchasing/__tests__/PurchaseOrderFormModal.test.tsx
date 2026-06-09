@@ -75,6 +75,8 @@ vi.mock('../../../hooks/useInventory', () => ({
       ],
     },
   }),
+  useCreateSupplier: () => ({ mutateAsync: vi.fn().mockResolvedValue({ id: 'sup3', name: 'New Sup', is_active: true, contact_name: null, phone: null, country: null, notes: null, supplier_link: null, company_id: 'c1', cdate: '', udate: '' }), isPending: false }),
+  useUpdateSupplier: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('../../../lib/toast', () => ({
@@ -154,4 +156,10 @@ it('test_supplier_filters_variants', async () => {
   renderModal()
   expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
   expect(screen.getAllByText('No supplier').length).toBeGreaterThanOrEqual(1)
+})
+
+it('test_po_modal_renders_with_supplier_section', async () => {
+  renderModal()
+  expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+  expect(screen.getByText('Supplier')).toBeInTheDocument()
 })

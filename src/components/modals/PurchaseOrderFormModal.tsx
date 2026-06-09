@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, ExternalLink } from 'lucide-react'
+import { SupplierFormModal } from './SupplierFormModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { FormField } from '../ui/form'
 import { Input } from '../ui/input'
@@ -56,6 +57,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
 
   const { fields, append, remove } = useFieldArray({ control, name: 'order_details' })
   const [hasDiscount, setHasDiscount] = useState(false)
+  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const [avgWindow, setAvgWindow] = useState<7 | 30>(30)
   const { data: replenishData } = useReplenishment()
   const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
@@ -141,6 +143,17 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                   {suppliers.map(s => (
                     <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
+                  <div className="border-t mt-1 pt-1 px-1 pb-1">
+                    <button
+                      type="button"
+                      className="w-full flex items-center gap-1.5 px-2 py-1.5 text-sm text-primary hover:bg-accent rounded-sm cursor-pointer"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setShowNewSupplierModal(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      New Supplier
+                    </button>
+                  </div>
                 </SelectContent>
               </Select>
             </FormField>
@@ -309,6 +322,14 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
             </Button>
           </DialogFooter>
         </form>
+        <SupplierFormModal
+          open={showNewSupplierModal}
+          onClose={() => setShowNewSupplierModal(false)}
+          onCreated={(s) => {
+            setValue('supplier_id', s.id)
+            setShowNewSupplierModal(false)
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

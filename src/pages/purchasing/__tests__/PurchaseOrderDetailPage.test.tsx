@@ -32,8 +32,16 @@ const { mockUsePurchaseOrder } = vi.hoisted(() => ({
   mockUsePurchaseOrder: vi.fn(),
 }))
 
+vi.mock('../../../hooks/useInventory', () => ({
+  useWarehouses: () => ({ data: { results: [{ id: 'w1', name: 'Main WH' }] } }),
+  useSuppliers: () => ({ data: { results: [{ id: 'sup1', name: 'Supplier A' }] } }),
+  useCreateSupplier: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateSupplier: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
+
 vi.mock('../../../hooks/usePurchasing', () => ({
   usePurchaseOrder: mockUsePurchaseOrder,
+  useCreatePurchaseOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdatePurchaseOrder: () => ({
     mutateAsync: vi.fn(),
     isPending: false,
