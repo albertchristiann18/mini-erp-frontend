@@ -25,6 +25,7 @@ const navItems: NavItem[] = [
     label: 'Inventory', icon: <Package className="h-4 w-4" />,
     children: [
       { label: 'Products', to: '/inventory/products' },
+      { label: 'Categories', to: '/inventory/categories' },
       { label: 'Stock', to: '/inventory/stock' },
       { label: 'Stock Closing', to: '/inventory/stock-closing' },
       { label: 'Warehouses', to: '/inventory/warehouses' },

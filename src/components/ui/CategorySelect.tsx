@@ -58,7 +58,7 @@ export function CategorySelect({ value, onChange, onNewCategoryCreated, error }:
       </button>
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       {dropdownOpen && (
-        <div className="absolute z-50 mt-1 w-full border bg-popover shadow-md rounded-md">
+        <div className="absolute z-50 mt-1 w-full border bg-background text-foreground shadow-md rounded-md">
           <div className="p-1">
             <Input
               placeholder="Search category..."

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getCategories, createCategory, getProducts, createProduct, updateProduct,
+  getCategories, createCategory, updateCategory, getProducts, createProduct, updateProduct,
   getProductVariants, getProductVariantStocks, getWarehouses, createWarehouse, updateWarehouse,
   getStockMovements, getMasterCategories,
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
@@ -10,10 +10,10 @@ import {
 import client from '../api/client'
 import type { Product } from '../types/inventory'
 
-export const useCategories = () =>
+export const useCategories = (params?: Record<string, string | number>) =>
   useQuery({
-    queryKey: ['categories'],
-    queryFn: () => getCategories().then(r => r.data),
+    queryKey: ['categories', params],
+    queryFn: () => getCategories(params).then(r => r.data),
     staleTime: 1000 * 60 * 10,
   })
 
@@ -21,6 +21,15 @@ export const useCreateCategory = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: unknown) => createCategory(data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  })
+}
+
+export const useUpdateCategory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: unknown }) =>
+      updateCategory(id, data).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
   })
 }

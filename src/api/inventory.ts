@@ -1,11 +1,14 @@
 import client from './client'
 import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductVariantSupplier } from '../types/inventory'
 
-export const getCategories = () =>
-  client.get<PaginatedResponse<Category>>('/category/')
+export const getCategories = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<Category>>('/category/', { params })
 
 export const createCategory = (data: unknown) =>
   client.post<Category>('/category/', data)
+
+export const updateCategory = (id: string, data: unknown) =>
+  client.patch<Category>(`/category/${id}/`, data)
 
 export const getProducts = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Product>>('/product/', { params })

@@ -6,6 +6,7 @@ import { ProductFormModal } from '../ProductFormModal'
 vi.mock('../../../hooks/useInventory', () => ({
   useCategories: () => ({ data: { results: [] } }),
   useCreateCategory: () => ({ mutateAsync: vi.fn() }),
+  useUpdateCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useCreateProduct: () => ({ mutateAsync: vi.fn() }),
   useUpdateProduct: () => ({ mutateAsync: vi.fn() }),
 }))

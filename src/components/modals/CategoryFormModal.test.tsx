@@ -7,6 +7,7 @@ const mockMutateAsync = vi.fn()
 
 vi.mock('../../hooks/useInventory', () => ({
   useCreateCategory: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
+  useUpdateCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('../../lib/toast', () => ({
