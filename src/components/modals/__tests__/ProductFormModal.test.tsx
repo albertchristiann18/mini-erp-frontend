@@ -5,8 +5,13 @@ import { ProductFormModal } from '../ProductFormModal'
 
 vi.mock('../../../hooks/useInventory', () => ({
   useCategories: () => ({ data: { results: [] } }),
+  useCreateCategory: () => ({ mutateAsync: vi.fn() }),
   useCreateProduct: () => ({ mutateAsync: vi.fn() }),
   useUpdateProduct: () => ({ mutateAsync: vi.fn() }),
+}))
+
+vi.mock('../../../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { company_id: 'c1' } }),
 }))
 
 function renderModal(open = true, product?: Record<string, unknown>) {

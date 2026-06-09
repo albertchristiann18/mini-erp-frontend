@@ -8,15 +8,16 @@ import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useCategories, useCreateProduct, useUpdateProduct } from '../../hooks/useInventory'
+import { CategorySelect } from '../ui/CategorySelect'
+import { useCreateProduct, useUpdateProduct } from '../../hooks/useInventory'
+import { useAuth } from '../../contexts/AuthContext'
 import { toast } from '../../lib/toast'
 import { PhotoUploadGrid } from '../inventory/PhotoUploadGrid'
 import type { Product, ProductPhoto } from '../../types/inventory'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
-  sku: z.string().optional(),
-  category: z.string().min(1, 'Category is required'),
+  category_id: z.string().min(1, 'Category is required'),
   description: z.string().min(25, 'Description must be at least 25 characters'),
   variant_name: z.string().optional(),
   variant_sku: z.string().optional(),
@@ -37,8 +38,8 @@ interface Props {
 }
 
 export function ProductFormModal({ open, onClose, product }: Props) {
+  const { user } = useAuth()
   const isEditing = !!product
-  const { data: categoriesData } = useCategories()
   const createMutation = useCreateProduct()
   const updateMutation = useUpdateProduct()
   const [photos, setPhotos] = useState<ProductPhoto[]>(product?.photos || [])
@@ -55,8 +56,7 @@ export function ProductFormModal({ open, onClose, product }: Props) {
   useEffect(() => {
     if (product && open) {
       setValue('name', product.name)
-      setValue('sku', product.sku_code)
-      setValue('category', product.category_id)
+      setValue('category_id', product.category_id)
       setValue('description', product.description)
       setValue('is_active', product.is_active)
       setValue('supplier_link', product.supplier_link ?? '')
@@ -83,7 +83,7 @@ export function ProductFormModal({ open, onClose, product }: Props) {
           data: {
             name: values.name,
             description: values.description,
-            category: values.category,
+            category_id: values.category_id,
             is_active: values.is_active,
             supplier_link: values.supplier_link || null,
             weight: values.weight ?? 0,
@@ -101,14 +101,18 @@ export function ProductFormModal({ open, onClose, product }: Props) {
     }
     const payload = {
       name: values.name,
-      sku: values.sku,
-      category: values.category,
       description: values.description,
+      category_id: values.category_id,
+      company_id: user?.company_id,
       supplier_link: values.supplier_link || null,
+      weight: values.weight ?? 0,
+      length: values.length ?? 0,
+      width: values.width ?? 0,
+      height: values.height ?? 0,
       variants: [{
         name: values.variant_name,
-        sku: `${values.sku}-${values.variant_sku}`,
-        base_price: values.selling_price,
+        sku_variant_code: (values.variant_sku ?? '').toUpperCase(),
+        base_price: values.selling_price ?? 0,
         marketplace_listings: [],
       }],
     }
@@ -121,8 +125,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
     }
   }
 
-  const categories = categoriesData?.results ?? []
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -134,23 +136,22 @@ export function ProductFormModal({ open, onClose, product }: Props) {
             <FormField label="Product Name" error={errors.name?.message} required>
               <Input {...register('name')} placeholder="e.g. T-Shirt Basic" />
             </FormField>
-            <FormField label="SKU" error={errors.sku?.message} required>
-              <Input {...register('sku')} placeholder="e.g. TSH-001" />
-            </FormField>
+            {isEditing && product?.sku_code && (
+              <FormField label="SKU (auto-generated)">
+                <div className="flex h-9 items-center rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground">
+                  {product.sku_code}
+                </div>
+              </FormField>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <FormField label="Category" error={errors.category?.message} required>
-              <Select
-                value={watch('category')}
-                onValueChange={(v) => setValue('category', v, { shouldValidate: true })}
-              >
-                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <FormField label="Category" error={errors.category_id?.message} required>
+              <CategorySelect
+                value={watch('category_id') ?? ''}
+                onChange={(id) => setValue('category_id', id, { shouldValidate: true })}
+                error={errors.category_id?.message}
+                required
+              />
             </FormField>
           </div>
           <FormField label="Description" error={errors.description?.message} required>

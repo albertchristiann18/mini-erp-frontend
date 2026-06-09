@@ -2,6 +2,7 @@ export interface Category {
   id: string
   company: string
   name: string
+  category_code: string
   description: string
   is_active: boolean
   master_category_key?: string

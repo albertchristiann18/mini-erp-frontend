@@ -4,6 +4,9 @@ import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Ware
 export const getCategories = () =>
   client.get<PaginatedResponse<Category>>('/category/')
 
+export const createCategory = (data: unknown) =>
+  client.post<Category>('/category/', data)
+
 export const getProducts = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Product>>('/product/', { params })
 

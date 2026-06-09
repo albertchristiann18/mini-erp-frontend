@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getCategories, getProducts, createProduct, updateProduct,
+  getCategories, createCategory, getProducts, createProduct, updateProduct,
   getProductVariants, getProductVariantStocks, getWarehouses, createWarehouse, updateWarehouse,
   getStockMovements, getMasterCategories,
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
@@ -16,6 +16,14 @@ export const useCategories = () =>
     queryFn: () => getCategories().then(r => r.data),
     staleTime: 1000 * 60 * 10,
   })
+
+export const useCreateCategory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: unknown) => createCategory(data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  })
+}
 
 export const useProducts = (page = 1, pageSize = 20, search?: string) => {
   const params: Record<string, string | number> = { page, page_size: pageSize }
