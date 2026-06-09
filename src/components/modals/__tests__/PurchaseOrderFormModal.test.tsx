@@ -7,6 +7,7 @@ import { PurchaseOrderFormModal } from '../PurchaseOrderFormModal'
 
 vi.mock('../../../hooks/useInventory', () => ({
   useWarehouses: () => ({ data: { results: [{ id: 'w1', name: 'Main WH' }] } }),
+  useSuppliers: () => ({ data: { results: [{ id: 'sup1', name: 'Supplier A' }] } }),
 }))
 
 vi.mock('../../../hooks/usePurchasing', () => ({

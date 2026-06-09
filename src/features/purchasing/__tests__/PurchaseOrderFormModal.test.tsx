@@ -66,6 +66,15 @@ vi.mock('../../../hooks/useInventory', () => ({
       ],
     },
   }),
+  useSuppliers: () => ({
+    data: {
+      count: 2,
+      results: [
+        { id: 'sup1', name: 'Supplier A' },
+        { id: 'sup2', name: 'Supplier B' },
+      ],
+    },
+  }),
 }))
 
 vi.mock('../../../lib/toast', () => ({
@@ -133,4 +142,16 @@ it('shows stock intel strip with SOH, AVG, DOI when variant is selected', async 
   expect(screen.getByText(/Incoming:/)).toBeInTheDocument()
   expect(screen.getByText(/AVG/)).toBeInTheDocument()
   expect(screen.getAllByText(/DOI:/).length).toBeGreaterThanOrEqual(1)
+})
+
+it('test_supplier_dropdown_renders', async () => {
+  renderModal()
+  expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+  expect(screen.getByText('Supplier')).toBeInTheDocument()
+})
+
+it('test_supplier_filters_variants', async () => {
+  renderModal()
+  expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+  expect(screen.getAllByText('No supplier').length).toBeGreaterThanOrEqual(1)
 })

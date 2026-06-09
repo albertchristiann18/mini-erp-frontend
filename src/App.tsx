@@ -38,6 +38,7 @@ const TikTokWebhookLogPage = lazy(() => import('./pages/tiktok/TikTokWebhookLogP
 const StockClosingPage = lazy(() => import('./pages/inventory/StockClosingPage'))
 const InventoryDashboardPage = lazy(() => import('./pages/dashboard/InventoryDashboardPage'))
 const BulkStockUpdatePage = lazy(() => import('./pages/inventory/BulkStockUpdatePage'))
+const SuppliersPage = lazy(() => import('./pages/purchasing/SuppliersPage'))
 
 const Loading = () => (
   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -69,10 +70,11 @@ export default function App() {
                   <Route path="purchasing">
                     <Route path="orders" element={<Suspense fallback={<Loading />}><PurchaseOrdersPage /></Suspense>} />
                     <Route path="orders/:id" element={<Suspense fallback={<Loading />}><PurchaseOrderDetailPage /></Suspense>} />
-                    <Route
-                      path="replenishment"
-                      element={<Suspense fallback={<Loading />}><ReplenishmentPage /></Suspense>}
-                    />
+                  <Route
+                    path="replenishment"
+                    element={<Suspense fallback={<Loading />}><ReplenishmentPage /></Suspense>}
+                  />
+                  <Route path="suppliers" element={<Suspense fallback={<Loading />}><SuppliersPage /></Suspense>} />
                   </Route>
                   <Route path="sales">
                     <Route

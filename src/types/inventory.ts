@@ -152,6 +152,31 @@ export interface InventorySummaryWarehouse {
   name: string
 }
 
+export interface Supplier {
+  id: string
+  name: string
+  contact_name: string | null
+  phone: string | null
+  country: string | null
+  notes: string | null
+  supplier_link: string | null
+  is_active: boolean
+  company_id: string
+  cdate: string
+  udate: string
+}
+
+export interface ProductVariantSupplier {
+  id: string
+  supplier_id: string
+  supplier_name: string
+  supplier_link: string | null
+  is_primary: boolean
+  notes: string | null
+  cdate: string
+  udate: string
+}
+
 export interface InventorySummaryResponse {
   warehouses: InventorySummaryWarehouse[]
   products: InventorySummaryProduct[]

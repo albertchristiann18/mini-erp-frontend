@@ -35,6 +35,7 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Purchase Orders', to: '/purchasing/orders' },
       { label: 'Replenishment', to: '/purchasing/replenishment' },
+      { label: 'Suppliers', to: '/purchasing/suppliers' },
     ],
   },
   {

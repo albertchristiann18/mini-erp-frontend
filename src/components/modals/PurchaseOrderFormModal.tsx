@@ -9,7 +9,7 @@ import { FormField } from '../ui/form'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useWarehouses } from '../../hooks/useInventory'
+import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
 import { useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
 import type { ReplenishmentItem } from '../../types/purchasing'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
@@ -26,6 +26,7 @@ const itemSchema = z.object({
 })
 
 const schema = z.object({
+  supplier_id: z.string().optional(),
   warehouse_id: z.string().min(1, 'Warehouse is required'),
   currency: z.string().optional(),
   exchange_rate: z.number().positive('Must be > 0').optional(),
@@ -41,6 +42,7 @@ interface Props {
 export function PurchaseOrderFormModal({ open, onClose }: Props) {
   const navigate = useNavigate()
   const { data: warehousesData } = useWarehouses()
+  const { data: suppliersData } = useSuppliers({ active_only: 'true' })
   const createMutation = useCreatePurchaseOrder((id) => {
     toast.success('Purchase order created')
     onClose()
@@ -49,7 +51,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
 
   const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined }] },
+    defaultValues: { supplier_id: '', currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined }] },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'order_details' })
@@ -76,6 +78,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
           : {}),
       }))
     }
+    if (!payload.supplier_id) delete payload.supplier_id
     if (!payload.currency) delete payload.currency
     if (!payload.exchange_rate) delete payload.exchange_rate
     try {
@@ -86,6 +89,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   }
 
   const warehouses = warehousesData?.results ?? []
+  const suppliers = suppliersData?.results ?? []
   const watchedItems = watch('order_details')
   const currencySymbols: Record<string, string> = {
     CNY: '¥', USD: '$', EUR: '€', SGD: 'S$', MYR: 'RM', IDR: 'Rp',
@@ -125,7 +129,21 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
           <DialogTitle>New Purchase Order</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-4 gap-3">
+            <FormField label="Supplier">
+              <Select
+                value={watch('supplier_id') ?? ''}
+                onValueChange={(v) => setValue('supplier_id', v || undefined)}
+              >
+                <SelectTrigger><SelectValue placeholder="No supplier" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No supplier</SelectItem>
+                  {suppliers.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
             <FormField label="Warehouse" error={errors.warehouse_id?.message} required>
               <Select
                 value={watch('warehouse_id')}
@@ -240,6 +258,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                                 setValue(`order_details.${i}.product_supplier_link`, productSupplierLink)
                               }}
                               placeholder="Select variant"
+                              supplierId={watch('supplier_id')}
                             />
                           </FormField>
                           <FormField label={''} error={errors.order_details?.[i]?.ordered_qty?.message}>

@@ -1,5 +1,5 @@
 import client from './client'
-import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse } from '../types/inventory'
+import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductVariantSupplier } from '../types/inventory'
 
 export const getCategories = () =>
   client.get<PaginatedResponse<Category>>('/category/')
@@ -89,3 +89,27 @@ export const updateVariantPrice = (productId: string, variantId: string, basePri
     `/product/${productId}/update_variant_price/${variantId}/`,
     { base_price: basePrice }
   )
+
+export const getSuppliers = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<Supplier>>('/suppliers/', { params })
+
+export const createSupplier = (data: unknown) =>
+  client.post<Supplier>('/suppliers/', data)
+
+export const updateSupplier = (id: string, data: unknown) =>
+  client.patch<Supplier>(`/suppliers/${id}/`, data)
+
+export const deleteSupplier = (id: string) =>
+  client.delete(`/suppliers/${id}/`)
+
+export const getVariantSuppliers = (params?: Record<string, string>) =>
+  client.get<PaginatedResponse<ProductVariantSupplier>>('/variant-suppliers/', { params })
+
+export const createVariantSupplier = (data: unknown) =>
+  client.post<ProductVariantSupplier>('/variant-suppliers/', data)
+
+export const updateVariantSupplier = (id: string, data: unknown) =>
+  client.patch<ProductVariantSupplier>(`/variant-suppliers/${id}/`, data)
+
+export const deleteVariantSupplier = (id: string) =>
+  client.delete(`/variant-suppliers/${id}/`)
