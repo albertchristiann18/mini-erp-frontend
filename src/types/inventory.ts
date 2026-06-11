@@ -10,6 +10,18 @@ export interface Category {
   udate: string
 }
 
+export interface VariantDimensionValue {
+  id: string
+  label: string
+}
+
+export interface VariantDimension {
+  id: string
+  name: string
+  order: number
+  values: VariantDimensionValue[]
+}
+
 export interface ProductPhoto {
   id: string
   image_url: string | null
@@ -33,10 +45,11 @@ export interface Product {
   height: number
   weight: number
   is_active: boolean
-  supplier_link: string | null
+  specifications?: Record<string, string>
   master_category_key: string | null
   photos?: ProductPhoto[]
   variants?: ProductVariant[]
+  variant_options?: Record<string, string[]>
   cdate: string
   udate: string
 }
@@ -52,9 +65,11 @@ export interface ProductVariant {
   product_supplier_link: string | null
   product_photo_url: string | null
   base_price: number
+  current_cogs?: number
   total_available_qty: number
   total_incoming_qty: number
   is_active: boolean
+  variant_values?: Record<string, string>
   marketplace_listings?: Array<{
     marketplace_id: string
     selling_price: number
@@ -163,6 +178,15 @@ export interface Supplier {
   supplier_link: string | null
   is_active: boolean
   company_id: string
+  cdate: string
+  udate: string
+}
+
+export interface ProductSupplier {
+  id: string
+  supplier_id: string
+  supplier_name: string
+  supplier_link: string | null
   cdate: string
   udate: string
 }

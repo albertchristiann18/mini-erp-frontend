@@ -24,12 +24,12 @@ function renderModal(open = true, product?: Record<string, unknown>) {
   )
 }
 
-it('renders supplier link field', () => {
+it('does NOT render supplier link field', () => {
   renderModal()
-  expect(screen.getByPlaceholderText('https://...')).toBeInTheDocument()
+  expect(screen.queryByPlaceholderText('https://...')).not.toBeInTheDocument()
 })
 
-it('populates supplier link when editing', () => {
+it('does NOT populate supplier link when editing', () => {
   const product = {
     id: 'p1',
     name: 'Test Product',
@@ -45,10 +45,9 @@ it('populates supplier link when editing', () => {
     height: 0,
     weight: 0,
     is_active: true,
-    supplier_link: 'https://supplier.example.com/product/123',
     cdate: '',
     udate: '',
   }
   renderModal(true, product)
-  expect(screen.getByDisplayValue('https://supplier.example.com/product/123')).toBeInTheDocument()
+  expect(screen.queryByDisplayValue('https://supplier.example.com/product/123')).not.toBeInTheDocument()
 })

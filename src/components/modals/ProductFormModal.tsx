@@ -23,7 +23,6 @@ const schema = z.object({
   variant_sku: z.string().optional(),
   selling_price: z.number().optional(),
   is_active: z.boolean().optional(),
-  supplier_link: z.string().url('Must be a valid URL').optional().or(z.literal('')),
   weight: z.number().int().min(0).optional(),
   length: z.number().int().min(0).optional(),
   width: z.number().int().min(0).optional(),
@@ -59,7 +58,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
       setValue('category_id', product.category_id)
       setValue('description', product.description)
       setValue('is_active', product.is_active)
-      setValue('supplier_link', product.supplier_link ?? '')
       setValue('weight', product.weight ?? 0)
       setValue('length', product.length ?? 0)
       setValue('width', product.width ?? 0)
@@ -85,7 +83,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
             description: values.description,
             category_id: values.category_id,
             is_active: values.is_active,
-            supplier_link: values.supplier_link || null,
             weight: values.weight ?? 0,
             length: values.length ?? 0,
             width: values.width ?? 0,
@@ -104,7 +101,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
       description: values.description,
       category_id: values.category_id,
       company_id: user?.company_id,
-      supplier_link: values.supplier_link || null,
       weight: values.weight ?? 0,
       length: values.length ?? 0,
       width: values.width ?? 0,
@@ -159,13 +155,6 @@ export function ProductFormModal({ open, onClose, product }: Props) {
             <p className="text-xs text-muted-foreground mt-1">
               {watch('description')?.length || 0}/25 minimum characters
             </p>
-          </FormField>
-          <FormField label="Supplier Link" error={errors.supplier_link?.message}>
-            <Input
-              {...register('supplier_link')}
-              placeholder="https://..."
-              type="url"
-            />
           </FormField>
           <div className="grid grid-cols-4 gap-3">
             <FormField label="Length (cm)" error={errors.length?.message}>

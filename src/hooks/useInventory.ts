@@ -6,7 +6,10 @@ import {
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getVariantSuppliers, createVariantSupplier, updateVariantSupplier, deleteVariantSupplier,
+  getProductSuppliers, createProductSupplier, deleteProductSupplier,
+  saveVariants,
 } from '../api/inventory'
+import type { SaveVariantsPayload } from '../api/inventory'
 import client from '../api/client'
 import type { Product } from '../types/inventory'
 
@@ -266,5 +269,40 @@ export const useDeleteVariantSupplier = () => {
   return useMutation({
     mutationFn: (id: string) => deleteVariantSupplier(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['variant-suppliers'] }),
+  })
+}
+
+export const useProductSuppliers = (productId: string) =>
+  useQuery({
+    queryKey: ['product-suppliers', productId],
+    queryFn: () => getProductSuppliers({ product_id: productId }).then(r => r.data),
+    enabled: !!productId,
+  })
+
+export const useCreateProductSupplier = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { supplier_id: string; supplier_link?: string | null }) =>
+      createProductSupplier({ product_id: productId, ...data }).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-suppliers', productId] }),
+  })
+}
+
+export const useDeleteProductSupplier = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteProductSupplier(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-suppliers', productId] }),
+  })
+}
+
+export const useSaveVariants = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: SaveVariantsPayload) => saveVariants(productId, data).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['product', productId] })
+      qc.invalidateQueries({ queryKey: ['products'] })
+    },
   })
 }

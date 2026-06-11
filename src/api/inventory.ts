@@ -1,5 +1,5 @@
 import client from './client'
-import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductVariantSupplier } from '../types/inventory'
+import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductSupplier, ProductVariantSupplier } from '../types/inventory'
 
 export const getCategories = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Category>>('/category/', { params })
@@ -119,3 +119,35 @@ export const updateVariantSupplier = (id: string, data: unknown) =>
 
 export const deleteVariantSupplier = (id: string) =>
   client.delete(`/variant-suppliers/${id}/`)
+
+export interface SaveVariantItem {
+  id?: string
+  variant_values: Record<string, string>
+  sku_variant_code: string
+  base_price: number
+}
+
+export interface SaveVariantsPayload {
+  variant_options: Record<string, string[]>
+  variants: SaveVariantItem[]
+}
+
+export interface SaveVariantsResult {
+  product_id: string
+  created: number
+  updated: number
+  deactivated: string[]
+  kept_with_stock: string[]
+}
+
+export const saveVariants = (productId: string, data: SaveVariantsPayload) =>
+  client.post<SaveVariantsResult>(`/product/${productId}/save_variants/`, data)
+
+export const getProductSuppliers = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<ProductSupplier>>('/product-suppliers/', { params })
+
+export const createProductSupplier = (data: { product_id: string; supplier_id: string; supplier_link?: string | null }) =>
+  client.post<ProductSupplier>('/product-suppliers/', data)
+
+export const deleteProductSupplier = (id: string) =>
+  client.delete(`/product-suppliers/${id}/`)
