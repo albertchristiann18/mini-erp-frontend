@@ -5,7 +5,6 @@ import {
   getStockMovements, getMasterCategories,
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
-  getVariantSuppliers, createVariantSupplier, updateVariantSupplier, deleteVariantSupplier,
   getProductSuppliers, createProductSupplier, deleteProductSupplier,
   saveVariants,
 } from '../api/inventory'
@@ -238,37 +237,6 @@ export const useDeleteSupplier = () => {
   return useMutation({
     mutationFn: (id: string) => deleteSupplier(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
-  })
-}
-
-export const useVariantSuppliers = (productVariantId: string) =>
-  useQuery({
-    queryKey: ['variant-suppliers', productVariantId],
-    queryFn: () => getVariantSuppliers({ product_variant_id: productVariantId }).then(r => r.data),
-    enabled: !!productVariantId,
-  })
-
-export const useCreateVariantSupplier = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: unknown) => createVariantSupplier(data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['variant-suppliers'] }),
-  })
-}
-
-export const useUpdateVariantSupplier = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: unknown }) => updateVariantSupplier(id, data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['variant-suppliers'] }),
-  })
-}
-
-export const useDeleteVariantSupplier = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => deleteVariantSupplier(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['variant-suppliers'] }),
   })
 }
 

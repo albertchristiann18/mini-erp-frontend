@@ -190,18 +190,6 @@ export interface ProductSupplier {
   cdate: string
   udate: string
 }
-
-export interface ProductVariantSupplier {
-  id: string
-  supplier_id: string
-  supplier_name: string
-  supplier_link: string | null
-  is_primary: boolean
-  notes: string | null
-  cdate: string
-  udate: string
-}
-
 export interface InventorySummaryResponse {
   warehouses: InventorySummaryWarehouse[]
   products: InventorySummaryProduct[]

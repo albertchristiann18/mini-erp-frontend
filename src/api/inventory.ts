@@ -1,5 +1,5 @@
 import client from './client'
-import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductSupplier, ProductVariantSupplier } from '../types/inventory'
+import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductSupplier } from '../types/inventory'
 
 export const getCategories = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Category>>('/category/', { params })
@@ -107,18 +107,6 @@ export const updateSupplier = (id: string, data: unknown) =>
 
 export const deleteSupplier = (id: string) =>
   client.delete(`/suppliers/${id}/`)
-
-export const getVariantSuppliers = (params?: Record<string, string>) =>
-  client.get<PaginatedResponse<ProductVariantSupplier>>('/variant-suppliers/', { params })
-
-export const createVariantSupplier = (data: unknown) =>
-  client.post<ProductVariantSupplier>('/variant-suppliers/', data)
-
-export const updateVariantSupplier = (id: string, data: unknown) =>
-  client.patch<ProductVariantSupplier>(`/variant-suppliers/${id}/`, data)
-
-export const deleteVariantSupplier = (id: string) =>
-  client.delete(`/variant-suppliers/${id}/`)
 
 export interface SaveVariantItem {
   id?: string
