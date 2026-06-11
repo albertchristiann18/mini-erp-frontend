@@ -38,6 +38,7 @@ const TikTokWebhookLogPage = lazy(() => import('./pages/tiktok/TikTokWebhookLogP
 const StockClosingPage = lazy(() => import('./pages/inventory/StockClosingPage'))
 const InventoryDashboardPage = lazy(() => import('./pages/dashboard/InventoryDashboardPage'))
 const BulkStockUpdatePage = lazy(() => import('./pages/inventory/BulkStockUpdatePage'))
+const ProductEditPage = lazy(() => import('./pages/inventory/ProductEditPage'))
 const CategoriesPage = lazy(() => import('./pages/inventory/CategoriesPage'))
 const SuppliersPage = lazy(() => import('./pages/purchasing/SuppliersPage'))
 
@@ -61,6 +62,8 @@ export default function App() {
                   <Route index element={<Suspense fallback={<Loading />}><DashboardPage /></Suspense>} />
                   <Route path="inventory">
                     <Route path="products" element={<Suspense fallback={<Loading />}><ProductsPage /></Suspense>} />
+                    <Route path="products/new" element={<Suspense fallback={<Loading />}><ProductEditPage /></Suspense>} />
+                    <Route path="products/:id/edit" element={<Suspense fallback={<Loading />}><ProductEditPage /></Suspense>} />
                     <Route path="products/:id" element={<Suspense fallback={<Loading />}><ProductDetailPage /></Suspense>} />
                     <Route path="stock" element={<Suspense fallback={<Loading />}><StockPage /></Suspense>} />
                     <Route path="warehouses" element={<Suspense fallback={<Loading />}><WarehousesPage /></Suspense>} />

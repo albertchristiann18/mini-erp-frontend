@@ -7,7 +7,6 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
-import { ProductFormModal } from '../../components/modals/ProductFormModal'
 import { BulkProductModal } from '../../components/modals/BulkProductModal'
 import { Plus, Upload, Pencil, Eye } from 'lucide-react'
 import type { Product } from '../../types/inventory'
@@ -17,25 +16,13 @@ export default function ProductsPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [showModal, setShowModal] = useState(false)
   const [showBulkModal, setShowBulkModal] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
   const { data, isLoading } = useProducts(page, 20, search || undefined)
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
-  const handleEdit = (product: Product) => {
-    setEditingProduct(product)
-    setShowModal(true)
-  }
-
   const handleView = (product: Product) => {
-    navigate(`/products/${product.id}`)
-  }
-
-  const handleCloseModal = () => {
-    setShowModal(false)
-    setEditingProduct(null)
+    navigate(`/inventory/products/${product.id}`)
   }
 
   return (
@@ -55,7 +42,7 @@ export default function ProductsPage() {
             <Button size="sm" variant="outline" onClick={() => setShowBulkModal(true)}>
               <Upload className="h-4 w-4 mr-1" /> Bulk Import
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)}>
+            <Button size="sm" onClick={() => navigate('/inventory/products/new')}>
               <Plus className="h-4 w-4 mr-1" /> New Product
             </Button>
           </div>
@@ -100,7 +87,7 @@ export default function ProductsPage() {
                         size="icon"
                         variant="ghost"
                         className="h-8 w-8"
-                        onClick={() => handleEdit(p)}
+                        onClick={() => navigate(`/inventory/products/${p.id}/edit`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -113,7 +100,6 @@ export default function ProductsPage() {
         </Table>
       </div>
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
-      <ProductFormModal open={showModal} onClose={handleCloseModal} product={editingProduct} />
       <BulkProductModal open={showBulkModal} onClose={() => setShowBulkModal(false)} />
     </div>
   )
