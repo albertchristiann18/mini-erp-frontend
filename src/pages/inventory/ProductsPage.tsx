@@ -9,13 +9,20 @@ import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
 import { BulkProductModal } from '../../components/modals/BulkProductModal'
-import { Plus, Upload, Pencil, Eye } from 'lucide-react'
+import { Plus, Upload, Pencil, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import type { Product } from '../../types/inventory'
+
+function SortIcon({ col, ordering }: { col: 'name' | 'sku_code', ordering: string }) {
+  if (ordering === col) return <ArrowUp className="h-3.5 w-3.5 ml-1 inline" />
+  if (ordering === `-${col}`) return <ArrowDown className="h-3.5 w-3.5 ml-1 inline" />
+  return <ArrowUpDown className="h-3 w-3 ml-1 inline opacity-40" />
+}
 
 export default function ProductsPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [ordering, setOrdering] = useState<string>('')
@@ -29,16 +36,27 @@ export default function ProductsPage() {
     navigate(`/inventory/products/${product.id}`)
   }
 
+  const handleSearch = () => { setSearch(searchInput); setPage(1) }
+
+  const handleSortHeader = (col: 'name' | 'sku_code') => {
+    setOrdering(prev => prev === col ? `-${col}` : prev === `-${col}` ? '' : col)
+    setPage(1)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-wrap">
-          <Input
-            placeholder="Search by name or SKU..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1) }}
-            className="max-w-[300px]"
-          />
+          <div className="flex items-center gap-1">
+            <Input
+              placeholder="Search by name or SKU..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              className="w-[280px]"
+            />
+            <Button variant="outline" size="sm" onClick={handleSearch}>Search</Button>
+          </div>
           <Select
             value={categoryFilter || '__all'}
             onValueChange={v => { setCategoryFilter(v === '__all' ? '' : v); setPage(1) }}
@@ -51,21 +69,6 @@ export default function ProductsPage() {
               {categoriesData?.results?.map(c => (
                 <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={ordering || '__default'}
-            onValueChange={v => { setOrdering(v === '__default' ? '' : v); setPage(1) }}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Sort by..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__default">Default</SelectItem>
-              <SelectItem value="name">Name A→Z</SelectItem>
-              <SelectItem value="-name">Name Z→A</SelectItem>
-              <SelectItem value="sku_code">SKU A→Z</SelectItem>
-              <SelectItem value="-sku_code">SKU Z→A</SelectItem>
             </SelectContent>
           </Select>
           <span className="text-sm text-muted-foreground whitespace-nowrap">{data?.count ?? 0} products</span>
@@ -85,8 +88,12 @@ export default function ProductsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>SKU</TableHead>
+              <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => handleSortHeader('name')}>
+                Name <SortIcon col="name" ordering={ordering} />
+              </TableHead>
+              <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => handleSortHeader('sku_code')}>
+                SKU <SortIcon col="sku_code" ordering={ordering} />
+              </TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>

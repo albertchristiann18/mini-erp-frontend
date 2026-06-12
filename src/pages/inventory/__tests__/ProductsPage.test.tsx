@@ -70,13 +70,12 @@ function renderPage() {
   )
 }
 
-it('renders search input, category select, sort select', () => {
+it('renders search input and category select', () => {
   setupMocks()
   renderPage()
 
   expect(screen.getByPlaceholderText('Search by name or SKU...')).toBeInTheDocument()
-  const comboboxes = screen.getAllByRole('combobox')
-  expect(comboboxes).toHaveLength(2)
+  screen.getByRole('combobox')
 })
 
 it('selecting a category calls useProducts with the correct category id', async () => {
@@ -96,24 +95,64 @@ it('selecting a category calls useProducts with the correct category id', async 
   })
 })
 
-it('changing sort calls useProducts with the correct ordering value', async () => {
+it('clicking Name header sorts ascending, then descending, then clears', async () => {
   setupMocks()
   renderPage()
 
+  const nameHeader = screen.getByText('Name')
+
   vi.mocked(useProducts).mockClear()
 
-  const comboboxes = screen.getAllByRole('combobox')
-  await userEvent.click(comboboxes[1])
-  await userEvent.click(screen.getByRole('option', { name: /^name a→z$/i }))
+  await userEvent.click(nameHeader)
 
   await waitFor(() => {
     const calls = vi.mocked(useProducts).mock.calls
     const lastCall = calls[calls.length - 1]
     expect(lastCall[4]).toBe('name')
   })
+
+  vi.mocked(useProducts).mockClear()
+  await userEvent.click(nameHeader)
+
+  await waitFor(() => {
+    const calls = vi.mocked(useProducts).mock.calls
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall[4]).toBe('-name')
+  })
+
+  vi.mocked(useProducts).mockClear()
+  await userEvent.click(nameHeader)
+
+  await waitFor(() => {
+    const calls = vi.mocked(useProducts).mock.calls
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall[4]).toBeUndefined()
+  })
 })
 
-it('changing any filter resets page to 1', async () => {
+it('search only queries on Enter or button click', async () => {
+  setupMocks()
+  renderPage()
+
+  vi.mocked(useProducts).mockClear()
+
+  const input = screen.getByPlaceholderText('Search by name or SKU...')
+  await userEvent.type(input, 'test-product')
+
+  const callsAfterType = vi.mocked(useProducts).mock.calls
+  const lastAfterType = callsAfterType[callsAfterType.length - 1]
+  expect(lastAfterType[2]).toBeUndefined()
+
+  await userEvent.keyboard('{Enter}')
+
+  await waitFor(() => {
+    const calls = vi.mocked(useProducts).mock.calls
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall[2]).toBe('test-product')
+  })
+})
+
+it('changing category resets page to 1', async () => {
   setupMocks()
   renderPage()
 
