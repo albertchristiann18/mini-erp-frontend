@@ -158,6 +158,7 @@ export default function ProductEditPage() {
         height: product.height ?? 0,
       })
       setBrand(product.specifications?.Merek ?? product.specifications?.Brand ?? '')
+      setPhotos(product.photos ?? [])
       const dims = initializeDimensions(product)
       const initialRows = initializeRows(product)
       setDimensions(dims)

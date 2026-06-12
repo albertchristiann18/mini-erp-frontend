@@ -95,7 +95,6 @@ export default function ProductDetailPage() {
   }
 
   const activeVariants = variants.filter(v => v.is_active)
-  const specEntries = Object.entries(product.specifications ?? {})
   const marketplaceIds = [...new Set(
     variants.flatMap(v => (v.marketplace_listings ?? []).map(l => l.marketplace_id))
   )]
@@ -139,7 +138,10 @@ export default function ProductDetailPage() {
                 ? `${product.length} × ${product.width} × ${product.height} cm`
                 : '—'}</div>
             {product.description && (
-              <div><span className="text-muted-foreground">Description: </span>{product.description}</div>
+              <div>
+                <span className="text-muted-foreground">Description:</span>
+                <p className="mt-1 whitespace-pre-line">{product.description}</p>
+              </div>
             )}
           </div>
         </div>
@@ -165,27 +167,6 @@ export default function ProductDetailPage() {
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* C. PRODUCT SPECIFICATIONS */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-4 border-b font-semibold">Product Specifications</div>
-        <div className="p-4">
-          {specEntries.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No specifications</p>
-          ) : (
-            <table className="w-full text-sm">
-              <tbody className="divide-y">
-                {specEntries.map(([key, val]) => (
-                  <tr key={key}>
-                    <td className="py-2 pr-4 text-muted-foreground w-40">{key}</td>
-                    <td className="py-2">{val}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
         </div>
       </div>
 
