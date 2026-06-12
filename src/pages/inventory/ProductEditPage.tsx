@@ -766,9 +766,9 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
                       <th key={d.id} className="text-left px-4 py-3 font-medium">{d.name}</th>
                     ))}
                     <th className="text-left px-4 py-3 font-medium">SKU</th>
-                    <th className="px-4 py-3 font-medium w-40">Price</th>
-                    <th className="px-4 py-3 font-medium text-muted-foreground">Stock</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="text-left px-4 py-3 font-medium w-40">Price</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
+                    <th className="text-left px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 w-16"></th>
                   </tr>
                 </thead>
