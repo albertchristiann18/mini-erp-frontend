@@ -163,7 +163,10 @@ export default function MarketplaceReconcilePage() {
                   <tbody>
                     {previewData.reconciled.map((row, i) => (
                       <tr key={i} className="border-b">
-                        <td className="p-2 font-mono text-xs">{row.sku}</td>
+                        <td className="p-2">
+                          <div className="font-mono text-xs">{row.sku}</div>
+                          <div className="text-xs text-muted-foreground">{row.product_name}.{row.variant_name}</div>
+                        </td>
                         <td className="p-2 text-right tabular-nums">{row.before}</td>
                         <td className="p-2 text-right tabular-nums">{row.after}</td>
                         <td className={`p-2 text-right tabular-nums font-medium ${(row.delta ?? 0) > 0 ? 'text-green-600 dark:text-green-400' : (row.delta ?? 0) < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>

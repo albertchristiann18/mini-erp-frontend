@@ -185,6 +185,8 @@ export interface ReconcileRow {
   after?: number
   delta?: number
   qty?: number
+  product_name?: string
+  variant_name?: string
 }
 
 export interface ReconcileResult {
@@ -202,6 +204,6 @@ export interface ReconcileResult {
 }
 
 export const marketplaceReconcileStock = (formData: FormData) =>
-  client.post<ReconcileResult>('/inventory/inventory/marketplace_reconcile/', formData, {
+  client.post<ReconcileResult>('/inventory/marketplace_reconcile/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
