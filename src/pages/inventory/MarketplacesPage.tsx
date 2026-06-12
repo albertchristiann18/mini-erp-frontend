@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Search, Plus, Pencil } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useMarketplaces, useCreateMarketplace, useUpdateMarketplace } from '../../hooks/useInventory'
+import { useCompanyMarketplaces, useCreateCompanyMarketplace, useUpdateCompanyMarketplace, useDeleteCompanyMarketplace } from '../../hooks/useInventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -9,7 +9,7 @@ import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { toast } from '../../lib/toast'
-import type { Marketplace } from '../../types/inventory'
+import type { CompanyMarketplace } from '../../types/inventory'
 
 export default function MarketplacesPage() {
   const { user } = useAuth()
@@ -17,30 +17,29 @@ export default function MarketplacesPage() {
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState<Marketplace | undefined>()
+  const [editing, setEditing] = useState<CompanyMarketplace | undefined>()
   const [formName, setFormName] = useState('')
-  const [formUrl, setFormUrl] = useState('')
   const [formActive, setFormActive] = useState(true)
+  const [deleteConfirm, setDeleteConfirm] = useState<CompanyMarketplace | undefined>()
 
   const params: Record<string, string | number> = { page, page_size: 20 }
   if (search) params.search = search
-  const { data, isLoading } = useMarketplaces(params)
-  const createMutation = useCreateMarketplace()
-  const updateMutation = useUpdateMarketplace()
+  const { data, isLoading } = useCompanyMarketplaces(params)
+  const createMutation = useCreateCompanyMarketplace()
+  const updateMutation = useUpdateCompanyMarketplace()
+  const deleteMutation = useDeleteCompanyMarketplace()
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   const openCreate = () => {
     setEditing(undefined)
     setFormName('')
-    setFormUrl('')
     setFormActive(true)
     setShowModal(true)
   }
 
-  const openEdit = (m: Marketplace) => {
+  const openEdit = (m: CompanyMarketplace) => {
     setEditing(m)
     setFormName(m.name)
-    setFormUrl(m.url ?? '')
     setFormActive(m.is_active)
     setShowModal(true)
   }
@@ -51,16 +50,31 @@ export default function MarketplacesPage() {
       if (editing) {
         await updateMutation.mutateAsync({
           id: editing.id,
-          data: { name: formName.trim(), url: formUrl.trim() || undefined, is_active: formActive },
+          data: { name: formName.trim(), is_active: formActive },
         })
         toast.success('Marketplace updated')
       } else {
-        await createMutation.mutateAsync({ name: formName.trim(), url: formUrl.trim() || undefined, is_active: formActive })
+        await createMutation.mutateAsync({ name: formName.trim(), is_active: formActive })
         toast.success('Marketplace created')
       }
       setShowModal(false)
     } catch {
       toast.error('Failed to save marketplace')
+    }
+  }
+
+  const handleDelete = async (m: CompanyMarketplace) => {
+    try {
+      await deleteMutation.mutateAsync(m.id)
+      toast.success('Marketplace deleted')
+      setDeleteConfirm(undefined)
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      if (status === 409) {
+        toast.error('Cannot delete — business entities are using this marketplace')
+      } else {
+        toast.error('Failed to delete marketplace')
+      }
     }
   }
 
@@ -94,20 +108,18 @@ export default function MarketplacesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>URL</TableHead>
               <TableHead>Status</TableHead>
-              {user?.is_staff && <TableHead className="w-24" />}
+              {user?.is_staff && <TableHead className="w-32" />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
             ) : data?.results.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No marketplaces yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No marketplaces yet</TableCell></TableRow>
             ) : data?.results.map(m => (
               <TableRow key={m.id}>
                 <TableCell className="font-medium">{m.name}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{m.url || '—'}</TableCell>
                 <TableCell>
                   <Badge variant={m.is_active ? 'success' : 'secondary'}>
                     {m.is_active ? 'Active' : 'Inactive'}
@@ -118,6 +130,13 @@ export default function MarketplacesPage() {
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(m)}>
                         <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setDeleteConfirm(m)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -153,10 +172,6 @@ export default function MarketplacesPage() {
               <label className="text-sm font-medium">Name <span className="text-destructive">*</span></label>
               <Input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Marketplace name" />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">URL</label>
-              <Input value={formUrl} onChange={e => setFormUrl(e.target.value)} type="url" placeholder="https://example.com" />
-            </div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={formActive} onChange={e => setFormActive(e.target.checked)} className="rounded" />
               Active
@@ -166,6 +181,22 @@ export default function MarketplacesPage() {
             <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={!formName.trim() || createMutation.isPending || updateMutation.isPending}>
               {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(undefined) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete Marketplace</DialogTitle></DialogHeader>
+          <p className="text-sm">Delete {deleteConfirm?.name}? This cannot be undone.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirm(undefined)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
         </DialogContent>

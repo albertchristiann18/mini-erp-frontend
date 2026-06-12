@@ -168,13 +168,13 @@ export interface InventorySummaryWarehouse {
   name: string
 }
 
-export interface Marketplace {
+export interface CompanyMarketplace {
   id: string
+  company_id: string
   name: string
-  url: string | null
-  status: string | null
   is_active: boolean
-  connected_time: string | null
+  cdate: string
+  udate: string
 }
 
 export interface BusinessEntity {

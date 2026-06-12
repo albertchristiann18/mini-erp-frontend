@@ -7,7 +7,7 @@ import {
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getProductSuppliers, createProductSupplier, deleteProductSupplier,
   saveVariants, deleteCategory,
-  getMarketplaces, createMarketplace, updateMarketplace,
+  getCompanyMarketplaces, createCompanyMarketplace, updateCompanyMarketplace, deleteCompanyMarketplace,
   getBusinessEntities, createBusinessEntity,
   updateBusinessEntity, deleteBusinessEntity, getProductBusinessEntities,
   attachBusinessEntity, detachBusinessEntity,
@@ -276,28 +276,36 @@ export const useDeleteProductSupplier = (productId: string) => {
   })
 }
 
-export const useMarketplaces = (params?: Record<string, string | number>) =>
+export const useCompanyMarketplaces = (params?: Record<string, string | number>) =>
   useQuery({
-    queryKey: ['marketplaces', params],
-    queryFn: () => getMarketplaces({ page_size: 100, ...params }).then(r => r.data),
-    staleTime: 1000 * 60 * 10,
+    queryKey: ['company-marketplaces', params],
+    queryFn: () => getCompanyMarketplaces({ page_size: 100, ...params }).then(r => r.data),
+    staleTime: 1000 * 60 * 5,
   })
 
-export const useCreateMarketplace = () => {
+export const useCreateCompanyMarketplace = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; url?: string; is_active?: boolean }) =>
-      createMarketplace(data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketplaces'] }),
+    mutationFn: (data: { name: string; is_active?: boolean }) =>
+      createCompanyMarketplace(data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['company-marketplaces'] }),
   })
 }
 
-export const useUpdateMarketplace = () => {
+export const useUpdateCompanyMarketplace = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<{ name: string; url: string; is_active: boolean }> }) =>
-      updateMarketplace(id, data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketplaces'] }),
+    mutationFn: ({ id, data }: { id: string; data: Partial<{ name: string; is_active: boolean }> }) =>
+      updateCompanyMarketplace(id, data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['company-marketplaces'] }),
+  })
+}
+
+export const useDeleteCompanyMarketplace = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteCompanyMarketplace(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['company-marketplaces'] }),
   })
 }
 

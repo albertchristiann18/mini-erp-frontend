@@ -4,15 +4,17 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect } from 'vitest'
 import MarketplacesPage from '../MarketplacesPage'
 
-const mockUseMarketplaces = vi.fn()
-const mockUseCreateMarketplace = vi.fn()
-const mockUseUpdateMarketplace = vi.fn()
+const mockUseCompanyMarketplaces = vi.fn()
+const mockUseCreateCompanyMarketplace = vi.fn()
+const mockUseUpdateCompanyMarketplace = vi.fn()
+const mockUseDeleteCompanyMarketplace = vi.fn()
 const mockUseAuth = vi.fn()
 
 vi.mock('../../../hooks/useInventory', () => ({
-  useMarketplaces: (...args: unknown[]) => mockUseMarketplaces(...args),
-  useCreateMarketplace: (...args: unknown[]) => mockUseCreateMarketplace(...args),
-  useUpdateMarketplace: (...args: unknown[]) => mockUseUpdateMarketplace(...args),
+  useCompanyMarketplaces: (...args: unknown[]) => mockUseCompanyMarketplaces(...args),
+  useCreateCompanyMarketplace: (...args: unknown[]) => mockUseCreateCompanyMarketplace(...args),
+  useUpdateCompanyMarketplace: (...args: unknown[]) => mockUseUpdateCompanyMarketplace(...args),
+  useDeleteCompanyMarketplace: (...args: unknown[]) => mockUseDeleteCompanyMarketplace(...args),
 }))
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -31,15 +33,16 @@ function renderPage() {
 }
 
 const mockMarketplaces = [
-  { id: 'm1', name: 'Shopee', url: 'https://shopee.com', status: 'active', is_active: true, connected_time: null },
-  { id: 'm2', name: 'Tokopedia', url: null, status: 'active', is_active: true, connected_time: null },
+  { id: 'm1', company_id: 'c1', name: 'Shopee', is_active: true, cdate: '', udate: '' },
+  { id: 'm2', company_id: 'c1', name: 'Tokopedia', is_active: true, cdate: '', udate: '' },
 ]
 
 it('test_renders_list', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
-  mockUseMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null }, isLoading: false })
-  mockUseCreateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
-  mockUseUpdateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null }, isLoading: false })
+  mockUseCreateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseUpdateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -49,9 +52,10 @@ it('test_renders_list', () => {
 
 it('test_empty_state', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
-  mockUseMarketplaces.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null }, isLoading: false })
-  mockUseCreateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
-  mockUseUpdateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null }, isLoading: false })
+  mockUseCreateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseUpdateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -60,9 +64,10 @@ it('test_empty_state', () => {
 
 it('test_shows_new_button_for_staff', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
-  mockUseMarketplaces.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null }, isLoading: false })
-  mockUseCreateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
-  mockUseUpdateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null }, isLoading: false })
+  mockUseCreateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseUpdateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -71,11 +76,24 @@ it('test_shows_new_button_for_staff', () => {
 
 it('test_hides_new_button_for_non_staff', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: false } })
-  mockUseMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null }, isLoading: false })
-  mockUseCreateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
-  mockUseUpdateMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null }, isLoading: false })
+  mockUseCreateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseUpdateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
   expect(screen.queryByText('New Marketplace')).not.toBeInTheDocument()
+})
+
+it('test_shows_delete_button_for_staff', () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true } })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null }, isLoading: false })
+  mockUseCreateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseUpdateCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCompanyMarketplace.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+
+  const { container } = renderPage()
+
+  expect(container.querySelector('.lucide-trash2')).toBeInTheDocument()
 })

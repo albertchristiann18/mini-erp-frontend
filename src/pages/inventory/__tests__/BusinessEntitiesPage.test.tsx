@@ -5,14 +5,14 @@ import { vi, it, expect } from 'vitest'
 import BusinessEntitiesPage from '../BusinessEntitiesPage'
 
 const mockUseBusinessEntities = vi.fn()
-const mockUseMarketplaces = vi.fn()
+const mockUseCompanyMarketplaces = vi.fn()
 const mockUseCreateBusinessEntity = vi.fn()
 const mockUseUpdateBusinessEntity = vi.fn()
 const mockUseAuth = vi.fn()
 
 vi.mock('../../../hooks/useInventory', () => ({
   useBusinessEntities: (...args: unknown[]) => mockUseBusinessEntities(...args),
-  useMarketplaces: (...args: unknown[]) => mockUseMarketplaces(...args),
+  useCompanyMarketplaces: (...args: unknown[]) => mockUseCompanyMarketplaces(...args),
   useCreateBusinessEntity: (...args: unknown[]) => mockUseCreateBusinessEntity(...args),
   useUpdateBusinessEntity: (...args: unknown[]) => mockUseUpdateBusinessEntity(...args),
 }))
@@ -38,14 +38,14 @@ const mockEntities = [
 ]
 
 const mockMarketplaces = [
-  { id: 'm1', name: 'Shopee', url: null, status: null, is_active: true, connected_time: null },
-  { id: 'm2', name: 'Tokopedia', url: null, status: null, is_active: true, connected_time: null },
+  { id: 'm1', company_id: 'c1', name: 'Shopee', is_active: true, cdate: '', udate: '' },
+  { id: 'm2', company_id: 'c1', name: 'Tokopedia', is_active: true, cdate: '', udate: '' },
 ]
 
 it('test_renders_list', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
   mockUseBusinessEntities.mockReturnValue({ data: { results: mockEntities, count: 2, next: null, previous: null }, isLoading: false })
-  mockUseMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
   mockUseCreateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseUpdateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
@@ -58,7 +58,7 @@ it('test_renders_list', () => {
 it('test_empty_state', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
   mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null }, isLoading: false })
-  mockUseMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
   mockUseCreateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseUpdateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
@@ -70,7 +70,7 @@ it('test_empty_state', () => {
 it('test_shows_new_button_for_staff', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
   mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null }, isLoading: false })
-  mockUseMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
   mockUseCreateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseUpdateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
@@ -82,7 +82,7 @@ it('test_shows_new_button_for_staff', () => {
 it('test_hides_new_button_for_non_staff', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: false } })
   mockUseBusinessEntities.mockReturnValue({ data: { results: mockEntities, count: 2, next: null, previous: null }, isLoading: false })
-  mockUseMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
   mockUseCreateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseUpdateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
@@ -94,7 +94,7 @@ it('test_hides_new_button_for_non_staff', () => {
 it('test_loading_state', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
   mockUseBusinessEntities.mockReturnValue({ data: undefined, isLoading: true })
-  mockUseMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
+  mockUseCompanyMarketplaces.mockReturnValue({ data: { results: mockMarketplaces, count: 2, next: null, previous: null } })
   mockUseCreateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseUpdateBusinessEntity.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 

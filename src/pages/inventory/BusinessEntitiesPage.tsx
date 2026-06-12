@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search, Plus, Pencil } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useBusinessEntities, useMarketplaces, useCreateBusinessEntity, useUpdateBusinessEntity } from '../../hooks/useInventory'
+import { useBusinessEntities, useCompanyMarketplaces, useCreateBusinessEntity, useUpdateBusinessEntity } from '../../hooks/useInventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
@@ -26,7 +26,7 @@ export default function BusinessEntitiesPage() {
   const params: Record<string, string | number> = { page, page_size: 20 }
   if (search) params.search = search
   const { data, isLoading } = useBusinessEntities(params)
-  const { data: marketplaceData } = useMarketplaces({ page_size: 100 })
+  const { data: marketplaceData } = useCompanyMarketplaces({ page_size: 100 })
   const createMutation = useCreateBusinessEntity()
   const updateMutation = useUpdateBusinessEntity()
   const totalPages = data ? Math.ceil(data.count / 20) : 1

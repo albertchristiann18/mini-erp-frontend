@@ -1,5 +1,5 @@
 import client from './client'
-import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductSupplier, Marketplace, BusinessEntity, ProductBusinessEntity } from '../types/inventory'
+import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductSupplier, CompanyMarketplace, BusinessEntity, ProductBusinessEntity } from '../types/inventory'
 
 export const getCategories = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Category>>('/category/', { params })
@@ -143,14 +143,17 @@ export const createProductSupplier = (data: { product_id: string; supplier_id: s
 export const deleteProductSupplier = (id: string) =>
   client.delete(`/product-suppliers/${id}/`)
 
-export const getMarketplaces = (params?: Record<string, string | number>) =>
-  client.get<PaginatedResponse<Marketplace>>('/marketplace/', { params })
+export const getCompanyMarketplaces = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<CompanyMarketplace>>('/company-marketplaces/', { params })
 
-export const createMarketplace = (data: { name: string; url?: string; is_active?: boolean }) =>
-  client.post<Marketplace>('/marketplace/', data)
+export const createCompanyMarketplace = (data: { name: string; is_active?: boolean }) =>
+  client.post<CompanyMarketplace>('/company-marketplaces/', data)
 
-export const updateMarketplace = (id: string, data: Partial<{ name: string; url: string; is_active: boolean }>) =>
-  client.patch<Marketplace>(`/marketplace/${id}/`, data)
+export const updateCompanyMarketplace = (id: string, data: Partial<{ name: string; is_active: boolean }>) =>
+  client.patch<CompanyMarketplace>(`/company-marketplaces/${id}/`, data)
+
+export const deleteCompanyMarketplace = (id: string) =>
+  client.delete(`/company-marketplaces/${id}/`)
 
 export const getBusinessEntities = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<BusinessEntity>>('/business-entities/', { params })
