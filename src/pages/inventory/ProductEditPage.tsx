@@ -33,7 +33,7 @@ import {
 import { Badge } from '../../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { PhotoUploadGrid } from '../../components/inventory/PhotoUploadGrid'
-import { ArrowLeft, X, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, X, Plus, Pencil } from 'lucide-react'
 import type { Product, ProductPhoto, VariantDimension, VariantDimensionValue } from '../../types/inventory'
 import type { SaveVariantsPayload, SaveVariantItem } from '../../api/inventory'
 
@@ -146,6 +146,7 @@ const [newSupplierLink, setNewSupplierLink] = useState('')
 const [supplierSearch, setSupplierSearch] = useState('')
 const [showAttachBEModal, setShowAttachBEModal] = useState(false)
 const [attachingBEId, setAttachingBEId] = useState('')
+const [showAttachSupplierModal, setShowAttachSupplierModal] = useState(false)
 
 const { data: productSuppliersData, isLoading: suppliersLoading } = useProductSuppliers(id ?? '')
 const createProductSupplierMutation = useCreateProductSupplier(id ?? '')
@@ -556,6 +557,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
             <div className="grid grid-cols-[200px_1fr] items-start gap-4 mb-5">
               <label className="font-medium text-sm pt-2.5">Status</label>
               <Select
+                key={`status-${String(watch('is_active'))}`}
                 value={watch('is_active') === true ? 'true' : watch('is_active') === false ? 'false' : ''}
                 onValueChange={v => setValue('is_active', v === 'true', { shouldValidate: true })}
               >
@@ -829,27 +831,34 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
 
         {isEditing && (
           <div className="rounded-lg border bg-card p-6">
-            <h2 className="text-lg font-semibold mb-4">Suppliers</h2>
-            <p className="text-xs text-muted-foreground mb-4">
-              Link one or more suppliers to this product. The linked supplier URL will be used when creating purchase orders.
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">Suppliers</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Link one or more suppliers to this product. The linked supplier URL will be used when creating purchase orders.
+                </p>
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={() => setShowAttachSupplierModal(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Attach
+              </Button>
+            </div>
 
             {suppliersLoading ? (
-              <p className="text-sm text-muted-foreground mb-4">Loading...</p>
+              <p className="text-sm text-muted-foreground">Loading...</p>
             ) : (productSuppliersData?.results ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground mb-4">No suppliers linked yet.</p>
+              <p className="text-sm text-muted-foreground">No suppliers linked yet.</p>
             ) : (
-              <div className="space-y-2 mb-4">
+              <div className="space-y-2">
                 {(productSuppliersData?.results ?? []).map(ps => (
                   <div key={ps.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                    <div>
-                      <span className="font-medium">{ps.supplier_name}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium shrink-0">{ps.supplier_name}</span>
                       {ps.supplier_link && (
                         <a
                           href={ps.supplier_link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="ml-3 text-xs text-muted-foreground hover:underline truncate max-w-[300px] inline-block align-bottom"
+                          className="text-xs text-muted-foreground hover:underline truncate"
                         >
                           {ps.supplier_link}
                         </a>
@@ -858,63 +867,71 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
                     <button
                       type="button"
                       onClick={() => deleteProductSupplierMutation.mutate(ps.id)}
-                      className="text-muted-foreground hover:text-destructive ml-4"
+                      className="text-muted-foreground hover:text-destructive ml-4 shrink-0"
                       title="Remove supplier"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="border-t pt-4">
-              <p className="text-sm font-medium mb-3">Link a supplier</p>
-              <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end max-w-[700px]">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Supplier</p>
-                  <Select
-                    value={newSupplierSelectedId}
-                    onValueChange={setNewSupplierSelectedId}
+            <Dialog open={showAttachSupplierModal} onOpenChange={(o) => { if (!o) { setShowAttachSupplierModal(false); setNewSupplierSelectedId(''); setNewSupplierLink(''); setSupplierSearch('') } }}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Attach Supplier</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Supplier</p>
+                    <Select value={newSupplierSelectedId} onValueChange={setNewSupplierSelectedId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select supplier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <div className="px-2 py-1">
+                          <Input
+                            placeholder="Search..."
+                            value={supplierSearch}
+                            onChange={e => setSupplierSearch(e.target.value)}
+                            className="h-7 text-xs"
+                            onClick={e => e.stopPropagation()}
+                          />
+                        </div>
+                        {(suppliersData?.results ?? []).map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Supplier URL (optional)</p>
+                    <Input
+                      type="url"
+                      placeholder="https://..."
+                      value={newSupplierLink}
+                      onChange={e => setNewSupplierLink(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => { setShowAttachSupplierModal(false); setNewSupplierSelectedId(''); setNewSupplierLink(''); setSupplierSearch('') }}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!newSupplierSelectedId || createProductSupplierMutation.isPending}
+                    onClick={async () => {
+                      await handleAddProductSupplier()
+                      setShowAttachSupplierModal(false)
+                    }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select supplier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="px-2 py-1">
-                        <Input
-                          placeholder="Search..."
-                          value={supplierSearch}
-                          onChange={e => setSupplierSearch(e.target.value)}
-                          className="h-7 text-xs"
-                          onClick={e => e.stopPropagation()}
-                        />
-                      </div>
-                      {(suppliersData?.results ?? []).map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Supplier URL (optional)</p>
-                  <Input
-                    type="url"
-                    placeholder="https://..."
-                    value={newSupplierLink}
-                    onChange={e => setNewSupplierLink(e.target.value)}
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleAddProductSupplier}
-                  disabled={!newSupplierSelectedId || createProductSupplierMutation.isPending}
-                >
-                  <Plus className="h-4 w-4 mr-1" /> Add
-                </Button>
-              </div>
-            </div>
+                    {createProductSupplierMutation.isPending ? 'Attaching...' : 'Attach'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 
