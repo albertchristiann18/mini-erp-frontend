@@ -214,9 +214,9 @@ export default function ProductDetailPage() {
                     <th key={d.id} className="text-left px-4 py-3 font-medium">{d.name}</th>
                   ))}
                   <th className="text-left px-4 py-3 font-medium">SKU</th>
-                  <th className="text-right px-4 py-3 font-medium">Cost (COGS)</th>
-                  <th className="text-right px-4 py-3 font-medium">Price</th>
-                  <th className="text-right px-4 py-3 font-medium">Stock</th>
+                  <th className="text-left px-4 py-3 font-medium">Cost (COGS)</th>
+                  <th className="text-left px-4 py-3 font-medium">Price</th>
+                  <th className="text-left px-4 py-3 font-medium">Stock</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -228,10 +228,10 @@ export default function ProductDetailPage() {
                       </td>
                     ))}
                     <td className="px-4 py-3 font-mono text-xs">{v.sku_variant_code}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
+                    <td className="px-4 py-3 text-muted-foreground">
                       {fmtNum(v.current_cogs)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3">
                       {editingPrices ? (
                         <Input
                           type="number"
@@ -243,13 +243,13 @@ export default function ProductDetailPage() {
                               [v.id]: parseInt(e.target.value) || 0,
                             }))
                           }
-                          className="h-8 w-32 text-right ml-auto"
+                          className="h-8 w-32"
                         />
                       ) : (
                         fmtNum(v.base_price)
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3">
                       {v.total_available_qty ?? 0}
                     </td>
                   </tr>
