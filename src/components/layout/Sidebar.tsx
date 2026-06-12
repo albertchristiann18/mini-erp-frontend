@@ -112,7 +112,7 @@ export function Sidebar() {
       <div className="flex h-14 items-center border-b px-4">
         <span className="font-semibold text-foreground">Mini ERP</span>
       </div>
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto p-3 space-y-1 overscroll-contain">
         {navItems.map(item =>
           item.to ? (
             <NavLink
