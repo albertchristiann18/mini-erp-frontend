@@ -766,8 +766,8 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
                       <th key={d.id} className="text-left px-4 py-3 font-medium">{d.name}</th>
                     ))}
                     <th className="text-left px-4 py-3 font-medium">SKU</th>
-                    <th className="text-right px-4 py-3 font-medium w-40">Price</th>
-                    <th className="text-right px-4 py-3 font-medium text-muted-foreground">Stock</th>
+                    <th className="px-4 py-3 font-medium w-40">Price</th>
+                    <th className="px-4 py-3 font-medium text-muted-foreground">Stock</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 w-16"></th>
                   </tr>
@@ -792,16 +792,16 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
                             className="h-8 font-mono text-xs w-48"
                           />
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3">
                           <Input
                             type="number"
                             min="0"
                             value={row.base_price}
                             onChange={e => handleRowChange(rowIdx, 'base_price', parseInt(e.target.value) || 0)}
-                            className="h-8 w-32 text-right"
+                            className="h-8 w-32"
                           />
                         </td>
-                        <td className="px-4 py-3 text-right text-muted-foreground">
+                        <td className="px-4 py-3 text-muted-foreground">
                           {row.total_available_qty}
                         </td>
                         <td className="px-4 py-3">
