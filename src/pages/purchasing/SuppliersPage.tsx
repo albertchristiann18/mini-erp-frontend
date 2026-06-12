@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Search, Plus, Pencil } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useSuppliers, useUpdateSupplier } from '../../hooks/useInventory'
+import { useSuppliers, useUpdateSupplier, useDeleteSupplier } from '../../hooks/useInventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
 import { toast } from '../../lib/toast'
 import type { Supplier } from '../../types/inventory'
@@ -18,11 +19,13 @@ export default function SuppliersPage() {
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Supplier | undefined>()
+  const [supplierToDelete, setSupplierToDelete] = useState<Supplier | undefined>()
 
   const params: Record<string, string | number> = { page, page_size: 20 }
   if (search) params.search = search
   const { data, isLoading } = useSuppliers(params)
   const updateMutation = useUpdateSupplier()
+  const deleteMutation = useDeleteSupplier()
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   return (
@@ -92,6 +95,14 @@ export default function SuppliersPage() {
                       </Button>
                       <Button
                         variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setSupplierToDelete(s)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
                         size="sm"
                         className="text-xs"
                         onClick={async () => {
@@ -119,6 +130,35 @@ export default function SuppliersPage() {
         onClose={() => { setShowModal(false); setEditing(undefined) }}
         supplier={editing}
       />
+      <Dialog open={!!supplierToDelete} onOpenChange={(o) => { if (!o) setSupplierToDelete(undefined) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Supplier</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete <span className="font-medium text-foreground">{supplierToDelete?.name}</span>? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSupplierToDelete(undefined)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={async () => {
+                if (!supplierToDelete) return
+                try {
+                  await deleteMutation.mutateAsync(supplierToDelete.id)
+                  toast.success('Supplier deleted')
+                  setSupplierToDelete(undefined)
+                } catch {
+                  toast.error('Failed to delete supplier')
+                }
+              }}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

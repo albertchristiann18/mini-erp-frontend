@@ -343,8 +343,20 @@ export default function PurchaseOrderDetailPage() {
       toast.success('Purchase order updated')
       cancelEditMode()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save'
-      toast.error(msg)
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
+      if (data && typeof data === 'object') {
+        const messages: string[] = []
+        for (const [field, msg] of Object.entries(data)) {
+          const label = HEADER_FIELD_CONFIG[field]?.label ?? field
+          const text = Array.isArray(msg) ? msg.join(', ') : String(msg)
+          messages.push(`${label}: ${text}`)
+        }
+        if (messages.length > 0) {
+          setValidationErrors(messages)
+          return
+        }
+      }
+      toast.error('Failed to save')
     }
   }
 

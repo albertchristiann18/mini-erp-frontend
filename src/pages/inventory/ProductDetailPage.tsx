@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useProduct, useSaveVariants } from '../../hooks/useInventory'
+import { useProduct, useSaveVariants, useProductSuppliers } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -31,6 +31,7 @@ export default function ProductDetailPage() {
   const qc = useQueryClient()
   const { data: product, isLoading } = useProduct(id!)
   const saveMutation = useSaveVariants(id!)
+  const { data: productSuppliersData } = useProductSuppliers(id!)
 
   const variants = product?.variants ?? []
   const photos = product?.photos ?? []
@@ -200,6 +201,36 @@ export default function ProductDetailPage() {
                 <div key={mid} className="flex justify-between text-sm">
                   <span className="font-mono text-xs text-muted-foreground">{mid}</span>
                   <span className="text-green-600">Connected ✓</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* D2. SUPPLIERS */}
+      <div className="rounded-lg border bg-card">
+        <div className="p-4 border-b font-semibold">Suppliers</div>
+        <div className="p-4">
+          {(productSuppliersData?.results ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No suppliers linked</p>
+          ) : (
+            <div className="space-y-2">
+              {(productSuppliersData?.results ?? []).map(ps => (
+                <div key={ps.id} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{ps.supplier_name}</span>
+                  {ps.supplier_link ? (
+                    <a
+                      href={ps.supplier_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline text-xs truncate max-w-[260px]"
+                    >
+                      {ps.supplier_link}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground text-xs">No link</span>
+                  )}
                 </div>
               ))}
             </div>

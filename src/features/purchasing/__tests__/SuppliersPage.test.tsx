@@ -6,6 +6,7 @@ import SuppliersPage from '../../../pages/purchasing/SuppliersPage'
 
 const mockMutateAsync = vi.fn()
 const mockUpdateMutateAsync = vi.fn()
+const mockDeleteMutateAsync = vi.fn()
 
 const mockSuppliersData: { count: number; results: Record<string, unknown>[] } = {
   count: 2,
@@ -19,7 +20,11 @@ vi.mock('../../../hooks/useInventory', () => ({
   useSuppliers: () => ({ data: mockSuppliersData, isLoading: false }),
   useCreateSupplier: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
   useUpdateSupplier: () => ({ mutateAsync: mockUpdateMutateAsync, isPending: false }),
-  useDeleteSupplier: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDeleteSupplier: () => ({ mutateAsync: mockDeleteMutateAsync, isPending: false }),
+}))
+
+vi.mock('../../../lib/toast', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
 }))
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -112,4 +117,40 @@ it('test_supplier_link_renders_in_table', async () => {
   renderPage()
   const link = await screen.findByRole('link', { name: /https:\/\/example.com\/store/ })
   expect(link).toHaveAttribute('href', 'https://example.com/store')
+})
+
+it('test_delete_supplier_opens_confirm_dialog', async () => {
+  mockSuppliersData.results = [
+    { id: 's1', name: 'Alpha Supplies', contact_name: 'John', phone: '123456', country: 'China', notes: null, supplier_link: null, is_active: true, company_id: 'c1', cdate: '', udate: '' },
+    { id: 's2', name: 'Beta Trading', contact_name: null, phone: null, country: null, notes: null, supplier_link: null, is_active: false, company_id: 'c1', cdate: '', udate: '' },
+  ]
+  renderPage()
+  const trashBtns = await screen.findAllByRole('button')
+  const trashBtn = trashBtns.find(btn => btn.querySelector('.lucide-trash-2'))
+  expect(trashBtn).toBeDefined()
+  if (trashBtn) fireEvent.click(trashBtn)
+
+  const dialog = await screen.findByRole('dialog')
+  expect(dialog).toHaveTextContent('Delete Supplier')
+  expect(dialog).toHaveTextContent('Alpha Supplies')
+})
+
+it('test_delete_supplier_confirms_and_calls_mutate', async () => {
+  mockSuppliersData.results = [
+    { id: 's1', name: 'Alpha Supplies', contact_name: 'John', phone: '123456', country: 'China', notes: null, supplier_link: null, is_active: true, company_id: 'c1', cdate: '', udate: '' },
+    { id: 's2', name: 'Beta Trading', contact_name: null, phone: null, country: null, notes: null, supplier_link: null, is_active: false, company_id: 'c1', cdate: '', udate: '' },
+  ]
+  mockDeleteMutateAsync.mockResolvedValue({ id: 's1' })
+  renderPage()
+  const trashBtns = await screen.findAllByRole('button')
+  const trashBtn = trashBtns.find(btn => btn.querySelector('.lucide-trash-2'))
+  expect(trashBtn).toBeDefined()
+  if (trashBtn) fireEvent.click(trashBtn)
+
+  const deleteBtn = await screen.findByText('Delete')
+  fireEvent.click(deleteBtn)
+
+  await waitFor(() => {
+    expect(mockDeleteMutateAsync).toHaveBeenCalledWith('s1')
+  })
 })
