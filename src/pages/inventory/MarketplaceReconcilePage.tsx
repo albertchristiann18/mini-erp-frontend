@@ -164,8 +164,8 @@ export default function MarketplaceReconcilePage() {
                     {previewData.reconciled.map((row, i) => (
                       <tr key={i} className="border-b">
                         <td className="p-2">
-                          <div className="font-mono text-xs">{row.sku}</div>
-                          <div className="text-xs text-muted-foreground">{row.product_name}.{row.variant_name}</div>
+                          <span className="font-mono text-xs">{row.sku}</span>
+                          <span className="ml-1 text-xs font-sans text-muted-foreground">{row.product_name}.{row.variant_name}</span>
                         </td>
                         <td className="p-2 text-right tabular-nums">{row.before}</td>
                         <td className="p-2 text-right tabular-nums">{row.after}</td>
@@ -193,10 +193,8 @@ export default function MarketplaceReconcilePage() {
                 <ul className="mt-2 space-y-1">
                   {previewData.not_found.map((item, i) => (
                     <li key={i} className="text-xs font-mono text-muted-foreground">
-                      <div>{item.sku}</div>
-                      {(item.file_product_name || item.file_variant_name) && (
-                        <div className="text-muted-foreground/60">{item.file_product_name}{item.file_product_name && item.file_variant_name ? ' / ' : ''}{item.file_variant_name}</div>
-                      )}
+                      <span>{item.sku}</span>
+                      <span className="ml-1 text-muted-foreground/60">{item.file_product_name}{item.file_product_name && item.file_variant_name ? '.' : ''}{item.file_variant_name}</span>
                     </li>
                   ))}
                 </ul>
