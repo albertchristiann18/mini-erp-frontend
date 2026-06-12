@@ -182,6 +182,84 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      {/* E. VARIANT DETAIL GRID */}
+      <div className="rounded-lg border bg-card">
+        <div className="p-4 border-b flex items-center justify-between">
+          <h2 className="font-semibold">Variant Detail</h2>
+          {user?.is_staff && (
+            editingPrices ? (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleSavePrices} disabled={isSavingPrices}>
+                  <Tag className="h-4 w-4 mr-1" />
+                  {isSavingPrices ? 'Saving...' : 'Save Prices'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleCancelPrices}>Cancel</Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" onClick={handleStartEditPrices}>
+                <Tag className="h-4 w-4 mr-1" /> Edit Prices
+              </Button>
+            )
+          )}
+        </div>
+
+        {activeVariants.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">No variants</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30">
+                  {dims.map(d => (
+                    <th key={d.id} className="text-left px-4 py-3 font-medium">{d.name}</th>
+                  ))}
+                  <th className="text-left px-4 py-3 font-medium">SKU</th>
+                  <th className="text-right px-4 py-3 font-medium">Cost (COGS)</th>
+                  <th className="text-right px-4 py-3 font-medium">Price</th>
+                  <th className="text-right px-4 py-3 font-medium">Stock</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {activeVariants.map(v => (
+                  <tr key={v.id}>
+                    {dims.map(d => (
+                      <td key={d.id} className="px-4 py-3 font-medium">
+                        {getDimLabel(d, v.variant_values?.[d.id])}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 font-mono text-xs">{v.sku_variant_code}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">
+                      {fmtNum(v.current_cogs)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {editingPrices ? (
+                        <Input
+                          type="number"
+                          min="0"
+                          value={editedPrices[v.id] ?? v.base_price}
+                          onChange={e =>
+                            setEditedPrices(prev => ({
+                              ...prev,
+                              [v.id]: parseInt(e.target.value) || 0,
+                            }))
+                          }
+                          className="h-8 w-32 text-right ml-auto"
+                        />
+                      ) : (
+                        fmtNum(v.base_price)
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {v.total_available_qty ?? 0}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* D. MARKETPLACE INTEGRATION */}
       <div className="rounded-lg border bg-card">
         <div className="p-4 border-b font-semibold">Marketplace Integration</div>
@@ -308,83 +386,6 @@ export default function ProductDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* E. VARIANT DETAIL GRID */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="font-semibold">Variant Detail</h2>
-          {user?.is_staff && (
-            editingPrices ? (
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleSavePrices} disabled={isSavingPrices}>
-                  <Tag className="h-4 w-4 mr-1" />
-                  {isSavingPrices ? 'Saving...' : 'Save Prices'}
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleCancelPrices}>Cancel</Button>
-              </div>
-            ) : (
-              <Button size="sm" variant="outline" onClick={handleStartEditPrices}>
-                <Tag className="h-4 w-4 mr-1" /> Edit Prices
-              </Button>
-            )
-          )}
-        </div>
-
-        {activeVariants.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">No variants</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  {dims.map(d => (
-                    <th key={d.id} className="text-left px-4 py-3 font-medium">{d.name}</th>
-                  ))}
-                  <th className="text-left px-4 py-3 font-medium">SKU</th>
-                  <th className="text-right px-4 py-3 font-medium">Cost (COGS)</th>
-                  <th className="text-right px-4 py-3 font-medium">Price</th>
-                  <th className="text-right px-4 py-3 font-medium">Stock</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {activeVariants.map(v => (
-                  <tr key={v.id}>
-                    {dims.map(d => (
-                      <td key={d.id} className="px-4 py-3 font-medium">
-                        {getDimLabel(d, v.variant_values?.[d.id])}
-                      </td>
-                    ))}
-                    <td className="px-4 py-3 font-mono text-xs">{v.sku_variant_code}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">
-                      {fmtNum(v.current_cogs)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {editingPrices ? (
-                        <Input
-                          type="number"
-                          min="0"
-                          value={editedPrices[v.id] ?? v.base_price}
-                          onChange={e =>
-                            setEditedPrices(prev => ({
-                              ...prev,
-                              [v.id]: parseInt(e.target.value) || 0,
-                            }))
-                          }
-                          className="h-8 w-32 text-right ml-auto"
-                        />
-                      ) : (
-                        fmtNum(v.base_price)
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {v.total_available_qty ?? 0}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
