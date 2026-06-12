@@ -38,6 +38,7 @@ const TikTokWebhookLogPage = lazy(() => import('./pages/tiktok/TikTokWebhookLogP
 const StockClosingPage = lazy(() => import('./pages/inventory/StockClosingPage'))
 const InventoryDashboardPage = lazy(() => import('./pages/dashboard/InventoryDashboardPage'))
 const BulkStockUpdatePage = lazy(() => import('./pages/inventory/BulkStockUpdatePage'))
+const MarketplaceReconcilePage = lazy(() => import('./pages/inventory/MarketplaceReconcilePage'))
 const ProductEditPage = lazy(() => import('./pages/inventory/ProductEditPage'))
 const CategoriesPage = lazy(() => import('./pages/inventory/CategoriesPage'))
 const MarketplacesPage = lazy(() => import('./pages/inventory/MarketplacesPage'))
@@ -72,6 +73,7 @@ export default function App() {
                     <Route path="stock-closing" element={<Suspense fallback={<Loading />}><StockClosingPage /></Suspense>} />
                     <Route path="inventory-dashboard" element={<Suspense fallback={<Loading />}><InventoryDashboardPage /></Suspense>} />
                     <Route path="bulk-stock-update" element={<Suspense fallback={<Loading />}><BulkStockUpdatePage /></Suspense>} />
+                    <Route path="marketplace-reconcile" element={<Suspense fallback={<Loading />}><MarketplaceReconcilePage /></Suspense>} />
                     <Route path="categories" element={<Suspense fallback={<Loading />}><CategoriesPage /></Suspense>} />
                     <Route path="marketplaces" element={<Suspense fallback={<Loading />}><MarketplacesPage /></Suspense>} />
                     <Route path="business-entities" element={<Suspense fallback={<Loading />}><BusinessEntitiesPage /></Suspense>} />

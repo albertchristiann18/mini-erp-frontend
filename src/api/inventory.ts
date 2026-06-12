@@ -177,3 +177,31 @@ export const attachBusinessEntity = (data: { product_id: string; business_entity
 
 export const detachBusinessEntity = (id: string) =>
   client.delete(`/product-business-entities/${id}/`)
+
+export interface ReconcileRow {
+  sku: string
+  variant_id?: string
+  before?: number
+  after?: number
+  delta?: number
+  qty?: number
+}
+
+export interface ReconcileResult {
+  reconciled: ReconcileRow[]
+  skipped: ReconcileRow[]
+  not_found: string[]
+  errors: string[]
+  summary: {
+    total: number
+    reconciled: number
+    skipped: number
+    not_found: number
+  }
+  dry_run: boolean
+}
+
+export const marketplaceReconcileStock = (formData: FormData) =>
+  client.post<ReconcileResult>('/inventory/inventory/marketplace_reconcile/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })

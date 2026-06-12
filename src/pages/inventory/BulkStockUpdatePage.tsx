@@ -106,9 +106,14 @@ export default function BulkStockUpdatePage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/stock')}>
-        <ArrowLeft className="h-4 w-4 mr-1" /> Back to Stock
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/stock')}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Stock
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => navigate('/inventory/marketplace-reconcile')}>
+          Marketplace Reconcile
+        </Button>
+      </div>
 
       <div className="rounded-lg border bg-card p-4 space-y-3">
         <h2 className="text-sm font-semibold">Step 1 — Search Product</h2>
