@@ -46,7 +46,7 @@ type VariantRow = {
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   category: z.string().min(1, 'Category is required'),
-  description: z.string().min(25, 'Description must be at least 25 characters'),
+  description: z.string().min(25, 'Description must be at least 25 characters').max(3000, 'Description cannot exceed 3000 characters'),
   weight: z.number().int().min(0).optional(),
   length: z.number().int().min(0).optional(),
   width: z.number().int().min(0).optional(),
@@ -483,10 +483,11 @@ export default function ProductEditPage() {
               <Textarea
                 {...register('description')}
                 placeholder="Min 25 characters"
-                className="min-h-[100px]"
+                className="min-h-[120px] resize-y"
+                maxLength={3000}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                {watch('description')?.length ?? 0} / 25 minimum
+                {watch('description')?.length ?? 0} / 3000
               </p>
               {errors.description && (
                 <p className="text-xs text-destructive mt-1">{errors.description.message}</p>
