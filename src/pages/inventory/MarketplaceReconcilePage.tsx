@@ -191,8 +191,13 @@ export default function MarketplaceReconcilePage() {
               </button>
               {notFoundOpen && (
                 <ul className="mt-2 space-y-1">
-                  {previewData.not_found.map((sku, i) => (
-                    <li key={i} className="text-xs font-mono text-muted-foreground">{sku}</li>
+                  {previewData.not_found.map((item, i) => (
+                    <li key={i} className="text-xs font-mono text-muted-foreground">
+                      <div>{item.sku}</div>
+                      {(item.file_product_name || item.file_variant_name) && (
+                        <div className="text-muted-foreground/60">{item.file_product_name}{item.file_product_name && item.file_variant_name ? ' / ' : ''}{item.file_variant_name}</div>
+                      )}
+                    </li>
                   ))}
                 </ul>
               )}

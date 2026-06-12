@@ -192,7 +192,7 @@ export interface ReconcileRow {
 export interface ReconcileResult {
   reconciled: ReconcileRow[]
   skipped: ReconcileRow[]
-  not_found: string[]
+  not_found: Array<{sku: string; file_product_name: string; file_variant_name: string}>
   errors: string[]
   summary: {
     total: number
