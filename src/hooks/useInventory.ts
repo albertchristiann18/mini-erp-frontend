@@ -48,11 +48,13 @@ export const useDeleteCategory = () => {
   })
 }
 
-export const useProducts = (page = 1, pageSize = 20, search?: string) => {
+export const useProducts = (page = 1, pageSize = 20, search?: string, category?: string, ordering?: string) => {
   const params: Record<string, string | number> = { page, page_size: pageSize }
   if (search) params.search = search
+  if (category) params.category = category
+  if (ordering) params.ordering = ordering
   return useQuery({
-    queryKey: ['products', page, pageSize, search],
+    queryKey: ['products', page, pageSize, search, category, ordering],
     queryFn: () => getProducts(params).then(r => r.data),
   })
 }

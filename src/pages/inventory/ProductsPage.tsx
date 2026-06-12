@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProducts } from '../../hooks/useInventory'
+import { useProducts, useCategories } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
 import { BulkProductModal } from '../../components/modals/BulkProductModal'
 import { Plus, Upload, Pencil, Eye } from 'lucide-react'
@@ -16,9 +17,12 @@ export default function ProductsPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState<string>('')
+  const [ordering, setOrdering] = useState<string>('')
   const [showBulkModal, setShowBulkModal] = useState(false)
 
-  const { data, isLoading } = useProducts(page, 20, search || undefined)
+  const { data: categoriesData } = useCategories({ page_size: 100 })
+  const { data, isLoading } = useProducts(page, 20, search || undefined, categoryFilter || undefined, ordering || undefined)
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   const handleView = (product: Product) => {
@@ -28,14 +32,43 @@ export default function ProductsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
           <Input
             placeholder="Search by name or SKU..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
             className="max-w-[300px]"
           />
-          <span className="text-sm text-muted-foreground">{data?.count ?? 0} products</span>
+          <Select
+            value={categoryFilter || '__all'}
+            onValueChange={v => { setCategoryFilter(v === '__all' ? '' : v); setPage(1) }}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all">All Categories</SelectItem>
+              {categoriesData?.results?.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={ordering || '__default'}
+            onValueChange={v => { setOrdering(v === '__default' ? '' : v); setPage(1) }}
+          >
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__default">Default</SelectItem>
+              <SelectItem value="name">Name A→Z</SelectItem>
+              <SelectItem value="-name">Name Z→A</SelectItem>
+              <SelectItem value="sku_code">SKU A→Z</SelectItem>
+              <SelectItem value="-sku_code">SKU Z→A</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground whitespace-nowrap">{data?.count ?? 0} products</span>
         </div>
         {user?.is_staff && (
           <div className="flex gap-2">
