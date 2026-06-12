@@ -428,7 +428,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
   const activeRows = rows.filter(r => !r.removed)
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6">
       <div className="flex items-center gap-3 mb-6">
         <Button
           variant="ghost"
