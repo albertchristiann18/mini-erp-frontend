@@ -168,6 +168,38 @@ export interface InventorySummaryWarehouse {
   name: string
 }
 
+export interface Marketplace {
+  id: string
+  name: string
+  url: string | null
+  status: string | null
+  is_active: boolean
+  connected_time: string | null
+}
+
+export interface BusinessEntity {
+  id: string
+  company_id: string
+  name: string
+  marketplace_id: string
+  marketplace_name: string
+  is_active: boolean
+  cdate: string
+  udate: string
+}
+
+export interface ProductBusinessEntity {
+  id: string
+  product_id: string
+  product_name: string
+  product_sku: string
+  business_entity_id: string
+  business_entity_name: string
+  marketplace_id: string
+  marketplace_name: string
+  cdate: string
+}
+
 export interface Supplier {
   id: string
   name: string

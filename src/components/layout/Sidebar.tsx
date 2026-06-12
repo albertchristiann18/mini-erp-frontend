@@ -26,6 +26,8 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Products', to: '/inventory/products' },
       { label: 'Categories', to: '/inventory/categories' },
+      { label: 'Marketplaces', to: '/inventory/marketplaces' },
+      { label: 'Business Entities', to: '/inventory/business-entities' },
       { label: 'Stock', to: '/inventory/stock' },
       { label: 'Stock Closing', to: '/inventory/stock-closing' },
       { label: 'Warehouses', to: '/inventory/warehouses' },

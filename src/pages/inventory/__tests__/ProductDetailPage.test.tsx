@@ -7,12 +7,20 @@ import ProductDetailPage from '../ProductDetailPage'
 const mockUseProduct = vi.fn()
 const mockUseSaveVariants = vi.fn()
 const mockUseProductSuppliers = vi.fn()
+const mockUseProductBusinessEntities = vi.fn()
+const mockUseAttachBusinessEntity = vi.fn()
+const mockUseDetachBusinessEntity = vi.fn()
+const mockUseBusinessEntities = vi.fn()
 const mockUseAuth = vi.fn()
 
 vi.mock('../../../hooks/useInventory', () => ({
   useProduct: (...args: unknown[]) => mockUseProduct(...args),
   useSaveVariants: (...args: unknown[]) => mockUseSaveVariants(...args),
   useProductSuppliers: (...args: unknown[]) => mockUseProductSuppliers(...args),
+  useProductBusinessEntities: (...args: unknown[]) => mockUseProductBusinessEntities(...args),
+  useAttachBusinessEntity: (...args: unknown[]) => mockUseAttachBusinessEntity(...args),
+  useDetachBusinessEntity: (...args: unknown[]) => mockUseDetachBusinessEntity(...args),
+  useBusinessEntities: (...args: unknown[]) => mockUseBusinessEntities(...args),
 }))
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -73,6 +81,10 @@ it('test_product_detail_shows_suppliers_section', () => {
   mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
   mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseProductSuppliers.mockReturnValue({ data: { results: mockSuppliers, count: 2, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
 
   renderPage()
 
@@ -86,6 +98,10 @@ it('test_product_detail_supplier_link_renders', () => {
   mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
   mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseProductSuppliers.mockReturnValue({ data: { results: mockSuppliers, count: 2, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
 
   renderPage()
 
@@ -101,6 +117,10 @@ it('test_product_detail_supplier_no_link_shows_fallback', () => {
   mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
   mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseProductSuppliers.mockReturnValue({ data: { results: mockSuppliers, count: 2, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
 
   renderPage()
 
@@ -112,8 +132,51 @@ it('test_product_detail_no_suppliers_shows_empty_state', () => {
   mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
   mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   mockUseProductSuppliers.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
 
   renderPage()
 
   expect(screen.getByText('No suppliers linked')).toBeInTheDocument()
+})
+
+it('test_shows_business_entities_section', () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true } })
+  mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
+  mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseProductSuppliers.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({
+    data: {
+      results: [
+        { id: 'pbe1', product_id: 'p1', product_name: 'Test Product', product_sku: 'TST-001', business_entity_id: 'be1', business_entity_name: 'Toko A', marketplace_id: 'm1', marketplace_name: 'Shopee', cdate: '' },
+      ],
+      count: 1, next: null, previous: null,
+    },
+  })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+
+  renderPage()
+
+  expect(screen.getByText('Business Entities')).toBeInTheDocument()
+  expect(screen.getByText('Toko A')).toBeInTheDocument()
+  expect(screen.getByText('Shopee')).toBeInTheDocument()
+})
+
+it('test_shows_empty_business_entities', () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true } })
+  mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
+  mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseProductSuppliers.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+
+  renderPage()
+
+  expect(screen.getByText('No business entities attached')).toBeInTheDocument()
 })

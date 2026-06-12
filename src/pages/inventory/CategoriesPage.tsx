@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Search, Plus, Pencil } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useCategories, useUpdateCategory } from '../../hooks/useInventory'
+import { useCategories, useUpdateCategory, useDeleteCategory } from '../../hooks/useInventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
 import { CategoryFormModal } from '../../components/modals/CategoryFormModal'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { toast } from '../../lib/toast'
 import type { Category } from '../../types/inventory'
 
@@ -18,11 +19,14 @@ export default function CategoriesPage() {
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Category | undefined>()
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | undefined>()
+  const [blockedProducts, setBlockedProducts] = useState<{ name: string; sku_code: string }[]>([])
 
   const params: Record<string, string | number> = { page, page_size: 20 }
   if (search) params.search = search
   const { data, isLoading } = useCategories(params)
   const updateMutation = useUpdateCategory()
+  const deleteMutation = useDeleteCategory()
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
   return (
@@ -84,6 +88,14 @@ export default function CategoriesPage() {
                       </Button>
                       <Button
                         variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setCategoryToDelete(c)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
                         size="sm"
                         className="text-xs"
                         onClick={async () => {
@@ -111,6 +123,62 @@ export default function CategoriesPage() {
         onClose={() => { setShowModal(false); setEditing(undefined) }}
         category={editing}
       />
+      <Dialog open={!!categoryToDelete} onOpenChange={(o) => { if (!o) setCategoryToDelete(undefined) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Category</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete <span className="font-medium text-foreground">{categoryToDelete?.name}</span>? This action cannot be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCategoryToDelete(undefined)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={async () => {
+                if (!categoryToDelete) return
+                try {
+                  await deleteMutation.mutateAsync(categoryToDelete.id)
+                  toast.success('Category deleted')
+                  setCategoryToDelete(undefined)
+                } catch (err: unknown) {
+                  const data = (err as { response?: { data?: { products?: { name: string; sku_code: string }[] } } })?.response?.data
+                  if (data?.products && data.products.length > 0) {
+                    setBlockedProducts(data.products)
+                    setCategoryToDelete(undefined)
+                  } else {
+                    toast.error('Failed to delete category')
+                  }
+                }
+              }}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={blockedProducts.length > 0} onOpenChange={(o) => { if (!o) setBlockedProducts([]) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cannot Delete Category</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mb-3">
+            This category is linked to the following products. Remove the category from these products first:
+          </p>
+          <ul className="space-y-1">
+            {blockedProducts.map(p => (
+              <li key={p.sku_code} className="flex items-center justify-between bg-muted px-3 py-1.5 rounded">
+                <span className="text-sm">{p.name}</span>
+                <span className="text-xs font-mono text-muted-foreground ml-4">{p.sku_code}</span>
+              </li>
+            ))}
+          </ul>
+          <DialogFooter>
+            <Button onClick={() => setBlockedProducts([])}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

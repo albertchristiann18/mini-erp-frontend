@@ -40,6 +40,8 @@ const InventoryDashboardPage = lazy(() => import('./pages/dashboard/InventoryDas
 const BulkStockUpdatePage = lazy(() => import('./pages/inventory/BulkStockUpdatePage'))
 const ProductEditPage = lazy(() => import('./pages/inventory/ProductEditPage'))
 const CategoriesPage = lazy(() => import('./pages/inventory/CategoriesPage'))
+const MarketplacesPage = lazy(() => import('./pages/inventory/MarketplacesPage'))
+const BusinessEntitiesPage = lazy(() => import('./pages/inventory/BusinessEntitiesPage'))
 const SuppliersPage = lazy(() => import('./pages/purchasing/SuppliersPage'))
 
 const Loading = () => (
@@ -71,6 +73,8 @@ export default function App() {
                     <Route path="inventory-dashboard" element={<Suspense fallback={<Loading />}><InventoryDashboardPage /></Suspense>} />
                     <Route path="bulk-stock-update" element={<Suspense fallback={<Loading />}><BulkStockUpdatePage /></Suspense>} />
                     <Route path="categories" element={<Suspense fallback={<Loading />}><CategoriesPage /></Suspense>} />
+                    <Route path="marketplaces" element={<Suspense fallback={<Loading />}><MarketplacesPage /></Suspense>} />
+                    <Route path="business-entities" element={<Suspense fallback={<Loading />}><BusinessEntitiesPage /></Suspense>} />
                   </Route>
                   <Route path="purchasing">
                     <Route path="orders" element={<Suspense fallback={<Loading />}><PurchaseOrdersPage /></Suspense>} />

@@ -7,12 +7,16 @@ import CategoriesPage from '../CategoriesPage'
 const mockUseCategories = vi.fn()
 const mockUseUpdateCategory = vi.fn()
 const mockUseCreateCategory = vi.fn()
+const mockUseDeleteCategory = vi.fn()
 const mockUseAuth = vi.fn()
+
+const mockDeleteMutateAsync = vi.fn()
 
 vi.mock('../../../hooks/useInventory', () => ({
   useCategories: (...args: unknown[]) => mockUseCategories(...args),
   useUpdateCategory: (...args: unknown[]) => mockUseUpdateCategory(...args),
   useCreateCategory: (...args: unknown[]) => mockUseCreateCategory(...args),
+  useDeleteCategory: (...args: unknown[]) => mockUseDeleteCategory(...args),
 }))
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -59,6 +63,7 @@ it('renders category name, code, and description in rows', () => {
   })
   mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })
   mockUseCreateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -73,6 +78,7 @@ it('shows "New Category" button for staff users', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true, company_id: 'co1' } })
   mockUseCategories.mockReturnValue({ data: { results: [], count: 0 }, isLoading: false })
   mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -83,6 +89,7 @@ it('does not show "New Category" button for non-staff users', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: false, company_id: 'co1' } })
   mockUseCategories.mockReturnValue({ data: { results: [], count: 0 }, isLoading: false })
   mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -102,6 +109,7 @@ it('shows Active/Inactive badge correctly', () => {
     isLoading: false,
   })
   mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -121,6 +129,7 @@ it('edit button click opens the modal', async () => {
     isLoading: false,
   })
   mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
   renderPage()
 
@@ -132,4 +141,93 @@ it('edit button click opens the modal', async () => {
   await userEvent.click(pencilButton!)
 
   expect(screen.getByRole('dialog')).toBeInTheDocument()
+})
+
+it('test_delete_category_opens_confirm_dialog', async () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true, company_id: 'co1' } })
+  mockUseCategories.mockReturnValue({
+    data: {
+      results: [
+        { id: 'c1', name: 'Dress', category_code: 'DRS', description: '', is_active: true, company: 'co1', cdate: '', udate: '' },
+      ],
+      count: 1,
+    },
+    isLoading: false,
+  })
+  mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: mockDeleteMutateAsync, isPending: false })
+
+  renderPage()
+
+  const trashButtons = screen.getAllByRole('button', { name: '' })
+  const trashButton = trashButtons.find(btn => btn.querySelector('.lucide-trash-2'))
+  expect(trashButton).toBeInTheDocument()
+
+  const { userEvent } = await import('@testing-library/user-event')
+  await userEvent.click(trashButton!)
+
+  expect(screen.getByText('Delete Category')).toBeInTheDocument()
+  expect(screen.getAllByText('Dress').length).toBeGreaterThan(0)
+})
+
+it('test_delete_category_success', async () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true, company_id: 'co1' } })
+  mockUseCategories.mockReturnValue({
+    data: {
+      results: [
+        { id: 'c1', name: 'Dress', category_code: 'DRS', description: '', is_active: true, company: 'co1', cdate: '', udate: '' },
+      ],
+      count: 1,
+    },
+    isLoading: false,
+  })
+  mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockDeleteMutateAsync.mockResolvedValue(undefined)
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: mockDeleteMutateAsync, isPending: false })
+
+  renderPage()
+
+  const trashButtons = screen.getAllByRole('button', { name: '' })
+  const trashButton = trashButtons.find(btn => btn.querySelector('.lucide-trash-2'))
+  expect(trashButton).toBeInTheDocument()
+
+  const { userEvent } = await import('@testing-library/user-event')
+  await userEvent.click(trashButton!)
+
+  await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+
+  expect(mockDeleteMutateAsync).toHaveBeenCalledWith('c1')
+})
+
+it('test_delete_category_blocked_shows_sku_modal', async () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true, company_id: 'co1' } })
+  mockUseCategories.mockReturnValue({
+    data: {
+      results: [
+        { id: 'c1', name: 'Dress', category_code: 'DRS', description: '', is_active: true, company: 'co1', cdate: '', udate: '' },
+      ],
+      count: 1,
+    },
+    isLoading: false,
+  })
+  mockUseUpdateCategory.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockDeleteMutateAsync.mockRejectedValue({ response: { data: { products: [{ name: 'Dress Floral', sku_code: 'DRS-001' }, { name: 'Jeans Slim', sku_code: 'DRS-002' }] } } })
+  mockUseDeleteCategory.mockReturnValue({ mutateAsync: mockDeleteMutateAsync, isPending: false })
+
+  renderPage()
+
+  const trashButtons = screen.getAllByRole('button', { name: '' })
+  const trashButton = trashButtons.find(btn => btn.querySelector('.lucide-trash-2'))
+  expect(trashButton).toBeInTheDocument()
+
+  const { userEvent } = await import('@testing-library/user-event')
+  await userEvent.click(trashButton!)
+
+  await userEvent.click(screen.getByRole('button', { name: /delete/i }))
+
+  expect(screen.getByText('Cannot Delete Category')).toBeInTheDocument()
+  expect(screen.getByText('Dress Floral')).toBeInTheDocument()
+  expect(screen.getByText('Jeans Slim')).toBeInTheDocument()
+  expect(screen.getByText('DRS-001')).toBeInTheDocument()
+  expect(screen.getByText('DRS-002')).toBeInTheDocument()
 })

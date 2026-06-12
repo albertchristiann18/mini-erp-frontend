@@ -1,5 +1,5 @@
 import client from './client'
-import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductSupplier } from '../types/inventory'
+import type { AvgSalesResult, Product, ProductVariant, ProductVariantStock, Warehouse, StockMovement, Category, PaginatedResponse, InventorySummaryResponse, Supplier, ProductSupplier, Marketplace, BusinessEntity, ProductBusinessEntity } from '../types/inventory'
 
 export const getCategories = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Category>>('/category/', { params })
@@ -9,6 +9,9 @@ export const createCategory = (data: unknown) =>
 
 export const updateCategory = (id: string, data: unknown) =>
   client.patch<Category>(`/category/${id}/`, data)
+
+export const deleteCategory = (id: string) =>
+  client.delete(`/category/${id}/`)
 
 export const getProducts = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<Product>>('/product/', { params })
@@ -139,3 +142,35 @@ export const createProductSupplier = (data: { product_id: string; supplier_id: s
 
 export const deleteProductSupplier = (id: string) =>
   client.delete(`/product-suppliers/${id}/`)
+
+export const getMarketplaces = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<Marketplace>>('/marketplace/', { params })
+
+export const createMarketplace = (data: { name: string; url?: string; is_active?: boolean }) =>
+  client.post<Marketplace>('/marketplace/', data)
+
+export const updateMarketplace = (id: string, data: Partial<{ name: string; url: string; is_active: boolean }>) =>
+  client.patch<Marketplace>(`/marketplace/${id}/`, data)
+
+export const getBusinessEntities = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<BusinessEntity>>('/business-entities/', { params })
+
+export const createBusinessEntity = (data: { name: string; marketplace_id: string; is_active?: boolean }) =>
+  client.post<BusinessEntity>('/business-entities/', data)
+
+export const updateBusinessEntity = (id: string, data: Partial<{ name: string; marketplace_id: string; is_active: boolean }>) =>
+  client.patch<BusinessEntity>(`/business-entities/${id}/`, data)
+
+export const deleteBusinessEntity = (id: string) =>
+  client.delete(`/business-entities/${id}/`)
+
+export const getProductBusinessEntities = (params?: Record<string, string | number>) =>
+  client.get<PaginatedResponse<ProductBusinessEntity>>('/product-business-entities/', { params })
+
+export const attachBusinessEntity = (data: { product_id: string; business_entity_id: string }) =>
+  client.post<{ id: string; product_id: string; business_entity_id: string; created: boolean }>(
+    '/product-business-entities/', data
+  )
+
+export const detachBusinessEntity = (id: string) =>
+  client.delete(`/product-business-entities/${id}/`)

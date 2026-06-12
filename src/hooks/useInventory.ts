@@ -6,7 +6,11 @@ import {
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getProductSuppliers, createProductSupplier, deleteProductSupplier,
-  saveVariants,
+  saveVariants, deleteCategory,
+  getMarketplaces, createMarketplace, updateMarketplace,
+  getBusinessEntities, createBusinessEntity,
+  updateBusinessEntity, deleteBusinessEntity, getProductBusinessEntities,
+  attachBusinessEntity, detachBusinessEntity,
 } from '../api/inventory'
 import type { SaveVariantsPayload } from '../api/inventory'
 import client from '../api/client'
@@ -32,6 +36,14 @@ export const useUpdateCategory = () => {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: unknown }) =>
       updateCategory(id, data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  })
+}
+
+export const useDeleteCategory = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteCategory(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
   })
 }
@@ -261,6 +273,87 @@ export const useDeleteProductSupplier = (productId: string) => {
   return useMutation({
     mutationFn: (id: string) => deleteProductSupplier(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product-suppliers', productId] }),
+  })
+}
+
+export const useMarketplaces = (params?: Record<string, string | number>) =>
+  useQuery({
+    queryKey: ['marketplaces', params],
+    queryFn: () => getMarketplaces({ page_size: 100, ...params }).then(r => r.data),
+    staleTime: 1000 * 60 * 10,
+  })
+
+export const useCreateMarketplace = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; url?: string; is_active?: boolean }) =>
+      createMarketplace(data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketplaces'] }),
+  })
+}
+
+export const useUpdateMarketplace = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<{ name: string; url: string; is_active: boolean }> }) =>
+      updateMarketplace(id, data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketplaces'] }),
+  })
+}
+
+export const useBusinessEntities = (params?: Record<string, string | number>) =>
+  useQuery({
+    queryKey: ['business-entities', params],
+    queryFn: () => getBusinessEntities(params).then(r => r.data),
+  })
+
+export const useCreateBusinessEntity = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; marketplace_id: string; is_active?: boolean }) =>
+      createBusinessEntity(data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['business-entities'] }),
+  })
+}
+
+export const useUpdateBusinessEntity = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<{ name: string; marketplace_id: string; is_active: boolean }> }) =>
+      updateBusinessEntity(id, data).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['business-entities'] }),
+  })
+}
+
+export const useDeleteBusinessEntity = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteBusinessEntity(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['business-entities'] }),
+  })
+}
+
+export const useProductBusinessEntities = (productId: string) =>
+  useQuery({
+    queryKey: ['product-business-entities', productId],
+    queryFn: () => getProductBusinessEntities({ product_id: productId }).then(r => r.data),
+    enabled: !!productId,
+  })
+
+export const useAttachBusinessEntity = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (businessEntityId: string) =>
+      attachBusinessEntity({ product_id: productId, business_entity_id: businessEntityId }).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-business-entities', productId] }),
+  })
+}
+
+export const useDetachBusinessEntity = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (assignmentId: string) => detachBusinessEntity(assignmentId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-business-entities', productId] }),
   })
 }
 

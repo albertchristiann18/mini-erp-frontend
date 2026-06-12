@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useProduct, useSaveVariants, useProductSuppliers } from '../../hooks/useInventory'
+import { useProduct, useSaveVariants, useProductSuppliers, useProductBusinessEntities, useAttachBusinessEntity, useDetachBusinessEntity, useBusinessEntities } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Input } from '../../components/ui/input'
-import { ArrowLeft, Pencil, Tag } from 'lucide-react'
+import { ArrowLeft, Pencil, Tag, Plus, X } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import type { VariantDimension } from '../../types/inventory'
 import type { SaveVariantsPayload } from '../../api/inventory'
 import { toast } from '../../lib/toast'
@@ -32,6 +34,12 @@ export default function ProductDetailPage() {
   const { data: product, isLoading } = useProduct(id!)
   const saveMutation = useSaveVariants(id!)
   const { data: productSuppliersData } = useProductSuppliers(id!)
+  const [showAttachModal, setShowAttachModal] = useState(false)
+  const [attachingId, setAttachingId] = useState('')
+  const { data: productBEData } = useProductBusinessEntities(id!)
+  const attachMutation = useAttachBusinessEntity(id!)
+  const detachMutation = useDetachBusinessEntity(id!)
+  const { data: allBEData } = useBusinessEntities({ page_size: 100, is_active: 'true' })
 
   const variants = product?.variants ?? []
   const photos = product?.photos ?? []
@@ -93,6 +101,10 @@ export default function ProductDetailPage() {
   if (!product) {
     return <div className="p-8 text-center text-muted-foreground">Product not found</div>
   }
+
+  const assignments = productBEData?.results ?? []
+  const attachedMarketplaceIds = new Set(assignments.map(a => a.marketplace_id))
+  const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
 
   const activeVariants = variants.filter(v => v.is_active)
   const marketplaceIds = [...new Set(
@@ -218,6 +230,83 @@ export default function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      {/* D3. BUSINESS ENTITIES */}
+      <div className="rounded-lg border bg-card">
+        <div className="p-4 border-b flex items-center justify-between">
+          <span className="font-semibold">Business Entities</span>
+          {user?.is_staff && (
+            <Button size="sm" variant="outline" onClick={() => setShowAttachModal(true)}>
+              <Plus className="h-4 w-4 mr-1" /> Attach
+            </Button>
+          )}
+        </div>
+        <div className="p-4">
+          {assignments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No business entities attached</p>
+          ) : (
+            <div className="space-y-2">
+              {assignments.map(a => (
+                <div key={a.id} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{a.business_entity_name}</span>
+                    <Badge variant="outline" className="text-xs">{a.marketplace_name}</Badge>
+                  </div>
+                  {user?.is_staff && (
+                    <Button
+                      size="sm" variant="ghost"
+                      onClick={() => detachMutation.mutate(a.id, {
+                        onSuccess: () => toast.success('Detached'),
+                        onError: () => toast.error('Failed to detach'),
+                      })}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={showAttachModal} onOpenChange={setShowAttachModal}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Attach Business Entity</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <Select value={attachingId} onValueChange={setAttachingId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a business entity" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableBEs.map(be => {
+                  const disabled = attachedMarketplaceIds.has(be.marketplace_id)
+                  return (
+                    <SelectItem key={be.id} value={be.id} disabled={disabled}>
+                      {be.name} ({be.marketplace_name})
+                      {disabled ? ' (marketplace already attached)' : ''}
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAttachModal(false)}>Cancel</Button>
+            <Button
+              disabled={!attachingId}
+              onClick={() => {
+                attachMutation.mutate(attachingId, {
+                  onSuccess: () => { toast.success('Attached'); setShowAttachModal(false); setAttachingId('') },
+                  onError: (err) => toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to attach'),
+                })
+              }}
+            >
+              Attach
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* E. VARIANT DETAIL GRID */}
       <div className="rounded-lg border bg-card">
