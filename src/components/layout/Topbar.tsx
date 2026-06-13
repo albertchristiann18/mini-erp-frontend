@@ -27,10 +27,16 @@ export function Topbar({ title }: TopbarProps) {
         </Button>
         {user && (
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-xs text-primary-foreground font-medium uppercase">
-              {user.username[0]}
-            </div>
-            <span className="text-sm text-muted-foreground hidden sm:block">{user.username}</span>
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-2 cursor-pointer hover:opacity-80"
+            >
+              <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-xs text-primary-foreground font-medium uppercase">
+                {user.username[0]}
+              </div>
+              <span className="text-sm text-muted-foreground hidden sm:block">{user.username}</span>
+            </button>
             {user.is_staff && (
               <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium">Admin</span>
             )}

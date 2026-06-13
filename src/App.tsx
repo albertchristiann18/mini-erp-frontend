@@ -44,6 +44,7 @@ const CategoriesPage = lazy(() => import('./pages/inventory/CategoriesPage'))
 const MarketplacesPage = lazy(() => import('./pages/inventory/MarketplacesPage'))
 const BusinessEntitiesPage = lazy(() => import('./pages/inventory/BusinessEntitiesPage'))
 const SuppliersPage = lazy(() => import('./pages/purchasing/SuppliersPage'))
+const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'))
 
 const Loading = () => (
   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -112,6 +113,7 @@ export default function App() {
                     <Route path="tiktok/settings" element={<Suspense fallback={<Loading />}><TikTokSettingsPage /></Suspense>} />
                     <Route path="tiktok/webhook-logs" element={<Suspense fallback={<Loading />}><TikTokWebhookLogPage /></Suspense>} />
                   </Route>
+                  <Route path="profile" element={<Suspense fallback={<Loading />}><ProfilePage /></Suspense>} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Route>
               </Route>

@@ -15,6 +15,10 @@ vi.mock('../../../hooks/useInventory', () => ({
   useCreateProductSupplier: vi.fn(),
   useDeleteProductSupplier: vi.fn(),
   useSuppliers: vi.fn(),
+  useProductBusinessEntities: vi.fn(() => ({ data: undefined, isLoading: false })),
+  useAttachBusinessEntity: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useDetachBusinessEntity: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useBusinessEntities: vi.fn(() => ({ data: undefined, isLoading: false })),
 }))
 
 vi.mock('react-router-dom', async () => {

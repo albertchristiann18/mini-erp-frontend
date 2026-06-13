@@ -4,6 +4,7 @@ export interface AuthUser {
   email: string
   is_staff: boolean
   company_id: string | null
+  company_name: string | null
   role: string | null
 }
 
