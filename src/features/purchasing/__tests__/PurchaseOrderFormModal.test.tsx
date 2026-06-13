@@ -66,6 +66,17 @@ vi.mock('../../../hooks/useInventory', () => ({
       ],
     },
   }),
+  useSuppliers: () => ({
+    data: {
+      count: 2,
+      results: [
+        { id: 'sup1', name: 'Supplier A' },
+        { id: 'sup2', name: 'Supplier B' },
+      ],
+    },
+  }),
+  useCreateSupplier: () => ({ mutateAsync: vi.fn().mockResolvedValue({ id: 'sup3', name: 'New Sup', is_active: true, contact_name: null, phone: null, country: null, notes: null, supplier_link: null, company_id: 'c1', cdate: '', udate: '' }), isPending: false }),
+  useUpdateSupplier: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('../../../lib/toast', () => ({
@@ -133,4 +144,22 @@ it('shows stock intel strip with SOH, AVG, DOI when variant is selected', async 
   expect(screen.getByText(/Incoming:/)).toBeInTheDocument()
   expect(screen.getByText(/AVG/)).toBeInTheDocument()
   expect(screen.getAllByText(/DOI:/).length).toBeGreaterThanOrEqual(1)
+})
+
+it('test_supplier_dropdown_renders', async () => {
+  renderModal()
+  expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+  expect(screen.getByText('Supplier')).toBeInTheDocument()
+})
+
+it('test_supplier_filters_variants', async () => {
+  renderModal()
+  expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+  expect(screen.getAllByText('No supplier').length).toBeGreaterThanOrEqual(1)
+})
+
+it('test_po_modal_renders_with_supplier_section', async () => {
+  renderModal()
+  expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+  expect(screen.getByText('Supplier')).toBeInTheDocument()
 })

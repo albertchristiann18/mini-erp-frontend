@@ -2,11 +2,24 @@ export interface Category {
   id: string
   company: string
   name: string
+  category_code: string
   description: string
   is_active: boolean
   master_category_key?: string
   cdate: string
   udate: string
+}
+
+export interface VariantDimensionValue {
+  id: string
+  label: string
+}
+
+export interface VariantDimension {
+  id: string
+  name: string
+  order: number
+  values: VariantDimensionValue[]
 }
 
 export interface ProductPhoto {
@@ -32,10 +45,11 @@ export interface Product {
   height: number
   weight: number
   is_active: boolean
-  supplier_link: string | null
+  specifications?: Record<string, string>
   master_category_key: string | null
   photos?: ProductPhoto[]
   variants?: ProductVariant[]
+  variant_options?: Record<string, string[]>
   cdate: string
   udate: string
 }
@@ -51,9 +65,11 @@ export interface ProductVariant {
   product_supplier_link: string | null
   product_photo_url: string | null
   base_price: number
+  current_cogs?: number
   total_available_qty: number
   total_incoming_qty: number
   is_active: boolean
+  variant_values?: Record<string, string>
   marketplace_listings?: Array<{
     marketplace_id: string
     selling_price: number
@@ -152,6 +168,60 @@ export interface InventorySummaryWarehouse {
   name: string
 }
 
+export interface CompanyMarketplace {
+  id: string
+  company_id: string
+  name: string
+  is_active: boolean
+  cdate: string
+  udate: string
+}
+
+export interface BusinessEntity {
+  id: string
+  company_id: string
+  name: string
+  marketplace_id: string
+  marketplace_name: string
+  is_active: boolean
+  cdate: string
+  udate: string
+}
+
+export interface ProductBusinessEntity {
+  id: string
+  product_id: string
+  product_name: string
+  product_sku: string
+  business_entity_id: string
+  business_entity_name: string
+  marketplace_id: string
+  marketplace_name: string
+  cdate: string
+}
+
+export interface Supplier {
+  id: string
+  name: string
+  contact_name: string | null
+  phone: string | null
+  country: string | null
+  notes: string | null
+  supplier_link: string | null
+  is_active: boolean
+  company_id: string
+  cdate: string
+  udate: string
+}
+
+export interface ProductSupplier {
+  id: string
+  supplier_id: string
+  supplier_name: string
+  supplier_link: string | null
+  cdate: string
+  udate: string
+}
 export interface InventorySummaryResponse {
   warehouses: InventorySummaryWarehouse[]
   products: InventorySummaryProduct[]

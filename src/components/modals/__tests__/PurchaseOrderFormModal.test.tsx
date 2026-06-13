@@ -7,6 +7,9 @@ import { PurchaseOrderFormModal } from '../PurchaseOrderFormModal'
 
 vi.mock('../../../hooks/useInventory', () => ({
   useWarehouses: () => ({ data: { results: [{ id: 'w1', name: 'Main WH' }] } }),
+  useSuppliers: () => ({ data: { results: [{ id: 'sup1', name: 'Supplier A' }] } }),
+  useCreateSupplier: () => ({ mutateAsync: vi.fn().mockResolvedValue({ id: 'sup3', name: 'New Sup', is_active: true, contact_name: null, phone: null, country: null, notes: null, supplier_link: null, company_id: 'c1', cdate: '', udate: '' }), isPending: false }),
+  useUpdateSupplier: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('../../../hooks/usePurchasing', () => ({

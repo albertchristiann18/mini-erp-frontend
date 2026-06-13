@@ -25,6 +25,9 @@ const navItems: NavItem[] = [
     label: 'Inventory', icon: <Package className="h-4 w-4" />,
     children: [
       { label: 'Products', to: '/inventory/products' },
+      { label: 'Categories', to: '/inventory/categories' },
+      { label: 'Marketplaces', to: '/inventory/marketplaces' },
+      { label: 'Business Entities', to: '/inventory/business-entities' },
       { label: 'Stock', to: '/inventory/stock' },
       { label: 'Stock Closing', to: '/inventory/stock-closing' },
       { label: 'Warehouses', to: '/inventory/warehouses' },
@@ -35,6 +38,7 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Purchase Orders', to: '/purchasing/orders' },
       { label: 'Replenishment', to: '/purchasing/replenishment' },
+      { label: 'Suppliers', to: '/purchasing/suppliers' },
     ],
   },
   {
@@ -108,7 +112,7 @@ export function Sidebar() {
       <div className="flex h-14 items-center border-b px-4">
         <span className="font-semibold text-foreground">Mini ERP</span>
       </div>
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto p-3 space-y-1 overscroll-contain">
         {navItems.map(item =>
           item.to ? (
             <NavLink

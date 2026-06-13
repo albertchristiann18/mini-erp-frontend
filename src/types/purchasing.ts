@@ -43,6 +43,7 @@ export interface PurchaseOrder {
   purchase_order_number: string
   status: POStatus
   supplier_name: string | null
+  supplier_id: string | null
   forwarder_name: string | null
   shop_services: string | null
   commission_fee_pct: number | null

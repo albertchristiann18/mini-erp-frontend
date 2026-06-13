@@ -30,6 +30,7 @@ const mockPO: PurchaseOrder = {
   status: "ORDERED",
   next_status: "SHIPPED",
   supplier_name: "Test Supplier",
+  supplier_id: null,
   forwarder_name: "Test Forwarder",
   shop_services: "Taobao",
   commission_fee_pct: 5,

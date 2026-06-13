@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
-import { useWarehouses } from '../../hooks/useInventory'
+import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
+import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -103,6 +104,8 @@ export default function PurchaseOrderDetailPage() {
   })
   const { data: warehouseData } = useWarehouses()
   const warehouses = warehouseData?.results ?? []
+  const { data: suppliersData } = useSuppliers({ active_only: 'true' })
+  const suppliers = suppliersData?.results ?? []
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [showAdvanceModal, setShowAdvanceModal] = useState(false)
   const [validationErrors, setValidationErrors] = useState<string[]>([])
@@ -123,6 +126,7 @@ export default function PurchaseOrderDetailPage() {
     discounted_unit_price_foreign: string
   }>>([])
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
+  const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
   const [hasDiscount, setHasDiscount] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -278,7 +282,7 @@ export default function PurchaseOrderDetailPage() {
       return
     }
     const payload: Record<string, unknown> = { warehouse_id: headerValues.warehouse_id }
-    const optionalFields = ['currency', 'exchange_rate', 'supplier_name', 'forwarder_name',
+    const optionalFields = ['currency', 'exchange_rate', 'supplier_id', 'supplier_name', 'forwarder_name',
       'shop_services', 'commission_fee_pct', 'delivery_fee', 'forecast_delivery_date',
       'forecast_cbm', 'forecast_shipping_fee_per_cbm', 'note']
     const numericFields = ['exchange_rate', 'commission_fee_pct', 'delivery_fee', 'forecast_cbm', 'forecast_shipping_fee_per_cbm']
@@ -339,8 +343,20 @@ export default function PurchaseOrderDetailPage() {
       toast.success('Purchase order updated')
       cancelEditMode()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to save'
-      toast.error(msg)
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
+      if (data && typeof data === 'object') {
+        const messages: string[] = []
+        for (const [field, msg] of Object.entries(data)) {
+          const label = HEADER_FIELD_CONFIG[field]?.label ?? field
+          const text = Array.isArray(msg) ? msg.join(', ') : String(msg)
+          messages.push(`${label}: ${text}`)
+        }
+        if (messages.length > 0) {
+          setValidationErrors(messages)
+          return
+        }
+      }
+      toast.error('Failed to save')
     }
   }
 
@@ -769,15 +785,46 @@ export default function PurchaseOrderDetailPage() {
                   <p className="text-sm font-semibold">{po?.warehouse_name ?? '—'}</p>
                 )}
               </div>
-              <EditableInfoItem
-                field="supplier_name"
-                label="Supplier"
-                value={po?.supplier_name}
-                editMode={editMode}
-                editable={isCreating || (po?.editable_fields?.header?.includes('supplier_name') ?? false)}
-                headerValues={headerValues}
-                setHeaderField={setHeaderField}
-              />
+              {(isCreating || (editMode && (po?.editable_fields?.header?.includes('supplier_name') ?? false))) ? (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Supplier</p>
+                  <Select
+                    value={String(headerValues.supplier_id ?? po?.supplier_id ?? '')}
+                    onValueChange={val => setHeaderField('supplier_id', val === 'none' ? '' : val)}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder="No supplier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No supplier</SelectItem>
+                      {suppliers.map((s: { id: string; name: string }) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                      <div className="border-t mt-1 pt-1 px-1 pb-1">
+                        <button
+                          type="button"
+                          className="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs text-primary hover:bg-accent rounded-sm cursor-pointer"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setShowNewSupplierModal(true)}
+                        >
+                          <Plus className="h-3 w-3" />
+                          New Supplier
+                        </button>
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <EditableInfoItem
+                  field="supplier_name"
+                  label="Supplier"
+                  value={po?.supplier_name}
+                  editMode={editMode}
+                  editable={false}
+                  headerValues={headerValues}
+                  setHeaderField={setHeaderField}
+                />
+              )}
               <EditableInfoItem
                 field="forwarder_name"
                 label="Forwarder"
@@ -1208,6 +1255,14 @@ export default function PurchaseOrderDetailPage() {
       <ValidationModal
         errors={validationErrors}
         onClose={() => setValidationErrors([])}
+      />
+      <SupplierFormModal
+        open={showNewSupplierModal}
+        onClose={() => setShowNewSupplierModal(false)}
+        onCreated={(s) => {
+          setHeaderField('supplier_id', s.id)
+          setShowNewSupplierModal(false)
+        }}
       />
     </div>
   )

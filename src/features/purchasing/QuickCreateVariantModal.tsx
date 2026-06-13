@@ -5,16 +5,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { FormField } from '../../components/ui/form'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { useCreateProduct, useCategories } from '../../hooks/useInventory'
+import { CategorySelect } from '../../components/ui/CategorySelect'
+import { useCreateProduct } from '../../hooks/useInventory'
+import { useAuth } from '../../contexts/AuthContext'
 import { toast } from '../../lib/toast'
 
 const schema = z.object({
   productName: z.string().min(1, 'Product name is required'),
-  productSku: z.string().min(1, 'SKU is required'),
-  categoryId: z.string().optional(),
+  categoryId: z.string().min(1, 'Category is required'),
   variantName: z.string().min(1, 'Variant name is required'),
   variantSkuSuffix: z.string().min(1, 'Variant SKU suffix is required'),
+  weight: z.number().int().min(0).optional(),
+  length: z.number().int().min(0).optional(),
+  width: z.number().int().min(0).optional(),
+  height: z.number().int().min(0).optional(),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -22,13 +26,11 @@ interface Props {
   open: boolean
   onClose: () => void
   onCreated: (variantId: string, variantLabel: string) => void
-  companyId?: string
 }
 
 export function QuickCreateVariantModal({ open, onClose, onCreated }: Props) {
-  const { data: categoriesData } = useCategories()
+  const { user } = useAuth()
   const createMutation = useCreateProduct()
-  const categories = categoriesData?.results ?? []
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -41,21 +43,24 @@ export function QuickCreateVariantModal({ open, onClose, onCreated }: Props) {
   }
 
   const onSubmit = async (values: FormValues) => {
-    const skuVariantCode = `${values.productSku}-${values.variantSkuSuffix}`.toUpperCase()
+    const skuVariantCode = values.variantSkuSuffix.toUpperCase()
     const description = `${values.productName} (created via PO - update description in product settings)`
 
-    const payload: Record<string, unknown> = {
+    const payload = {
       name: values.productName,
       description,
+      company_id: user?.company_id,
+      category_id: values.categoryId,
+      weight: values.weight ?? 0,
+      length: values.length ?? 0,
+      width: values.width ?? 0,
+      height: values.height ?? 0,
       variants: [{
         name: values.variantName,
         sku_variant_code: skuVariantCode,
         base_price: 0,
         marketplace_listings: [],
       }],
-    }
-    if (values.categoryId) {
-      payload.category_id = values.categoryId
     }
 
     try {
@@ -79,26 +84,16 @@ export function QuickCreateVariantModal({ open, onClose, onCreated }: Props) {
           <DialogTitle>Quick Create Product</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Product Name" error={errors.productName?.message} required>
-              <Input {...register('productName')} placeholder="e.g. Kaos Polos" autoFocus />
-            </FormField>
-            <FormField label="Product SKU" error={errors.productSku?.message} required>
-              <Input {...register('productSku')} placeholder="e.g. KAO-001" />
-            </FormField>
-          </div>
-          <FormField label="Category" error={undefined}>
-            <Select
+          <FormField label="Product Name" error={errors.productName?.message} required>
+            <Input {...register('productName')} placeholder="e.g. Kaos Polos" autoFocus />
+          </FormField>
+          <FormField label="Category" error={errors.categoryId?.message} required>
+            <CategorySelect
               value={watch('categoryId') ?? ''}
-              onValueChange={(v) => setValue('categoryId', v)}
-            >
-              <SelectTrigger><SelectValue placeholder="Select category (optional)" /></SelectTrigger>
-              <SelectContent>
-                {categories.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(id) => setValue('categoryId', id, { shouldValidate: true })}
+              error={errors.categoryId?.message}
+              required
+            />
           </FormField>
           <div className="border-t pt-3">
             <p className="text-xs font-medium text-muted-foreground mb-2">First Variant</p>
@@ -110,11 +105,20 @@ export function QuickCreateVariantModal({ open, onClose, onCreated }: Props) {
                 <Input {...register('variantSkuSuffix')} placeholder="e.g. BLU-M" />
               </FormField>
             </div>
-            {watch('productSku') && watch('variantSkuSuffix') && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Full SKU: <span className="font-mono font-medium">{`${watch('productSku')}-${watch('variantSkuSuffix')}`.toUpperCase()}</span>
-              </p>
-            )}
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <FormField label="Weight (g)" error={errors.weight?.message}>
+              <Input type="number" min="0" {...register('weight', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Length (cm)" error={errors.length?.message}>
+              <Input type="number" min="0" {...register('length', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Width (cm)" error={errors.width?.message}>
+              <Input type="number" min="0" {...register('width', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
+            <FormField label="Height (cm)" error={errors.height?.message}>
+              <Input type="number" min="0" {...register('height', { valueAsNumber: true })} placeholder="0" />
+            </FormField>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>

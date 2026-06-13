@@ -12,9 +12,10 @@ interface Props {
   onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
   placeholder?: string
   excludeVariantIds?: Set<string>
+  supplierId?: string
 }
 
-export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, placeholder = 'Select variant', excludeVariantIds }: Props) {
+export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, placeholder = 'Select variant', excludeVariantIds, supplierId }: Props) {
   const [open, setOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
@@ -33,7 +34,11 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
   }, [open])
 
   const { data, isLoading } = useVariantSearch(
-    { search: activeSearch || undefined, page_size: 10 },
+    {
+      search: activeSearch || undefined,
+      page_size: 10,
+      ...(supplierId ? { supplier_id: supplierId } : {}),
+    },
     open,
   )
 

@@ -38,6 +38,12 @@ const TikTokWebhookLogPage = lazy(() => import('./pages/tiktok/TikTokWebhookLogP
 const StockClosingPage = lazy(() => import('./pages/inventory/StockClosingPage'))
 const InventoryDashboardPage = lazy(() => import('./pages/dashboard/InventoryDashboardPage'))
 const BulkStockUpdatePage = lazy(() => import('./pages/inventory/BulkStockUpdatePage'))
+const MarketplaceReconcilePage = lazy(() => import('./pages/inventory/MarketplaceReconcilePage'))
+const ProductEditPage = lazy(() => import('./pages/inventory/ProductEditPage'))
+const CategoriesPage = lazy(() => import('./pages/inventory/CategoriesPage'))
+const MarketplacesPage = lazy(() => import('./pages/inventory/MarketplacesPage'))
+const BusinessEntitiesPage = lazy(() => import('./pages/inventory/BusinessEntitiesPage'))
+const SuppliersPage = lazy(() => import('./pages/purchasing/SuppliersPage'))
 
 const Loading = () => (
   <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -59,20 +65,27 @@ export default function App() {
                   <Route index element={<Suspense fallback={<Loading />}><DashboardPage /></Suspense>} />
                   <Route path="inventory">
                     <Route path="products" element={<Suspense fallback={<Loading />}><ProductsPage /></Suspense>} />
+                    <Route path="products/new" element={<Suspense fallback={<Loading />}><ProductEditPage /></Suspense>} />
+                    <Route path="products/:id/edit" element={<Suspense fallback={<Loading />}><ProductEditPage /></Suspense>} />
                     <Route path="products/:id" element={<Suspense fallback={<Loading />}><ProductDetailPage /></Suspense>} />
                     <Route path="stock" element={<Suspense fallback={<Loading />}><StockPage /></Suspense>} />
                     <Route path="warehouses" element={<Suspense fallback={<Loading />}><WarehousesPage /></Suspense>} />
                     <Route path="stock-closing" element={<Suspense fallback={<Loading />}><StockClosingPage /></Suspense>} />
                     <Route path="inventory-dashboard" element={<Suspense fallback={<Loading />}><InventoryDashboardPage /></Suspense>} />
                     <Route path="bulk-stock-update" element={<Suspense fallback={<Loading />}><BulkStockUpdatePage /></Suspense>} />
+                    <Route path="marketplace-reconcile" element={<Suspense fallback={<Loading />}><MarketplaceReconcilePage /></Suspense>} />
+                    <Route path="categories" element={<Suspense fallback={<Loading />}><CategoriesPage /></Suspense>} />
+                    <Route path="marketplaces" element={<Suspense fallback={<Loading />}><MarketplacesPage /></Suspense>} />
+                    <Route path="business-entities" element={<Suspense fallback={<Loading />}><BusinessEntitiesPage /></Suspense>} />
                   </Route>
                   <Route path="purchasing">
                     <Route path="orders" element={<Suspense fallback={<Loading />}><PurchaseOrdersPage /></Suspense>} />
                     <Route path="orders/:id" element={<Suspense fallback={<Loading />}><PurchaseOrderDetailPage /></Suspense>} />
-                    <Route
-                      path="replenishment"
-                      element={<Suspense fallback={<Loading />}><ReplenishmentPage /></Suspense>}
-                    />
+                  <Route
+                    path="replenishment"
+                    element={<Suspense fallback={<Loading />}><ReplenishmentPage /></Suspense>}
+                  />
+                  <Route path="suppliers" element={<Suspense fallback={<Loading />}><SuppliersPage /></Suspense>} />
                   </Route>
                   <Route path="sales">
                     <Route
