@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Document, Page, View, Text, Image, Link, StyleSheet, PDFViewer, pdf } from '@react-pdf/renderer'
 import type { PurchaseOrder, PurchaseOrderDetail } from '../../types/purchasing'
+import client from '../../api/client'
 
-async function fetchAsBase64(url: string): Promise<string | null> {
+async function fetchPhotoViaProxy(productId: string): Promise<string | null> {
   try {
-    const response = await fetch(url)
-    const blob = await response.blob()
+    const response = await client.get<Blob>(`/product/${productId}/photo-proxy/`, {
+      responseType: 'blob',
+    })
+    const blob = response.data
     return new Promise<string>(resolve => {
       const reader = new FileReader()
       reader.onloadend = () => resolve(reader.result as string)
@@ -126,8 +129,11 @@ function PODocument({ po, groups, grandTotalForeign, currencySymbol, imageMap }:
           return (
             <View key={gi} style={styles.productBlock} wrap={false}>
               <View style={styles.imageBox}>
-                {group.product_photo_url
-                  ? <Image src={imageMap[group.product_photo_url] ?? group.product_photo_url} style={styles.productImage} />
+                {(group.product_photo_url || imageMap[group.product_id])
+                  ? <Image
+                      src={imageMap[group.product_id] ?? group.product_photo_url ?? ''}
+                      style={styles.productImage}
+                    />
                   : <View style={styles.imagePlaceholder} />
                 }
               </View>
@@ -207,24 +213,26 @@ export default function PurchaseOrderExportPDF({ po }: Props) {
   const [imageMap, setImageMap] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    const urls = groups
-      .map(g => g.product_photo_url)
-      .filter((u): u is string => !!u)
-    if (urls.length === 0) return
+    const groupsWithPhoto = groups.filter(g => g.product_photo_url && g.product_id)
+    if (groupsWithPhoto.length === 0) return
 
     let cancelled = false
-    Promise.all(urls.map(async url => {
-      const base64 = await fetchAsBase64(url)
-      return [url, base64] as const
-    })).then(entries => {
+    Promise.all(
+      groupsWithPhoto.map(async g => {
+        const base64 = await fetchPhotoViaProxy(g.product_id)
+        return [g.product_id, base64] as const
+      }),
+    ).then(entries => {
       if (cancelled) return
       const map: Record<string, string> = {}
-      for (const [url, base64] of entries) {
-        if (base64) map[url] = base64
+      for (const [productId, base64] of entries) {
+        if (base64) map[productId] = base64
       }
       setImageMap(map)
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [po.id])
 
   const handleDownload = async () => {
