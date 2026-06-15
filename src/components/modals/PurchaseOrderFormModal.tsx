@@ -339,7 +339,15 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                           </Button>
                         </div>
                         {variantId && (
-                          <VariantStockStrip variantId={variantId} stockMap={stockMap} avgWindow={avgWindow} orderedQty={watch(`order_details.${i}.ordered_qty`) || 0} />
+                          <VariantStockStrip
+                            variantId={variantId}
+                            stockMap={stockMap}
+                            avgWindow={avgWindow}
+                            orderedQty={watch(`order_details.${i}.ordered_qty`) || 0}
+                            onUseRec={(qty) =>
+                              setValue(`order_details.${i}.ordered_qty`, qty, { shouldValidate: true })
+                            }
+                          />
                         )}
                       </div>
                     )
@@ -369,22 +377,27 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   )
 }
 
-function VariantStockStrip({
+export function VariantStockStrip({
   variantId,
   stockMap,
   avgWindow,
   orderedQty,
+  onUseRec,
 }: {
   variantId: string
   stockMap: Map<string, ReplenishmentItem>
   avgWindow: 7 | 30
   orderedQty: number
+  onUseRec?: (qty: number) => void
 }) {
   const stats = stockMap.get(variantId)
   if (!stats) return null
   const avg = avgWindow === 7 ? stats.avg_sales_7d : stats.avg_sales_30d
   const doi = avg > 0 ? Math.round((stats.stock_on_hand + stats.incoming_qty) / avg) : null
   const doiAfter = avg > 0 ? Math.round((stats.stock_on_hand + stats.incoming_qty + orderedQty) / avg) : null
+  const recQty = avg > 0
+    ? Math.max(0, Math.ceil(90 * avg) - stats.stock_on_hand - stats.incoming_qty)
+    : null
   return (
     <div className="ml-2 flex flex-wrap gap-3 pb-1.5 text-xs text-muted-foreground">
       <span>SOH: <strong className="text-foreground">{stats.stock_on_hand}</strong></span>
@@ -402,6 +415,21 @@ function VariantStockStrip({
           {doiAfter !== null ? `${doiAfter}d` : '∞'}
         </strong>
       </span>
+      {recQty !== null && (
+        <span>
+          Rec:{' '}
+          <strong className="text-foreground">{recQty}</strong>
+          {onUseRec && recQty > 0 && (
+            <button
+              type="button"
+              className="ml-1 text-[11px] text-primary hover:underline"
+              onClick={() => onUseRec(recQty)}
+            >
+              Use
+            </button>
+          )}
+        </span>
+      )}
     </div>
   )
 }

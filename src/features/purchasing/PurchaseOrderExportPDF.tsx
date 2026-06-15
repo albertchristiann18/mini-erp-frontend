@@ -27,7 +27,7 @@ interface ProductGroup {
   items: PurchaseOrderDetail[]
 }
 
-function groupByProduct(details: PurchaseOrderDetail[]): ProductGroup[] {
+export function groupByProduct(details: PurchaseOrderDetail[]): ProductGroup[] {
   const map = new Map<string, ProductGroup>()
   for (const item of details) {
     if (!map.has(item.product_id)) {
@@ -139,7 +139,6 @@ function PODocument({ po, groups, grandTotalForeign, currencySymbol, imageMap }:
               </View>
 
               <View style={styles.productContent}>
-                <Text style={styles.productName}>{group.product_name}</Text>
                 {group.product_supplier_link && (
                   <Link src={group.product_supplier_link} style={styles.productLink}>
                     {group.product_supplier_link}

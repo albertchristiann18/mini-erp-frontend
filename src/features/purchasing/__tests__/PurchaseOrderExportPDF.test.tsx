@@ -17,7 +17,7 @@ vi.mock('@react-pdf/renderer', () => ({
   pdf: () => ({ toBlob: () => new Blob() }),
 }))
 
-import PurchaseOrderExportPDF from '../PurchaseOrderExportPDF'
+import PurchaseOrderExportPDF, { groupByProduct } from '../PurchaseOrderExportPDF'
 import type { PurchaseOrder } from '../../../types/purchasing'
 
 const mockPo = {
@@ -149,4 +149,61 @@ it('PO export shows image placeholder when no photo', () => {
 
   const images = screen.queryAllByTestId('pdf-image')
   expect(images.length).toBe(0)
+})
+
+it('groupByProduct sets product_name correctly', () => {
+  const details = [
+    {
+      id: 'd1',
+      variant_id: 'v1',
+      product_variant_name: 'Red',
+      product_id: 'p1',
+      product_name: 'Product A',
+      product_supplier_link: null,
+      product_photo_url: null,
+      ordered_qty: 5,
+      received_qty: null,
+      unit_price_foreign: '10.00',
+      unit_price_base: 15000,
+      discounted_unit_price_foreign: null,
+      discounted_unit_price_base: null,
+      total_price_foreign: '50.00',
+      total_price_base: 75000,
+      discounted_total_price_foreign: null,
+      discounted_total_price_base: null,
+      remarks: '',
+      avg_sales: null,
+      avg_sales_7d: null,
+      stock_on_hand: 20,
+      incoming_qty: 0,
+    },
+    {
+      id: 'd2',
+      variant_id: 'v2',
+      product_variant_name: 'Blue',
+      product_id: 'p1',
+      product_name: 'Product A',
+      product_supplier_link: null,
+      product_photo_url: null,
+      ordered_qty: 3,
+      received_qty: null,
+      unit_price_foreign: '10.00',
+      unit_price_base: 15000,
+      discounted_unit_price_foreign: null,
+      discounted_unit_price_base: null,
+      total_price_foreign: '30.00',
+      total_price_base: 45000,
+      discounted_total_price_foreign: null,
+      discounted_total_price_base: null,
+      remarks: '',
+      avg_sales: null,
+      avg_sales_7d: null,
+      stock_on_hand: 10,
+      incoming_qty: 0,
+    },
+  ]
+  const groups = groupByProduct(details)
+  expect(groups).toHaveLength(1)
+  expect(groups[0].product_name).toBe('Product A')
+  expect(groups[0].items).toHaveLength(2)
 })

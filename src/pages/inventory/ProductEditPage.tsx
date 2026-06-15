@@ -34,10 +34,24 @@ import {
 import { Badge } from '../../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { PhotoUploadGrid } from '../../components/inventory/PhotoUploadGrid'
-import { ArrowLeft, X, Plus, Pencil, ImagePlus } from 'lucide-react'
+import { ArrowLeft, X, Plus, Pencil, ImagePlus, GripVertical } from 'lucide-react'
 import type { Product, ProductPhoto, VariantDimension, VariantDimensionValue } from '../../types/inventory'
 import type { SaveVariantsPayload, SaveVariantItem } from '../../api/inventory'
 import { uploadVariantPhoto } from '../../api/inventory'
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 type VariantRow = {
   id?: string
@@ -67,6 +81,133 @@ type FormValues = z.infer<typeof schema>
 function getLabelForDim(dim: VariantDimension, valueId: string | undefined): string {
   if (!valueId) return ''
   return dim.values.find(v => v.id === valueId)?.label ?? valueId
+}
+
+function SortableDimRow({
+  dim,
+  dimIdx,
+  renamingDimIdx,
+  renameDimValue,
+  setRenameDimValue,
+  setRenamingDimIdx,
+  addValueActiveIdx,
+  setAddValueActiveIdx,
+  addValueInputs,
+  setAddValueInputs,
+  handleRenameDimension,
+  handleDeleteDimension,
+  handleAddValue,
+  handleRemoveValue,
+}: {
+  dim: VariantDimension
+  dimIdx: number
+  renamingDimIdx: number | null
+  renameDimValue: string
+  setRenameDimValue: (v: string) => void
+  setRenamingDimIdx: (i: number | null) => void
+  addValueActiveIdx: number | null
+  setAddValueActiveIdx: (i: number | null) => void
+  addValueInputs: Record<number, string>
+  setAddValueInputs: React.Dispatch<React.SetStateAction<Record<number, string>>>
+  handleRenameDimension: (i: number) => void
+  handleDeleteDimension: (i: number) => void
+  handleAddValue: (i: number) => void
+  handleRemoveValue: (i: number, val: VariantDimensionValue) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: dim.id })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  }
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div className="flex items-center gap-2 mb-2">
+        <button
+          type="button"
+          className="cursor-grab text-muted-foreground hover:text-foreground touch-none shrink-0"
+          {...attributes}
+          {...listeners}
+          title="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        {renamingDimIdx === dimIdx ? (
+          <>
+            <Input
+              autoFocus
+              value={renameDimValue}
+              onChange={e => setRenameDimValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); handleRenameDimension(dimIdx) }
+                if (e.key === 'Escape') { setRenamingDimIdx(null); setRenameDimValue('') }
+              }}
+              className="h-7 w-32 text-sm"
+            />
+            <Button type="button" size="sm" className="h-7 px-2 text-xs"
+              onClick={() => handleRenameDimension(dimIdx)}>Save</Button>
+            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs"
+              onClick={() => { setRenamingDimIdx(null); setRenameDimValue('') }}>Cancel</Button>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              {dim.name}
+            </p>
+            <button type="button"
+              onClick={() => { setRenamingDimIdx(dimIdx); setRenameDimValue(dim.name) }}
+              className="text-xs text-muted-foreground hover:text-foreground" title="Rename attribute">
+              <Pencil className="h-3 w-3" />
+            </button>
+            <button type="button"
+              onClick={() => handleDeleteDimension(dimIdx)}
+              className="text-xs text-muted-foreground hover:text-destructive" title="Delete attribute">
+              <X className="h-3 w-3" />
+            </button>
+          </>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        {dim.values.map(val => (
+          <Badge key={val.id} variant="secondary" className="gap-1 pr-1 text-sm py-1">
+            {val.label}
+            <button type="button" onClick={() => handleRemoveValue(dimIdx, val)}
+              className="ml-1 hover:text-destructive">
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
+        {addValueActiveIdx === dimIdx ? (
+          <div className="flex items-center gap-1">
+            <Input
+              autoFocus
+              placeholder={`Add ${dim.name}`}
+              value={addValueInputs[dimIdx] ?? ''}
+              onChange={e => setAddValueInputs(prev => ({ ...prev, [dimIdx]: e.target.value }))}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); handleAddValue(dimIdx); setAddValueActiveIdx(null) }
+                if (e.key === 'Escape') { setAddValueActiveIdx(null); setAddValueInputs(prev => ({ ...prev, [dimIdx]: '' })) }
+              }}
+              className="h-8 w-32 text-sm"
+            />
+            <Button type="button" size="sm" className="h-8 px-2"
+              onClick={() => { handleAddValue(dimIdx); setAddValueActiveIdx(null) }}>✓</Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8 px-2"
+              onClick={() => { setAddValueActiveIdx(null); setAddValueInputs(prev => ({ ...prev, [dimIdx]: '' })) }}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <button type="button"
+            onClick={() => setAddValueActiveIdx(dimIdx)}
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-dashed border-muted-foreground/40 text-sm text-muted-foreground hover:border-muted-foreground hover:text-foreground transition-colors">
+            <Plus className="h-3 w-3" /> Add {dim.name}
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function cartesian<T>(arrays: T[][]): T[][] {
@@ -147,6 +288,17 @@ export default function ProductEditPage() {
   const [brand, setBrand] = useState('')
   const [addValueActiveIdx, setAddValueActiveIdx] = useState<number | null>(null)
   const [renamingDimIdx, setRenamingDimIdx] = useState<number | null>(null)
+const sensors = useSensors(useSensor(PointerSensor))
+
+const handleDimDragEnd = (event: DragEndEvent) => {
+  const { active, over } = event
+  if (!over || active.id === over.id) return
+  setDimensions(prev => {
+    const oldIndex = prev.findIndex(d => d.id === active.id)
+    const newIndex = prev.findIndex(d => d.id === over.id)
+    return arrayMove(prev, oldIndex, newIndex)
+  })
+}
   const [renameDimValue, setRenameDimValue] = useState('')
 const [newSupplierSelectedId, setNewSupplierSelectedId] = useState('')
 const [newSupplierLink, setNewSupplierLink] = useState('')
@@ -626,132 +778,34 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
               No attributes yet. Click &quot;Add Attribute&quot; to define variant types (e.g. Color, Size).
             </p>
           ) : (
-            <div className="space-y-5">
-              {dimensions.map((dim, dimIdx) => (
-                <div key={dim.id}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {renamingDimIdx === dimIdx ? (
-                      <>
-                        <Input
-                          autoFocus
-                          value={renameDimValue}
-                          onChange={e => setRenameDimValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { e.preventDefault(); handleRenameDimension(dimIdx) }
-                            if (e.key === 'Escape') { setRenamingDimIdx(null); setRenameDimValue('') }
-                          }}
-                          className="h-7 w-32 text-sm"
-                        />
-                        <Button
-                          type="button" size="sm" className="h-7 px-2 text-xs"
-                          onClick={() => handleRenameDimension(dimIdx)}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                          onClick={() => { setRenamingDimIdx(null); setRenameDimValue('') }}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                          {dim.name}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => { setRenamingDimIdx(dimIdx); setRenameDimValue(dim.name) }}
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                          title="Rename attribute"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDimension(dimIdx)}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                          title="Delete attribute"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    {dim.values.map(val => (
-                      <Badge key={val.id} variant="secondary" className="gap-1 pr-1 text-sm py-1">
-                        {val.label}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveValue(dimIdx, val)}
-                          className="ml-1 hover:text-destructive"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-
-                    {addValueActiveIdx === dimIdx ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          autoFocus
-                          placeholder={`Add ${dim.name}`}
-                          value={addValueInputs[dimIdx] ?? ''}
-                          onChange={e =>
-                            setAddValueInputs(prev => ({ ...prev, [dimIdx]: e.target.value }))
-                          }
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              handleAddValue(dimIdx)
-                              setAddValueActiveIdx(null)
-                            }
-                            if (e.key === 'Escape') {
-                              setAddValueActiveIdx(null)
-                              setAddValueInputs(prev => ({ ...prev, [dimIdx]: '' }))
-                            }
-                          }}
-                          className="h-8 w-32 text-sm"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => {
-                            handleAddValue(dimIdx)
-                            setAddValueActiveIdx(null)
-                          }}
-                        >
-                          ✓
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2"
-                          onClick={() => {
-                            setAddValueActiveIdx(null)
-                            setAddValueInputs(prev => ({ ...prev, [dimIdx]: '' }))
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setAddValueActiveIdx(dimIdx)}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-dashed border-muted-foreground/40 text-sm text-muted-foreground hover:border-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <Plus className="h-3 w-3" /> Add {dim.name}
-                      </button>
-                    )}
-                  </div>
+            <DndContext sensors={sensors} onDragEnd={handleDimDragEnd}>
+              <SortableContext
+                items={dimensions.map(d => d.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-5">
+                  {dimensions.map((dim, dimIdx) => (
+                    <SortableDimRow
+                      key={dim.id}
+                      dim={dim}
+                      dimIdx={dimIdx}
+                      renamingDimIdx={renamingDimIdx}
+                      renameDimValue={renameDimValue}
+                      setRenameDimValue={setRenameDimValue}
+                      setRenamingDimIdx={setRenamingDimIdx}
+                      addValueActiveIdx={addValueActiveIdx}
+                      setAddValueActiveIdx={setAddValueActiveIdx}
+                      addValueInputs={addValueInputs}
+                      setAddValueInputs={setAddValueInputs}
+                      handleRenameDimension={handleRenameDimension}
+                      handleDeleteDimension={handleDeleteDimension}
+                      handleAddValue={handleAddValue}
+                      handleRemoveValue={handleRemoveValue}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
           )}
 
           {dimensions.length > 0 && (

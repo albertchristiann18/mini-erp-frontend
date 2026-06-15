@@ -318,6 +318,34 @@ it('renders Suppliers card in edit mode (:id param present)', () => {
   expect(screen.getByText('Suppliers')).toBeInTheDocument()
 })
 
+it('dimension rows have grip handle when 2 dimensions exist', () => {
+  const productWithDims = {
+    ...baseProduct,
+    variant_options: { Color: ['Red', 'Blue'], Size: ['S', 'M'] },
+    variants: [
+      {
+        id: 'var-1', name: 'Red-S', sku_variant_code: 'SKU-RS', base_price: 10000,
+        variant_values: { Color: 'Red', Size: 'S' }, is_active: true,
+        total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
+      },
+    ],
+  }
+  vi.mocked(useParams).mockReturnValue({ id: '123' })
+  vi.mocked(useProduct).mockReturnValue(hookResult(productWithDims))
+  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
+  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+  vi.mocked(useProductSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
+  vi.mocked(useCreateProductSupplier).mockReturnValue(mutationMock())
+  vi.mocked(useDeleteProductSupplier).mockReturnValue(mutationMock())
+  vi.mocked(useSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
+
+  renderPage()
+  const grips = screen.getAllByTitle('Drag to reorder')
+  expect(grips).toHaveLength(2)
+})
+
 it('variant matrix shows photo column', () => {
   const productWithVariant = {
     ...baseProduct,
