@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
@@ -11,6 +11,9 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
+let mockLastUnitPriceForeign: string | null = null
+let mockLastCurrency: string | null = null
+
 vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
   VariantSearchSelect: ({
     onSelect,
@@ -18,12 +21,12 @@ vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
   }: {
     value: string
     selectedLabel?: string
-    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
+    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null) => void
     placeholder?: string
   }) => (
     <button
       data-testid="variant-search-select"
-      onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1', null)}
+      onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1', null, mockLastUnitPriceForeign, mockLastCurrency)}
     >
       {placeholder ?? 'Select variant'}
     </button>
@@ -162,4 +165,57 @@ it('test_po_modal_renders_with_supplier_section', async () => {
   renderModal()
   expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
   expect(screen.getByText('Supplier')).toBeInTheDocument()
+})
+
+describe('price auto-fill', () => {
+  beforeEach(() => {
+    mockLastUnitPriceForeign = null
+    mockLastCurrency = null
+  })
+
+  function getUnitPriceInput() {
+    return document.querySelector<HTMLInputElement>('input[step="0.001"]')
+  }
+
+  it('test_price_auto_fills_when_currency_matches', async () => {
+    mockLastUnitPriceForeign = '20.00'
+    mockLastCurrency = 'CNY'
+
+    renderModal()
+    expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(getUnitPriceInput()).not.toBeNull()
+    })
+
+    const selects = screen.getAllByTestId('variant-search-select')
+    fireEvent.click(selects[0])
+
+    await waitFor(() => {
+      const input = getUnitPriceInput()
+      expect(input).not.toBeNull()
+    }, { timeout: 3000 })
+  })
+
+  it('test_price_not_auto_filled_when_currency_mismatch', async () => {
+    mockLastUnitPriceForeign = '20.00'
+    mockLastCurrency = 'USD'  // PO defaults to CNY, so this mismatches
+
+    renderModal()
+    expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(document.querySelector<HTMLInputElement>('input[step="0.001"]')).not.toBeNull()
+    })
+
+    const selects = screen.getAllByTestId('variant-search-select')
+    fireEvent.click(selects[0])
+
+    await waitFor(() => {
+      const input = document.querySelector<HTMLInputElement>('input[step="0.001"]')
+      // Price must NOT be auto-filled because currencies differ (USD ≠ CNY)
+      expect(input?.value).not.toBe('20')
+      expect(input?.value).not.toBe('20.00')
+    }, { timeout: 3000 })
+  })
 })

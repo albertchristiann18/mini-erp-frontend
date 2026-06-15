@@ -27,6 +27,7 @@ interface ProductGroup {
   items: PurchaseOrderDetail[]
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function groupByProduct(details: PurchaseOrderDetail[]): ProductGroup[] {
   const map = new Map<string, ProductGroup>()
   for (const item of details) {

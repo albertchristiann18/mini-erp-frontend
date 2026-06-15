@@ -128,6 +128,8 @@ export interface ProductVariantStock {
   total_available_qty: number
   physical_qty: number
   is_active: boolean
+  last_unit_price_foreign: string | null
+  last_currency: string | null
 }
 
 export interface AvgSalesVariant {

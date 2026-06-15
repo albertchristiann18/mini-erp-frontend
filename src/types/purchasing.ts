@@ -32,6 +32,7 @@ export interface PurchaseOrderDetail {
   avg_sales_7d: string | null
   stock_on_hand: number
   incoming_qty: number
+  variant_values: Record<string, string>
 }
 
 export interface PurchaseOrder {

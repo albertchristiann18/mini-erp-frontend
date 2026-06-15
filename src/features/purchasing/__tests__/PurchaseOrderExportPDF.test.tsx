@@ -101,6 +101,7 @@ it('PO export shows supplier link when available', () => {
         avg_sales_7d: null,
         stock_on_hand: 20,
         incoming_qty: 0,
+        variant_values: {},
       },
     ],
   } satisfies PurchaseOrder
@@ -141,6 +142,7 @@ it('PO export shows image placeholder when no photo', () => {
         avg_sales_7d: null,
         stock_on_hand: 20,
         incoming_qty: 0,
+        variant_values: {},
       },
     ],
   } satisfies PurchaseOrder
@@ -176,6 +178,7 @@ it('groupByProduct sets product_name correctly', () => {
       avg_sales_7d: null,
       stock_on_hand: 20,
       incoming_qty: 0,
+      variant_values: {},
     },
     {
       id: 'd2',
@@ -200,6 +203,7 @@ it('groupByProduct sets product_name correctly', () => {
       avg_sales_7d: null,
       stock_on_hand: 10,
       incoming_qty: 0,
+      variant_values: {},
     },
   ]
   const groups = groupByProduct(details)

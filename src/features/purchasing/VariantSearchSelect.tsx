@@ -9,7 +9,7 @@ import { QuickCreateProductModal } from './QuickCreateProductModal'
 interface Props {
   value: string
   selectedLabel?: string
-  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
+  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null) => void
   onQuickCreated?: (variants: Array<{
     id: string
     label: string
@@ -17,6 +17,8 @@ interface Props {
     productName: string
     productSupplierLink: string | null
     productPhotoUrl: string | null
+    lastUnitPriceForeign: string | null
+    lastCurrency: string | null
   }>) => void
   placeholder?: string
   excludeVariantIds?: Set<string>
@@ -61,9 +63,14 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     }
   }
 
-  const handleSelect = (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => {
+  const handleSelect = (
+    id: string, label: string, productId: string, productName: string,
+    productSupplierLink: string | null, productPhotoUrl: string | null,
+    lastUnitPriceForeign: string | null, lastCurrency: string | null,
+  ) => {
     setInternalSelectedLabel(label)
-    onSelect(id, label, productId, productName, productSupplierLink, productPhotoUrl)
+    onSelect(id, label, productId, productName, productSupplierLink, productPhotoUrl,
+      lastUnitPriceForeign, lastCurrency)
     setOpen(false)
     setSearchInput('')
     setActiveSearch('')
@@ -116,7 +123,16 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
                   key={v.id}
                   type="button"
                   className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent transition-colors"
-                  onClick={() => handleSelect(v.id, `${v.name} (${v.sku_variant_code})`, v.product, v.product_name, v.product_supplier_link ?? null, v.product_photo_url ?? null)}
+                  onClick={() => handleSelect(
+                    v.id,
+                    `${v.name} (${v.sku_variant_code})`,
+                    v.product,
+                    v.product_name,
+                    v.product_supplier_link ?? null,
+                    v.product_photo_url ?? null,
+                    v.last_unit_price_foreign ?? null,
+                    v.last_currency ?? null,
+                  )}
                 >
                   <div className="font-medium">{v.name}</div>
                   <div className="text-muted-foreground">
@@ -147,12 +163,17 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
             setQuickCreateOpen(false)
             return
           }
+          const enrichedVariants = variants.map(v => ({
+            ...v,
+            lastUnitPriceForeign: null as string | null,
+            lastCurrency: null as string | null,
+          }))
           if (onQuickCreated) {
-            onQuickCreated(variants)
+            onQuickCreated(enrichedVariants)
           } else {
-            const first = variants[0]
+            const first = enrichedVariants[0]
             setInternalSelectedLabel(first.label)
-            onSelect(first.id, first.label, first.productId, first.productName, first.productSupplierLink, first.productPhotoUrl)
+            onSelect(first.id, first.label, first.productId, first.productName, first.productSupplierLink, first.productPhotoUrl, null, null)
           }
           setQuickCreateOpen(false)
         }}

@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect, beforeEach } from 'vitest'
@@ -20,17 +21,31 @@ vi.mock('../../../hooks/usePurchasing', () => ({
   usePurchaseOrderSummary: vi.fn(() => ({ data: undefined })),
 }))
 
+let mockVariantSearchData: unknown = { results: [], count: 0, next: null, previous: null }
+
 vi.mock('../../../hooks/useInventory', () => ({
   useWarehouses: vi.fn(() => ({ data: { results: [] } })),
   useSuppliers: vi.fn(() => ({ data: { results: [] } })),
+  useVariantSearch: vi.fn(() => ({ data: mockVariantSearchData, isLoading: false })),
 }))
 
+let mockIsStaff = false
+
 vi.mock('../../../contexts/AuthContext', () => ({
-  useAuth: vi.fn(() => ({ user: { is_staff: false } })),
+  useAuth: vi.fn(() => ({ user: { is_staff: mockIsStaff } })),
 }))
 
 vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
-  VariantSearchSelect: () => <div data-testid="variant-search-select" />,
+  VariantSearchSelect: ({ onSelect }: {
+    value: string
+    selectedLabel?: string
+    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null) => void
+    placeholder?: string
+  }) => (
+    <div data-testid="variant-search-select" onClick={() =>
+      onSelect('v1', 'Red Variant (RED-001)', 'prod-1', 'Product A', null, null, null, null)}
+    />
+  ),
 }))
 
 vi.mock('../../../features/purchasing/PurchaseOrderExportModal', () => ({
@@ -155,6 +170,7 @@ it('PO detail variant row shows photo upload when no photo', async () => {
         avg_sales_7d: null,
         stock_on_hand: 20,
         incoming_qty: 0,
+        variant_values: {},
       },
     ],
   }
@@ -195,6 +211,7 @@ it('PO detail variant row shows existing photo', async () => {
         avg_sales_7d: null,
         stock_on_hand: 10,
         incoming_qty: 5,
+        variant_values: {},
       },
     ],
   }
@@ -207,4 +224,134 @@ it('PO detail variant row shows existing photo', async () => {
     const img = document.querySelector('img[src="https://example.com/photo.jpg"]')
     expect(img).toBeInTheDocument()
   })
+})
+
+it('test_groupby_toggle_visible_when_variant_values_exist', async () => {
+  const poWithVariantValues = {
+    ...basePo,
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Red Variant',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: { color: 'Red' },
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithVariantValues))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    const byProductElements = screen.getAllByText('By Product')
+    expect(byProductElements.length).toBeGreaterThanOrEqual(1)
+  })
+
+  const groupByTriggers = screen.getAllByText('By Product')
+  const groupByTrigger = groupByTriggers[0].closest('button') || groupByTriggers[0]
+  await userEvent.click(groupByTrigger)
+
+  expect(await screen.findByText('By Color')).toBeInTheDocument()
+})
+
+it('test_bulk_add_modal_renders_and_selects', async () => {
+  mockIsStaff = true
+  mockVariantSearchData = {
+    results: [
+      {
+        id: 'v1', name: 'Red Variant', sku_variant_code: 'RED-001',
+        product: 'prod-1', product_name: 'Product A',
+        product_supplier_link: null, product_photo_url: null,
+        base_price: 100, total_available_qty: 50, physical_qty: 50,
+        is_active: true, last_unit_price_foreign: null, last_currency: null,
+      },
+      {
+        id: 'v2', name: 'Blue Variant', sku_variant_code: 'BLU-001',
+        product: 'prod-1', product_name: 'Product A',
+        product_supplier_link: null, product_photo_url: null,
+        base_price: 100, total_available_qty: 30, physical_qty: 30,
+        is_active: true, last_unit_price_foreign: null, last_currency: null,
+      },
+    ],
+    count: 2, next: null, previous: null,
+  }
+
+  const poWithDetails = {
+    ...basePo,
+    status: 'DRAFT',
+    editable_fields: { header: [], order_detail: [] },
+    next_status: 'ORDERED',
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Red Variant',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: {},
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithDetails))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const bulkAddButton = await screen.findByRole('button', { name: /bulk add/i })
+  await userEvent.click(bulkAddButton)
+
+  expect(await screen.findByText('Bulk Add Variants')).toBeInTheDocument()
+
+  const checkboxes = screen.getAllByRole('checkbox')
+  expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+
+  await userEvent.click(checkboxes[0])
+  await userEvent.click(checkboxes[1])
+
+  const addSelectedButton = screen.getByRole('button', { name: /add selected \(2\)/i })
+  expect(addSelectedButton).toBeEnabled()
 })

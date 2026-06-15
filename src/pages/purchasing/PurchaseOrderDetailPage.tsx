@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
-import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
+import { useWarehouses, useSuppliers, useVariantSearch } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../types/purchasing'
+import type { ProductVariantStock } from '../../types/inventory'
 import { uploadVariantPhoto } from '../../api/inventory'
 import type { BadgeProps } from '../../components/ui/badge'
 
@@ -129,6 +130,7 @@ export default function PurchaseOrderDetailPage() {
     discounted_unit_price_foreign: string
   }>>([])
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
+  const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false)
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
   const [hasDiscount, setHasDiscount] = useState(false)
@@ -161,6 +163,18 @@ export default function PurchaseOrderDetailPage() {
     return m
   }, [replenishData])
 
+  const [groupBy, setGroupBy] = useState<string>('product')
+
+  const availableGroupKeys = useMemo<string[]>(() => {
+    const keySet = new Set<string>()
+    for (const item of (po?.order_details ?? [])) {
+      for (const key of Object.keys(item.variant_values ?? {})) {
+        keySet.add(key)
+      }
+    }
+    return Array.from(keySet)
+  }, [po?.order_details])
+
   const usedVariantIds = useMemo<Set<string>>(() => {
     const ids = new Set<string>()
     for (const item of (po?.order_details ?? [])) {
@@ -174,12 +188,13 @@ export default function PurchaseOrderDetailPage() {
 
   useEffect(() => {
     if (!po) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setGroupBy('product')
     const anyDiscounted = (po.order_details ?? []).some(item =>
       item.discounted_unit_price_foreign != null &&
       item.discounted_unit_price_foreign !== item.unit_price_foreign
     )
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHasDiscount(anyDiscounted)
+      setHasDiscount(anyDiscounted)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
 
@@ -424,13 +439,31 @@ export default function PurchaseOrderDetailPage() {
     const groupMap = new Map<string, DisplayGroup>()
 
     for (const item of visibleDetails) {
-      const key = item.product_id || 'unknown'
+      let key: string
+      let groupLabel: string
+      let groupPhoto: string | null
+
+      if (groupBy === 'product') {
+        key = item.product_id || 'unknown'
+        groupLabel = item.product_name || 'Unknown Product'
+        groupPhoto = item.product_photo_url ?? null
+      } else if (groupBy === 'flat') {
+        key = item.id
+        groupLabel = item.product_variant_name || item.product_name || ''
+        groupPhoto = null
+      } else {
+        const dimValue = item.variant_values?.[groupBy] ?? 'Other'
+        key = dimValue
+        groupLabel = dimValue
+        groupPhoto = null
+      }
+
       if (!groupMap.has(key)) {
         groupMap.set(key, {
           groupKey: key,
-          productName: item.product_name || 'Unknown Product',
-          productSupplierLink: item.product_supplier_link,
-          productPhotoUrl: item.product_photo_url ?? null,
+          productName: groupLabel,
+          productSupplierLink: groupBy === 'product' ? item.product_supplier_link : null,
+          productPhotoUrl: groupPhoto,
           existingItems: [],
           newItemsList: [],
         })
@@ -667,13 +700,22 @@ export default function PurchaseOrderDetailPage() {
                 <VariantSearchSelect
                   value={n.product_variant_id}
                   selectedLabel={n.product_variant_label}
-                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) => {
+                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
                     updateNewItem(n._tempId, 'product_variant_id', id)
                     updateNewItem(n._tempId, 'product_variant_label', label)
                     updateNewItem(n._tempId, 'product_id', productId)
                     updateNewItem(n._tempId, 'product_name', productName)
                     updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
                     updateNewItem(n._tempId, 'product_photo_url', productPhotoUrl ?? '')
+                    const effectiveCurrency = po?.currency ?? String(headerValues.currency ?? '')
+                    if (
+                      lastUnitPriceForeign &&
+                      lastCurrency &&
+                      lastCurrency === effectiveCurrency &&
+                      parseFloat(lastUnitPriceForeign) > 0
+                    ) {
+                      updateNewItem(n._tempId, 'unit_price_foreign', lastUnitPriceForeign)
+                    }
                   }}
                   placeholder="Select variant"
                 />
@@ -1205,7 +1247,7 @@ export default function PurchaseOrderDetailPage() {
       <div className="rounded-lg border bg-card">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-base font-semibold">Order Items</h2>
-          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
             <div className="flex rounded-md border overflow-hidden text-xs h-6">
               <button
                 type="button"
@@ -1223,6 +1265,22 @@ export default function PurchaseOrderDetailPage() {
                 onClick={() => setAvgWindow(30)}
               >30d</button>
             </div>
+            {availableGroupKeys.length > 0 && !isCreating && (
+              <Select value={groupBy} onValueChange={setGroupBy}>
+                <SelectTrigger className="h-6 text-xs w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="product">By Product</SelectItem>
+                  {availableGroupKeys.map(k => (
+                    <SelectItem key={k} value={k}>
+                      By {k.charAt(0).toUpperCase() + k.slice(1)}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="flat">Flat</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
             {editMode && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
                 <input
@@ -1233,6 +1291,11 @@ export default function PurchaseOrderDetailPage() {
                 />
                 Has Discount
               </label>
+            )}
+            {editMode && canAddDeleteItems && (
+              <Button type="button" size="sm" variant="outline" onClick={() => setBulkAddModalOpen(true)}>
+                <Plus className="h-3 w-3 mr-1" /> Bulk Add
+              </Button>
             )}
             {editMode && canAddDeleteItems && (
               <Button type="button" size="sm" variant="outline" onClick={() => setAddItemModalOpen(true)}>
@@ -1287,6 +1350,15 @@ export default function PurchaseOrderDetailPage() {
         poExchangeRate={poExchangeRate}
         freightPerUnit={freightPerUnit}
         commissionPerUnit={commissionPerUnit}
+        currency={po?.currency ?? String(headerValues.currency ?? '')}
+        excludeVariantIds={usedVariantIds}
+      />
+      <BulkAddVariantsModal
+        open={bulkAddModalOpen}
+        onClose={() => setBulkAddModalOpen(false)}
+        onAdd={(items) => {
+          for (const item of items) handleAddItemFromModal(item)
+        }}
         currency={po?.currency ?? String(headerValues.currency ?? '')}
         excludeVariantIds={usedVariantIds}
       />
@@ -1488,16 +1560,24 @@ function AddItemModal({
               value={draft.product_variant_id}
               selectedLabel={draft.product_variant_label}
               excludeVariantIds={excludeVariantIds}
-              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) =>
-                setDraft(prev => ({
-                  ...prev,
-                  product_variant_id: id,
-                  product_variant_label: label,
-                  product_id: productId,
-                  product_name: productName,
-                  product_supplier_link: productSupplierLink ?? null,
-                  product_photo_url: productPhotoUrl ?? null,
-                }))
+              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) =>
+                setDraft(prev => {
+                  const autoFill =
+                    lastUnitPriceForeign &&
+                    lastCurrency &&
+                    lastCurrency === currency &&
+                    parseFloat(lastUnitPriceForeign) > 0
+                  return {
+                    ...prev,
+                    product_variant_id: id,
+                    product_variant_label: label,
+                    product_id: productId,
+                    product_name: productName,
+                    product_supplier_link: productSupplierLink ?? null,
+                    product_photo_url: productPhotoUrl ?? null,
+                    ...(autoFill ? { unit_price_foreign: lastUnitPriceForeign! } : {}),
+                  }
+                })
               }
               placeholder="Search and select variant..."
             />
@@ -1598,6 +1678,150 @@ function AddItemModal({
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={handleAdd}>Add to Order</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function BulkAddVariantsModal({
+  open, onClose, onAdd, currency, excludeVariantIds,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (items: Array<{
+    product_variant_id: string
+    product_variant_label: string
+    product_id: string
+    product_name: string
+    product_supplier_link: string | null
+    product_photo_url: string | null
+    ordered_qty: string
+    unit_price_foreign: string
+    discounted_unit_price_foreign: string
+  }>) => void
+  currency: string
+  excludeVariantIds: Set<string>
+}) {
+  const [searchInput, setSearchInput] = useState('')
+  const [activeSearch, setActiveSearch] = useState('')
+  const [selected, setSelected] = useState<Map<string, ProductVariantStock>>(new Map())
+
+  const { data, isLoading } = useVariantSearch(
+    { search: activeSearch || undefined, page_size: 50 },
+    open,
+  )
+  const variants = (data?.results ?? []).filter(v => !excludeVariantIds.has(v.id))
+
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSearchInput('')
+      setActiveSearch('')
+      setSelected(new Map())
+    }
+  }, [open])
+
+  const toggleVariant = (v: ProductVariantStock) =>
+    setSelected(prev => {
+      const next = new Map(prev)
+      if (next.has(v.id)) next.delete(v.id)
+      else next.set(v.id, v)
+      return next
+    })
+
+  const handleConfirm = () => {
+    const selectedVariants = Array.from(selected.values())
+    const items = selectedVariants.map(v => {
+      const autoFill =
+        v.last_unit_price_foreign &&
+        v.last_currency &&
+        v.last_currency === currency &&
+        parseFloat(v.last_unit_price_foreign) > 0
+      return {
+        product_variant_id: v.id,
+        product_variant_label: `${v.name} (${v.sku_variant_code})`,
+        product_id: v.product,
+        product_name: v.product_name,
+        product_supplier_link: v.product_supplier_link ?? null,
+        product_photo_url: v.product_photo_url ?? null,
+        ordered_qty: '1',
+        unit_price_foreign: autoFill ? v.last_unit_price_foreign! : '',
+        discounted_unit_price_foreign: '',
+      }
+    })
+    onAdd(items)
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Bulk Add Variants</DialogTitle>
+        </DialogHeader>
+        <div className="flex gap-1 mb-3">
+          <Input
+            className="h-8 text-sm"
+            placeholder="Search name or SKU..."
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') setActiveSearch(searchInput) }}
+          />
+          <Button type="button" size="sm" variant="outline"
+            onClick={() => setActiveSearch(searchInput)}>
+            Search
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto min-h-0 border rounded-md divide-y">
+          {isLoading ? (
+            <div className="p-4 text-sm text-muted-foreground text-center">Loading...</div>
+          ) : variants.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground text-center">No variants found</div>
+          ) : (
+            variants.map(v => {
+              const isChecked = selected.has(v.id)
+              const hasPrice = v.last_unit_price_foreign &&
+                v.last_currency === currency &&
+                parseFloat(v.last_unit_price_foreign) > 0
+              return (
+                <label key={v.id}
+                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0"
+                    checked={isChecked}
+                    onChange={() => toggleVariant(v)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{v.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {v.sku_variant_code} · {v.product_name}
+                    </div>
+                  </div>
+                  <div className="text-xs text-right shrink-0">
+                    <div className="text-muted-foreground">SOH: {v.total_available_qty}</div>
+                    {hasPrice && (
+                      <div className="text-primary font-medium">
+                        {v.last_currency} {v.last_unit_price_foreign}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              )
+            })
+          )}
+        </div>
+        <DialogFooter className="mt-3">
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={selected.size === 0}
+            onClick={handleConfirm}
+          >
+            Add Selected ({selected.size})
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

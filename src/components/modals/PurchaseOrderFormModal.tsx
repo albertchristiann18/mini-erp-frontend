@@ -276,12 +276,23 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                           <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
                             <VariantSearchSelect
                               value={watch(`order_details.${i}.product_variant_id`)}
-                              onSelect={(id, _label, productId, productName, productSupplierLink, productPhotoUrl) => {
+                              onSelect={(id, _label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
                                 setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
                                 setValue(`order_details.${i}.product_id`, productId)
                                 setValue(`order_details.${i}.product_name`, productName)
                                 setValue(`order_details.${i}.product_supplier_link`, productSupplierLink)
                                 setValue(`order_details.${i}.product_photo_url`, productPhotoUrl)
+                                const poCurrency = watch('currency')
+                                if (
+                                  lastUnitPriceForeign &&
+                                  lastCurrency &&
+                                  lastCurrency === poCurrency
+                                ) {
+                                  const price = parseFloat(lastUnitPriceForeign)
+                                  if (!isNaN(price) && price > 0) {
+                                    setValue(`order_details.${i}.unit_price_foreign`, price, { shouldValidate: true })
+                                  }
+                                }
                               }}
                               onQuickCreated={(variants) => {
                                 if (variants.length === 0) return
