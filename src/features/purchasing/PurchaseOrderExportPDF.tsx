@@ -1,5 +1,20 @@
+import { useState, useEffect } from 'react'
 import { Document, Page, View, Text, Image, Link, StyleSheet, PDFViewer, pdf } from '@react-pdf/renderer'
 import type { PurchaseOrder, PurchaseOrderDetail } from '../../types/purchasing'
+
+async function fetchAsBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    const blob = await response.blob()
+    return new Promise<string>(resolve => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
 
 interface ProductGroup {
   product_id: string
@@ -84,9 +99,10 @@ interface DocProps {
   groups: ProductGroup[]
   grandTotalForeign: number
   currencySymbol: string
+  imageMap: Record<string, string>
 }
 
-function PODocument({ po, groups, grandTotalForeign, currencySymbol }: DocProps) {
+function PODocument({ po, groups, grandTotalForeign, currencySymbol, imageMap }: DocProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -111,7 +127,7 @@ function PODocument({ po, groups, grandTotalForeign, currencySymbol }: DocProps)
             <View key={gi} style={styles.productBlock} wrap={false}>
               <View style={styles.imageBox}>
                 {group.product_photo_url
-                  ? <Image src={group.product_photo_url} style={styles.productImage} />
+                  ? <Image src={imageMap[group.product_photo_url] ?? group.product_photo_url} style={styles.productImage} />
                   : <View style={styles.imagePlaceholder} />
                 }
               </View>
@@ -188,9 +204,32 @@ export default function PurchaseOrderExportPDF({ po }: Props) {
   const grandTotalForeign = (po.order_details ?? []).reduce((s, i) =>
     s + Number(i.discounted_total_price_foreign ?? i.total_price_foreign ?? 0), 0)
 
+  const [imageMap, setImageMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const urls = groups
+      .map(g => g.product_photo_url)
+      .filter((u): u is string => !!u)
+    if (urls.length === 0) return
+
+    let cancelled = false
+    Promise.all(urls.map(async url => {
+      const base64 = await fetchAsBase64(url)
+      return [url, base64] as const
+    })).then(entries => {
+      if (cancelled) return
+      const map: Record<string, string> = {}
+      for (const [url, base64] of entries) {
+        if (base64) map[url] = base64
+      }
+      setImageMap(map)
+    })
+    return () => { cancelled = true }
+  }, [po.id])
+
   const handleDownload = async () => {
     const blob = await pdf(
-      <PODocument po={po} groups={groups} grandTotalForeign={grandTotalForeign} currencySymbol={currencySymbol} />
+      <PODocument po={po} groups={groups} grandTotalForeign={grandTotalForeign} currencySymbol={currencySymbol} imageMap={imageMap} />
     ).toBlob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -203,7 +242,7 @@ export default function PurchaseOrderExportPDF({ po }: Props) {
   return (
     <div className="flex flex-col h-full">
       <PDFViewer width="100%" height="100%" showToolbar>
-        <PODocument po={po} groups={groups} grandTotalForeign={grandTotalForeign} currencySymbol={currencySymbol} />
+        <PODocument po={po} groups={groups} grandTotalForeign={grandTotalForeign} currencySymbol={currencySymbol} imageMap={imageMap} />
       </PDFViewer>
       <div className="flex justify-end px-6 py-3 border-t bg-background">
         <button

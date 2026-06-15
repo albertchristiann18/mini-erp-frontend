@@ -4,7 +4,6 @@ import { QuickCreateProductModal } from '../QuickCreateProductModal'
 
 const mockCreateProduct = vi.fn()
 const mockUploadProductPhoto = vi.fn()
-const mockUploadVariantPhoto = vi.fn()
 
 vi.mock('../../../hooks/useInventory', () => ({
   useCreateProduct: () => ({ mutateAsync: mockCreateProduct, isPending: false }),
@@ -29,7 +28,6 @@ vi.mock('../../../lib/toast', () => ({
 
 vi.mock('../../../api/inventory', () => ({
   uploadProductPhoto: (...args: unknown[]) => mockUploadProductPhoto(...args),
-  uploadVariantPhoto: (...args: unknown[]) => mockUploadVariantPhoto(...args),
 }))
 
 vi.mock('../../../components/ui/CategorySelect', () => ({
@@ -52,25 +50,25 @@ it('renders form fields', () => {
   expect(screen.getByText('Category')).toBeInTheDocument()
   expect(screen.getByText('Supplier Link')).toBeInTheDocument()
   expect(screen.getByText('Product Photo')).toBeInTheDocument()
-  expect(screen.getByText('Add Variant')).toBeInTheDocument()
+  expect(screen.getByText('Add Dimension')).toBeInTheDocument()
 })
 
-it('shows empty variant message when no rows', () => {
+it('shows no dimensions message when no dimensions added', () => {
   render(<QuickCreateProductModal open={true} onClose={vi.fn()} onCreated={vi.fn()} />)
-  expect(screen.getByText('No variants — a Default variant will be created automatically.')).toBeInTheDocument()
+  expect(screen.getByText('No dimensions — a Default variant will be created automatically.')).toBeInTheDocument()
 })
 
-it('adds and removes variant rows', () => {
+it('can add and remove a dimension row', () => {
   render(<QuickCreateProductModal open={true} onClose={vi.fn()} onCreated={vi.fn()} />)
-  fireEvent.click(screen.getByText('Add Variant'))
-  expect(screen.getByPlaceholderText('e.g. Blue / M')).toBeInTheDocument()
-  expect(screen.getByPlaceholderText('BLU-M')).toBeInTheDocument()
+  fireEvent.click(screen.getByText('Add Dimension'))
+  expect(screen.getByPlaceholderText('e.g. color')).toBeInTheDocument()
+  expect(screen.getByPlaceholderText('e.g. Red, Blue, Green')).toBeInTheDocument()
 
   const xButtons = screen.getAllByRole('button').filter(b =>
     b.querySelector('svg.lucide-x')
   )
   fireEvent.click(xButtons[0])
-  expect(screen.queryByPlaceholderText('e.g. Blue / M')).not.toBeInTheDocument()
+  expect(screen.queryByPlaceholderText('e.g. color')).not.toBeInTheDocument()
 })
 
 it('validates required fields', async () => {
@@ -82,7 +80,17 @@ it('validates required fields', async () => {
   })
 })
 
-it('submits with no variants (Default flow)', async () => {
+it('validates dimension rows have name and values', async () => {
+  render(<QuickCreateProductModal open={true} onClose={vi.fn()} onCreated={vi.fn()} />)
+  fireEvent.click(screen.getByText('Add Dimension'))
+  fireEvent.click(screen.getByText('Create & Add'))
+  await waitFor(() => {
+    expect(screen.getByText('Dimension name is required')).toBeInTheDocument()
+    expect(screen.getByText('At least one value required')).toBeInTheDocument()
+  })
+})
+
+it('submits with no variants when no dimensions', async () => {
   const onCreated = vi.fn()
   mockCreateProduct.mockResolvedValue({
     id: 'prod1',
@@ -97,19 +105,27 @@ it('submits with no variants (Default flow)', async () => {
   fireEvent.click(screen.getByText('Create & Add'))
 
   await waitFor(() => {
+    expect(mockCreateProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ variant_options: {}, variants: [] })
+    )
+  })
+
+  await waitFor(() => {
     expect(onCreated).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'v1', label: 'Default (SKU-DEFAULT)' }),
     ])
   })
 })
 
-it('submits with multiple variants → shows picker', async () => {
+it('submits with correct dimension payload for 2 dimensions', async () => {
   mockCreateProduct.mockResolvedValue({
     id: 'prod1',
     name: 'Test',
     variants: [
-      { id: 'v1', name: 'Red', sku_variant_code: 'RED' },
-      { id: 'v2', name: 'Blue', sku_variant_code: 'BLU' },
+      { id: 'v1', name: 'Red / S', sku_variant_code: 'RED-S' },
+      { id: 'v2', name: 'Red / M', sku_variant_code: 'RED-M' },
+      { id: 'v3', name: 'Blue / S', sku_variant_code: 'BLUE-S' },
+      { id: 'v4', name: 'Blue / M', sku_variant_code: 'BLUE-M' },
     ],
   })
 
@@ -117,62 +133,72 @@ it('submits with multiple variants → shows picker', async () => {
 
   fireEvent.change(getProductNameInput(), { target: { value: 'Test' } })
   fireEvent.click(screen.getByText('SelectCategory'))
-  fireEvent.click(screen.getByText('Add Variant'))
-  fireEvent.change(screen.getByPlaceholderText('e.g. Blue / M'), { target: { value: 'Red' } })
-  fireEvent.change(screen.getByPlaceholderText('BLU-M'), { target: { value: 'RED' } })
-  fireEvent.click(screen.getByText('Add Variant'))
-  const inputs = screen.getAllByPlaceholderText('e.g. Blue / M')
-  fireEvent.change(inputs[1], { target: { value: 'Blue' } })
-  const skuInputs = screen.getAllByPlaceholderText('BLU-M')
-  fireEvent.change(skuInputs[1], { target: { value: 'BLU' } })
+
+  fireEvent.click(screen.getByText('Add Dimension'))
+  fireEvent.change(screen.getByPlaceholderText('e.g. color'), { target: { value: 'color' } })
+  fireEvent.change(screen.getByPlaceholderText('e.g. Red, Blue, Green'), { target: { value: 'Red, Blue' } })
+
+  fireEvent.click(screen.getByText('Add Dimension'))
+  const nameInputs = screen.getAllByPlaceholderText('e.g. color')
+  const valuesInputs = screen.getAllByPlaceholderText('e.g. Red, Blue, Green')
+  fireEvent.change(nameInputs[1], { target: { value: 'size' } })
+  fireEvent.change(valuesInputs[1], { target: { value: 'S, M' } })
 
   fireEvent.click(screen.getByText('Create & Add'))
 
   await waitFor(() => {
-    expect(screen.getByText('Choose Variants to Add')).toBeInTheDocument()
-    expect(screen.getByText('Red (RED)')).toBeInTheDocument()
-    expect(screen.getByText('Blue (BLU)')).toBeInTheDocument()
+    expect(mockCreateProduct).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant_options: { color: ['Red', 'Blue'], size: ['S', 'M'] },
+      })
+    )
+  })
+
+  await waitFor(() => {
+    const callArgs = mockCreateProduct.mock.calls[0][0]
+    expect(callArgs.variants).toHaveLength(4)
+    expect(callArgs.variants[0].variant_values).toEqual({ color: 'Red', size: 'S' })
+    expect(callArgs.variants[1].variant_values).toEqual({ color: 'Red', size: 'M' })
+    expect(callArgs.variants[2].variant_values).toEqual({ color: 'Blue', size: 'S' })
+    expect(callArgs.variants[3].variant_values).toEqual({ color: 'Blue', size: 'M' })
   })
 })
 
-it('picker: add selected submits only checked variants', async () => {
-  const onCreated = vi.fn()
+it('shows picker step when 2+ variants created', async () => {
   mockCreateProduct.mockResolvedValue({
     id: 'prod1',
     name: 'Test',
     variants: [
-      { id: 'v1', name: 'Red', sku_variant_code: 'RED' },
-      { id: 'v2', name: 'Blue', sku_variant_code: 'BLU' },
+      { id: 'v1', name: 'Red / S', sku_variant_code: 'RED-S' },
+      { id: 'v2', name: 'Red / M', sku_variant_code: 'RED-M' },
+      { id: 'v3', name: 'Blue / S', sku_variant_code: 'BLUE-S' },
+      { id: 'v4', name: 'Blue / M', sku_variant_code: 'BLUE-M' },
     ],
   })
 
-  render(<QuickCreateProductModal open={true} onClose={vi.fn()} onCreated={onCreated} />)
+  render(<QuickCreateProductModal open={true} onClose={vi.fn()} onCreated={vi.fn()} />)
 
   fireEvent.change(getProductNameInput(), { target: { value: 'Test' } })
   fireEvent.click(screen.getByText('SelectCategory'))
-  fireEvent.click(screen.getByText('Add Variant'))
-  fireEvent.change(screen.getByPlaceholderText('e.g. Blue / M'), { target: { value: 'Red' } })
-  fireEvent.change(screen.getByPlaceholderText('BLU-M'), { target: { value: 'RED' } })
-  fireEvent.click(screen.getByText('Add Variant'))
-  const inputs = screen.getAllByPlaceholderText('e.g. Blue / M')
-  fireEvent.change(inputs[1], { target: { value: 'Blue' } })
-  const skuInputs = screen.getAllByPlaceholderText('BLU-M')
-  fireEvent.change(skuInputs[1], { target: { value: 'BLU' } })
+
+  fireEvent.click(screen.getByText('Add Dimension'))
+  fireEvent.change(screen.getByPlaceholderText('e.g. color'), { target: { value: 'color' } })
+  fireEvent.change(screen.getByPlaceholderText('e.g. Red, Blue, Green'), { target: { value: 'Red, Blue' } })
+
+  fireEvent.click(screen.getByText('Add Dimension'))
+  const nameInputs = screen.getAllByPlaceholderText('e.g. color')
+  const valuesInputs = screen.getAllByPlaceholderText('e.g. Red, Blue, Green')
+  fireEvent.change(nameInputs[1], { target: { value: 'size' } })
+  fireEvent.change(valuesInputs[1], { target: { value: 'S, M' } })
+
   fireEvent.click(screen.getByText('Create & Add'))
 
   await waitFor(() => {
     expect(screen.getByText('Choose Variants to Add')).toBeInTheDocument()
-  })
-
-  const checkboxes = screen.getAllByRole('checkbox')
-  fireEvent.click(checkboxes[1])
-
-  fireEvent.click(screen.getByText(/Add Selected/))
-
-  await waitFor(() => {
-    expect(onCreated).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'v1' }),
-    ])
+    expect(screen.getByText('Red / S (RED-S)')).toBeInTheDocument()
+    expect(screen.getByText('Red / M (RED-M)')).toBeInTheDocument()
+    expect(screen.getByText('Blue / S (BLUE-S)')).toBeInTheDocument()
+    expect(screen.getByText('Blue / M (BLUE-M)')).toBeInTheDocument()
   })
 })
 

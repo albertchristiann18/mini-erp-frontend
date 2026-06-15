@@ -7,14 +7,19 @@ import { Button } from '../../components/ui/button'
 import { CategorySelect } from '../../components/ui/CategorySelect'
 import { useCreateProduct } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
-import { uploadProductPhoto, uploadVariantPhoto } from '../../api/inventory'
+import { uploadProductPhoto } from '../../api/inventory'
 import { toast } from '../../lib/toast'
 
-interface VariantRow {
+type DimensionRow = {
   name: string
-  skuSuffix: string
-  photo: File | null
-  photoPreview: string | null
+  values: string
+}
+
+function cartesian(arrays: string[][]): string[][] {
+  return arrays.reduce<string[][]>(
+    (acc, arr) => acc.flatMap(combo => arr.map(item => [...combo, item])),
+    [[]],
+  )
 }
 
 interface CreatedVariant {
@@ -42,7 +47,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
   const [supplierLink, setSupplierLink] = useState('')
   const [productPhoto, setProductPhoto] = useState<File | null>(null)
   const [productPhotoPreview, setProductPhotoPreview] = useState<string | null>(null)
-  const [variantRows, setVariantRows] = useState<VariantRow[]>([])
+  const [dimensionRows, setDimensionRows] = useState<DimensionRow[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -57,7 +62,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     setSupplierLink('')
     setProductPhoto(null)
     setProductPhotoPreview(null)
-    setVariantRows([])
+    setDimensionRows([])
     setErrors({})
     setStep('form')
     setCreatedVariants([])
@@ -78,29 +83,13 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     if (productPhotoInputRef.current) productPhotoInputRef.current.value = ''
   }
 
-  const addVariantRow = () =>
-    setVariantRows(prev => [...prev, { name: '', skuSuffix: '', photo: null, photoPreview: null }])
-
-  const removeVariantRow = (idx: number) =>
-    setVariantRows(prev => prev.filter((_, i) => i !== idx))
-
-  const handleVariantPhoto = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setVariantRows(prev =>
-      prev.map((r, i) =>
-        i === idx ? { ...r, photo: file, photoPreview: URL.createObjectURL(file) } : r,
-      ),
-    )
-  }
-
   const validate = (): boolean => {
     const errs: Record<string, string> = {}
     if (!productName.trim()) errs.productName = 'Product name is required'
     if (!categoryId) errs.categoryId = 'Category is required'
-    variantRows.forEach((r, i) => {
-      if (!r.name.trim()) errs[`variant_${i}_name`] = 'Variant name is required'
-      if (!r.skuSuffix.trim()) errs[`variant_${i}_sku`] = 'SKU suffix is required'
+    dimensionRows.forEach((d, i) => {
+      if (!d.name.trim()) errs[`dim_${i}_name`] = 'Dimension name is required'
+      if (!d.values.trim()) errs[`dim_${i}_values`] = 'At least one value required'
     })
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -112,21 +101,40 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     try {
       const description = `${productName.trim()} — added via Purchase Order. Update description from the Products page.`
 
+      // Build variant_options from dimensions
+      const variantOptions: Record<string, string[]> = {}
+      for (const dim of dimensionRows) {
+        const dimName = dim.name.trim()
+        const dimVals = dim.values.split(',').map(v => v.trim()).filter(Boolean)
+        if (dimName && dimVals.length > 0) {
+          variantOptions[dimName] = dimVals
+        }
+      }
+
+      // Build Cartesian product of all dimension values
+      const dimEntries = Object.entries(variantOptions)
+      let variantsPayload: Array<{ variant_values: Record<string, string>; sku_variant_code: string; base_price: 0 }> = []
+      if (dimEntries.length > 0) {
+        const combos = cartesian(dimEntries.map(([, vals]) => vals))
+        variantsPayload = combos.map(combo => {
+          const variantValues: Record<string, string> = {}
+          dimEntries.forEach(([key], i) => { variantValues[key] = combo[i] })
+          // Auto-generate SKU suffix from first 4 chars of each dimension value
+          const skuSuffix = combo
+            .map(v => v.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '').slice(0, 4))
+            .join('-')
+          return { variant_values: variantValues, sku_variant_code: skuSuffix, base_price: 0 as const }
+        })
+      }
+
       const createPayload: Record<string, unknown> = {
         name: productName.trim(),
         category_id: categoryId,
         description,
         company_id: user?.company_id,
-        weight: 0,
-        length: 0,
-        width: 0,
-        height: 0,
-        variant_options: variantRows.length > 0 ? { Variant: variantRows.map(r => r.name.trim()) } : {},
-        variants: variantRows.map(r => ({
-          variant_values: variantRows.length > 0 ? { Variant: r.name.trim() } : {},
-          sku_variant_code: r.skuSuffix.trim().toUpperCase(),
-          base_price: 0,
-        })),
+        weight: 0, length: 0, width: 0, height: 0,
+        variant_options: variantOptions,
+        variants: variantsPayload,
       }
       if (supplierId) createPayload.supplier_id = supplierId
       if (supplierLink.trim()) createPayload.supplier_link = supplierLink.trim()
@@ -144,20 +152,8 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
         }
       }
 
-      for (let i = 0; i < created.variants.length; i++) {
-        const variantDef = created.variants[i]
-        const rowPhoto = variantRows[i]?.photo ?? null
-        if (rowPhoto && variantDef) {
-          try {
-            await uploadVariantPhoto(productId, variantDef.id, rowPhoto)
-          } catch {
-            // Non-fatal: product is created, photo can be added later
-          }
-        }
-      }
-
       const supplierLinkVal = supplierLink.trim() || null
-      const resultVariants: CreatedVariant[] = created.variants.map(v => ({
+      const resultVariants: CreatedVariant[] = (created.variants ?? []).map(v => ({
         id: v.id,
         label: `${v.name} (${v.sku_variant_code})`,
         productId,
@@ -268,52 +264,77 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
 
           <div className="border-t pt-3">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium">Variants <span className="text-muted-foreground font-normal">(optional)</span></p>
-              <Button type="button" variant="outline" size="sm" onClick={addVariantRow}>
-                <Plus className="h-3 w-3 mr-1" /> Add Variant
+              <p className="text-xs font-medium">
+                Variant Dimensions <span className="text-muted-foreground font-normal">(optional)</span>
+              </p>
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={() => setDimensionRows(prev => [...prev, { name: '', values: '' }])}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add Dimension
               </Button>
             </div>
 
-            {variantRows.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No variants — a Default variant will be created automatically.</p>
+            {dimensionRows.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No dimensions — a Default variant will be created automatically.
+              </p>
             ) : (
               <div className="space-y-2">
-                {variantRows.map((row, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <label className="w-8 h-8 rounded border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary shrink-0 overflow-hidden relative">
-                      {row.photoPreview ? (
-                        <img src={row.photoPreview} className="w-full h-full object-cover" />
-                      ) : (
-                        <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                {dimensionRows.map((dim, idx) => (
+                  <div key={idx} className="flex items-start gap-2">
+                    <div className="w-28 shrink-0">
+                      <Input
+                        value={dim.name}
+                        onChange={e =>
+                          setDimensionRows(prev =>
+                            prev.map((d, i) => i === idx ? { ...d, name: e.target.value } : d),
+                          )
+                        }
+                        placeholder="e.g. color"
+                        className={`h-7 text-xs ${errors[`dim_${idx}_name`] ? 'border-destructive' : ''}`}
+                      />
+                      {errors[`dim_${idx}_name`] && (
+                        <p className="text-xs text-destructive mt-0.5">{errors[`dim_${idx}_name`]}</p>
                       )}
-                      <input type="file" accept="image/*" className="hidden" onChange={e => handleVariantPhoto(idx, e)} />
-                    </label>
+                    </div>
 
                     <div className="flex-1">
                       <Input
-                        value={row.name}
-                        onChange={e => setVariantRows(prev => prev.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
-                        placeholder="e.g. Blue / M"
-                        className={`h-7 text-xs ${errors[`variant_${idx}_name`] ? 'border-destructive' : ''}`}
+                        value={dim.values}
+                        onChange={e =>
+                          setDimensionRows(prev =>
+                            prev.map((d, i) => i === idx ? { ...d, values: e.target.value } : d),
+                          )
+                        }
+                        placeholder="e.g. Red, Blue, Green"
+                        className={`h-7 text-xs ${errors[`dim_${idx}_values`] ? 'border-destructive' : ''}`}
                       />
-                      {errors[`variant_${idx}_name`] && <p className="text-xs text-destructive">{errors[`variant_${idx}_name`]}</p>}
+                      {errors[`dim_${idx}_values`] && (
+                        <p className="text-xs text-destructive mt-0.5">{errors[`dim_${idx}_values`]}</p>
+                      )}
                     </div>
 
-                    <div className="w-24">
-                      <Input
-                        value={row.skuSuffix}
-                        onChange={e => setVariantRows(prev => prev.map((r, i) => i === idx ? { ...r, skuSuffix: e.target.value } : r))}
-                        placeholder="BLU-M"
-                        className={`h-7 text-xs font-mono ${errors[`variant_${idx}_sku`] ? 'border-destructive' : ''}`}
-                      />
-                      {errors[`variant_${idx}_sku`] && <p className="text-xs text-destructive">{errors[`variant_${idx}_sku`]}</p>}
-                    </div>
-
-                    <button type="button" onClick={() => removeVariantRow(idx)} className="text-muted-foreground hover:text-destructive shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDimensionRows(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-muted-foreground hover:text-destructive mt-1 shrink-0"
+                    >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
+                {/* Show count of combinations */}
+                {dimensionRows.some(d => d.name.trim() && d.values.trim()) && (() => {
+                  const count = dimensionRows
+                    .filter(d => d.name.trim() && d.values.trim())
+                    .reduce((acc, d) => acc * d.values.split(',').filter(v => v.trim()).length, 1)
+                  return (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      → {count} variant{count !== 1 ? 's' : ''} will be created
+                    </p>
+                  )
+                })()}
               </div>
             )}
           </div>
