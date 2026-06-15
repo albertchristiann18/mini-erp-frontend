@@ -18,6 +18,7 @@ import {
   useAttachBusinessEntity,
   useDetachBusinessEntity,
   useBusinessEntities,
+  useDeleteVariantPhoto,
 } from '../../hooks/useInventory'
 import { toast } from '../../lib/toast'
 import { Button } from '../../components/ui/button'
@@ -33,9 +34,10 @@ import {
 import { Badge } from '../../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { PhotoUploadGrid } from '../../components/inventory/PhotoUploadGrid'
-import { ArrowLeft, X, Plus, Pencil } from 'lucide-react'
+import { ArrowLeft, X, Plus, Pencil, ImagePlus } from 'lucide-react'
 import type { Product, ProductPhoto, VariantDimension, VariantDimensionValue } from '../../types/inventory'
 import type { SaveVariantsPayload, SaveVariantItem } from '../../api/inventory'
+import { uploadVariantPhoto } from '../../api/inventory'
 
 type VariantRow = {
   id?: string
@@ -46,6 +48,8 @@ type VariantRow = {
   total_available_qty: number
   hasStock: boolean
   removed: boolean
+  photoUrl: string | null
+  pendingPhoto: File | null
 }
 
 const schema = z.object({
@@ -96,6 +100,8 @@ function initializeRows(product: Product): VariantRow[] {
       total_available_qty: v.total_available_qty ?? 0,
       hasStock: (v.total_incoming_qty ?? 0) > 0 || (v.total_available_qty ?? 0) > 0,
       removed: false,
+      photoUrl: v.photo_url ?? null,
+      pendingPhoto: null,
     }))
 }
 
@@ -118,6 +124,7 @@ export default function ProductEditPage() {
   const createMutation = useCreateProduct()
   const updateMutation = useUpdateProduct()
   const saveMutation = useSaveVariants(id ?? '')
+  const deleteVariantPhotoMutation = useDeleteVariantPhoto(id ?? '')
   const qc = useQueryClient()
 
   const {
@@ -226,6 +233,8 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
         total_available_qty: 0,
         hasStock: false,
         removed: false,
+        photoUrl: null,
+        pendingPhoto: null,
       }
     })
 
@@ -328,6 +337,8 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
           total_available_qty: 0,
           hasStock: false,
           removed: false,
+          photoUrl: null,
+          pendingPhoto: null,
         })
         added++
       }
@@ -412,6 +423,14 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       } else {
         await saveMutation.mutateAsync(variantsPayload)
       }
+
+      // Upload pending photos for active rows that have a pending file
+      const activeRowsWithPhotos = rows
+        .filter(r => !r.removed && r.id && r.pendingPhoto)
+      const variantPhotoPromises = activeRowsWithPhotos.map(r =>
+        uploadVariantPhoto(productId, r.id!, r.pendingPhoto!).catch(() => {}),
+      )
+      await Promise.allSettled(variantPhotoPromises)
 
       toast.success(isEditing ? 'Product saved' : 'Product created')
       navigate(`/inventory/products/${productId}`)
@@ -767,6 +786,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
                     {dimensions.map(d => (
                       <th key={d.id} className="text-left px-4 py-3 font-medium">{d.name}</th>
                     ))}
+                    <th className="text-left px-4 py-3 font-medium w-16">Photo</th>
                     <th className="text-left px-4 py-3 font-medium">SKU</th>
                     <th className="text-left px-4 py-3 font-medium w-40">Price</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
@@ -785,6 +805,50 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
                             {getLabelForDim(d, row.variantValues[d.id])}
                           </td>
                         ))}
+                        <td className="px-4 py-3">
+                          <label className="relative block w-10 h-10 rounded border-2 overflow-hidden cursor-pointer
+                            border-border hover:border-primary transition-colors">
+                            {row.pendingPhoto ? (
+                              <img src={URL.createObjectURL(row.pendingPhoto)} alt="" className="w-full h-full object-cover" />
+                            ) : row.photoUrl ? (
+                              <img src={row.photoUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                <ImagePlus className="w-4 h-4" />
+                              </div>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={e => {
+                                const file = e.target.files?.[0]
+                                if (!file) return
+                                setRows(prev =>
+                                  prev.map((r, i) => (i === rowIdx ? { ...r, pendingPhoto: file } : r)),
+                                )
+                              }}
+                            />
+                          </label>
+                          {(row.pendingPhoto || row.photoUrl) && isEditing && row.id && (
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-destructive mt-0.5 block"
+                              onClick={() => {
+                                if (row.pendingPhoto) {
+                                  setRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, pendingPhoto: null } : r))
+                                } else if (row.photoUrl && row.id) {
+                                  deleteVariantPhotoMutation.mutate(row.id, {
+                                    onSuccess: () =>
+                                      setRows(prev => prev.map((r, i) => i === rowIdx ? { ...r, photoUrl: null } : r)),
+                                  })
+                                }
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <Input
                             value={row.sku_variant_code}

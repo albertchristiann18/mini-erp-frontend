@@ -12,11 +12,12 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon, ImagePlus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../types/purchasing'
+import { uploadVariantPhoto } from '../../api/inventory'
 import type { BadgeProps } from '../../components/ui/badge'
 
 function getCurrencySymbol(currency: string | null | undefined): string {
@@ -108,6 +109,8 @@ export default function PurchaseOrderDetailPage() {
   const suppliers = suppliersData?.results ?? []
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [showAdvanceModal, setShowAdvanceModal] = useState(false)
+  const [variantPhotoOverrides, setVariantPhotoOverrides] = useState<Record<string, string>>({})
+  const [uploadingVariantPhoto, setUploadingVariantPhoto] = useState<Record<string, boolean>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [editMode, setEditMode] = useState(isCreating)
   const [headerValues, setHeaderValues] = useState<Record<string, string | File>>({})
@@ -137,6 +140,18 @@ export default function PurchaseOrderDetailPage() {
       else next.add(key)
       return next
     })
+
+  const handleVariantPhotoUpload = async (variantId: string, productId: string, file: File) => {
+    setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: true }))
+    try {
+      const r = await uploadVariantPhoto(productId, variantId, file)
+      setVariantPhotoOverrides(prev => ({ ...prev, [variantId]: r.data.photo_url }))
+    } catch {
+      toast.error('Failed to upload photo')
+    } finally {
+      setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: false }))
+    }
+  }
 
   const [avgWindow, setAvgWindow] = useState<7 | 14 | 30>(30)
   const { data: replenishData } = useReplenishment()
@@ -535,7 +550,36 @@ export default function PurchaseOrderDetailPage() {
 
           return (
             <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
-              <td className="pl-6 pr-3 py-1.5 whitespace-nowrap font-mono font-medium">{item.product_variant_name}</td>
+              <td className="pl-4 pr-3 py-1.5 whitespace-nowrap">
+                <div className="flex items-center gap-2">
+                  <label className={`relative w-7 h-7 rounded border overflow-hidden shrink-0 cursor-pointer
+                    ${uploadingVariantPhoto[item.variant_id] ? 'opacity-50' : 'hover:opacity-80'}`}>
+                    {variantPhotoOverrides[item.variant_id] || item.product_photo_url ? (
+                      <img
+                        src={variantPhotoOverrides[item.variant_id] ?? item.product_photo_url ?? ''}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                        <ImagePlus className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingVariantPhoto[item.variant_id]}
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file) handleVariantPhotoUpload(item.variant_id, item.product_id, file)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                  <span className="font-mono font-medium">{item.product_variant_name}</span>
+                </div>
+              </td>
               <td className="px-3 py-1.5 whitespace-nowrap">
                 {isDetailEditable('ordered_qty') ? (
                   <Input type="number" className="h-7 w-14 text-xs"
@@ -1201,6 +1245,7 @@ export default function PurchaseOrderDetailPage() {
           <table className="w-full min-w-max text-xs border-collapse">
             <thead>
               <tr className="border-b bg-muted/30 text-muted-foreground">
+                <th className="w-8" />
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap min-w-[160px]">Variant</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Order</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Receive</th>

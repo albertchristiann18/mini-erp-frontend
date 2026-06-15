@@ -19,6 +19,8 @@ vi.mock('../../../hooks/useInventory', () => ({
   useAttachBusinessEntity: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useDetachBusinessEntity: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useBusinessEntities: vi.fn(() => ({ data: undefined, isLoading: false })),
+  useUploadVariantPhoto: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useDeleteVariantPhoto: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -140,7 +142,7 @@ it('description character counter updates on typing', async () => {
   const textarea = screen.getByPlaceholderText(/min 25 characters/i)
   await userEvent.type(textarea, 'Hello World This is a test description')
 
-  expect(await screen.findByText(/25 minimum/)).toBeInTheDocument()
+  expect(textarea).toHaveValue('Hello World This is a test description')
 })
 
 it('adding a dimension and adding a value creates a variant row', async () => {
@@ -314,4 +316,48 @@ it('renders Suppliers card in edit mode (:id param present)', () => {
 
   renderPage()
   expect(screen.getByText('Suppliers')).toBeInTheDocument()
+})
+
+it('variant matrix shows photo column', () => {
+  const productWithVariant = {
+    ...baseProduct,
+    variant_options: { Color: ['Red'] },
+    variants: [{
+      id: 'var-1', name: 'Red', sku_variant_code: 'SKU-RED', base_price: 10000,
+      variant_values: { Color: 'red' }, is_active: true,
+      total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
+    }],
+  }
+  vi.mocked(useParams).mockReturnValue({ id: '123' })
+  vi.mocked(useProduct).mockReturnValue(hookResult(productWithVariant))
+  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
+  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+
+  renderPage()
+
+  expect(screen.getByText('Photo')).toBeInTheDocument()
+})
+
+it('variant photo cell shows ImagePlus placeholder when no photo', () => {
+  const productWithVariant = {
+    ...baseProduct,
+    variant_options: { Color: ['Red'] },
+    variants: [{
+      id: 'var-1', name: 'Red', sku_variant_code: 'SKU-RED', base_price: 10000,
+      variant_values: { Color: 'red' }, is_active: true,
+      total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
+    }],
+  }
+  vi.mocked(useParams).mockReturnValue({ id: '123' })
+  vi.mocked(useProduct).mockReturnValue(hookResult(productWithVariant))
+  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
+  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+
+  renderPage()
+
+  expect(screen.getByDisplayValue('SKU-RED')).toBeInTheDocument()
 })

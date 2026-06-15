@@ -73,6 +73,9 @@ export const uploadVariantPhoto = (productId: string, variantId: string, image: 
   )
 }
 
+export const deleteVariantPhoto = (productId: string, variantId: string) =>
+  client.delete(`/product/${productId}/variants/${variantId}/photo/`)
+
 export const deleteProductPhoto = (productId: string, photoId: string) =>
   client.delete(`/product/${productId}/photos/${photoId}/`)
 

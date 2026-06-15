@@ -6,7 +6,7 @@ import {
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getProductSuppliers, createProductSupplier, deleteProductSupplier,
-  saveVariants, deleteCategory,
+  saveVariants, deleteCategory, uploadVariantPhoto, deleteVariantPhoto,
   getCompanyMarketplaces, createCompanyMarketplace, updateCompanyMarketplace, deleteCompanyMarketplace,
   getBusinessEntities, createBusinessEntity,
   updateBusinessEntity, deleteBusinessEntity, getProductBusinessEntities,
@@ -375,5 +375,22 @@ export const useSaveVariants = (productId: string) => {
       qc.invalidateQueries({ queryKey: ['product', productId] })
       qc.invalidateQueries({ queryKey: ['products'] })
     },
+  })
+}
+
+export const useUploadVariantPhoto = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ variantId, image }: { variantId: string; image: File }) =>
+      uploadVariantPhoto(productId, variantId, image).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
+  })
+}
+
+export const useDeleteVariantPhoto = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (variantId: string) => deleteVariantPhoto(productId, variantId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
   })
 }
