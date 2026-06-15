@@ -341,9 +341,15 @@ it('test_bulk_add_modal_renders_and_selects', async () => {
   const editButton = screen.getByRole('button', { name: /edit/i })
   await userEvent.click(editButton)
 
-  const bulkAddButton = await screen.findByRole('button', { name: /bulk add/i })
-  await userEvent.click(bulkAddButton)
+  // Open the split button dropdown
+  const moreOptionsBtn = await screen.findByRole('button', { name: /more add options/i })
+  await userEvent.click(moreOptionsBtn)
 
+  // Click the "Bulk Add Variants" option in the dropdown
+  const bulkAddOption = await screen.findByText('Bulk Add Variants')
+  await userEvent.click(bulkAddOption)
+
+  // Modal should now be open
   expect(await screen.findByText('Bulk Add Variants')).toBeInTheDocument()
 
   const checkboxes = screen.getAllByRole('checkbox')
@@ -354,4 +360,20 @@ it('test_bulk_add_modal_renders_and_selects', async () => {
 
   const addSelectedButton = screen.getByRole('button', { name: /add selected \(2\)/i })
   expect(addSelectedButton).toBeEnabled()
+})
+
+it('opens add item modal from the primary Add Item button', async () => {
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const addItemBtn = await screen.findByRole('button', { name: /add item/i })
+  await userEvent.click(addItemBtn)
+
+  expect(await screen.findByRole('dialog', { name: /add item/i })).toBeInTheDocument()
 })

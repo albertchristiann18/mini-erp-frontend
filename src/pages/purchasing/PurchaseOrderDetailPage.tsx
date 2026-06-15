@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
 import { useWarehouses, useSuppliers, useVariantSearch } from '../../hooks/useInventory'
@@ -131,6 +131,8 @@ export default function PurchaseOrderDetailPage() {
   }>>([])
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
   const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false)
+  const [showAddDropdown, setShowAddDropdown] = useState(false)
+  const addDropdownRef = useRef<HTMLDivElement>(null)
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
   const [hasDiscount, setHasDiscount] = useState(false)
@@ -197,6 +199,17 @@ export default function PurchaseOrderDetailPage() {
       setHasDiscount(anyDiscounted)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
+
+  useEffect(() => {
+    if (!showAddDropdown) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addDropdownRef.current && !addDropdownRef.current.contains(e.target as Node)) {
+        setShowAddDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showAddDropdown])
 
   if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -774,7 +787,7 @@ export default function PurchaseOrderDetailPage() {
     )
     })
   })()
-
+  
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1293,14 +1306,41 @@ export default function PurchaseOrderDetailPage() {
               </label>
             )}
             {editMode && canAddDeleteItems && (
-              <Button type="button" size="sm" variant="outline" onClick={() => setBulkAddModalOpen(true)}>
-                <Plus className="h-3 w-3 mr-1" /> Bulk Add
-              </Button>
-            )}
-            {editMode && canAddDeleteItems && (
-              <Button type="button" size="sm" variant="outline" onClick={() => setAddItemModalOpen(true)}>
-                <Plus className="h-3 w-3 mr-1" /> Add Item
-              </Button>
+              <div className="relative" ref={addDropdownRef}>
+                <div className="flex">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-r-none border-r-0"
+                    onClick={() => setAddItemModalOpen(true)}
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Add Item
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="rounded-l-none px-1.5"
+                    aria-label="More add options"
+                    onClick={() => setShowAddDropdown(prev => !prev)}
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </div>
+                {showAddDropdown && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-card border rounded-md shadow-md min-w-[160px]">
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors flex items-center gap-2"
+                      onClick={() => { setBulkAddModalOpen(true); setShowAddDropdown(false) }}
+                    >
+                      <Plus className="h-3.5 w-3.5 shrink-0" />
+                      Bulk Add Variants
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
