@@ -4,18 +4,26 @@ import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { cn } from '../../lib/utils'
 import { useVariantSearch } from '../../hooks/useInventory'
-import { QuickCreateVariantModal } from './QuickCreateVariantModal'
+import { QuickCreateProductModal } from './QuickCreateProductModal'
 
 interface Props {
   value: string
   selectedLabel?: string
   onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
+  onQuickCreated?: (variants: Array<{
+    id: string
+    label: string
+    productId: string
+    productName: string
+    productSupplierLink: string | null
+    productPhotoUrl: string | null
+  }>) => void
   placeholder?: string
   excludeVariantIds?: Set<string>
   supplierId?: string
 }
 
-export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, placeholder = 'Select variant', excludeVariantIds, supplierId }: Props) {
+export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, onQuickCreated, placeholder = 'Select variant', excludeVariantIds, supplierId }: Props) {
   const [open, setOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
@@ -130,12 +138,22 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
         </div>
       )}
 
-      <QuickCreateVariantModal
+      <QuickCreateProductModal
         open={quickCreateOpen}
         onClose={() => setQuickCreateOpen(false)}
-        onCreated={(id, label) => {
-          setInternalSelectedLabel(label)
-          onSelect(id, label, '', '', null, null)
+        supplierId={supplierId}
+        onCreated={(variants) => {
+          if (variants.length === 0) {
+            setQuickCreateOpen(false)
+            return
+          }
+          if (onQuickCreated) {
+            onQuickCreated(variants)
+          } else {
+            const first = variants[0]
+            setInternalSelectedLabel(first.label)
+            onSelect(first.id, first.label, first.productId, first.productName, first.productSupplierLink, first.productPhotoUrl)
+          }
           setQuickCreateOpen(false)
         }}
       />

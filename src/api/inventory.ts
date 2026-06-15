@@ -63,6 +63,16 @@ export const uploadProductPhoto = (productId: string, image: File) => {
   })
 }
 
+export const uploadVariantPhoto = (productId: string, variantId: string, image: File) => {
+  const form = new FormData()
+  form.append('image', image)
+  return client.post<{ photo_url: string }>(
+    `/product/${productId}/variants/${variantId}/photo/`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+}
+
 export const deleteProductPhoto = (productId: string, photoId: string) =>
   client.delete(`/product/${productId}/photos/${photoId}/`)
 

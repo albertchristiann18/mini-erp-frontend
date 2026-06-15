@@ -21,6 +21,7 @@ const itemSchema = z.object({
   product_id: z.string().optional(),
   product_name: z.string().optional(),
   product_supplier_link: z.string().nullable().optional(),
+  product_photo_url: z.string().nullable().optional(),
   ordered_qty: z.number().min(1, 'Min 1'),
   unit_price_foreign: z.number().min(0, 'Required'),
   discounted_unit_price_foreign: z.number().min(0).optional(),
@@ -52,7 +53,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
 
   const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { supplier_id: '', currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined }] },
+    defaultValues: { supplier_id: '', currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, product_photo_url: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined }] },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'order_details' })
@@ -102,6 +103,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
     productId: string | undefined
     productName: string
     productSupplierLink: string | null | undefined
+    productPhotoUrl: string | null | undefined
     indices: number[]
   }
 
@@ -114,6 +116,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
           productId: item.product_id,
           productName: item.product_name || 'Unknown Product',
           productSupplierLink: item.product_supplier_link,
+          productPhotoUrl: item.product_photo_url,
           indices: [],
         })
       }
@@ -216,7 +219,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                   />
                   Has Discount
                 </label>
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, product_photo_url: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined })}>
                   <Plus className="h-3 w-3 mr-1" /> Add Item
                 </Button>
               </div>
@@ -245,6 +248,15 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
               return (
                 <div key={group.productId} className="space-y-1">
                   <div className="flex items-center gap-3 px-2 py-2 bg-muted/50 rounded">
+                    {group.productPhotoUrl ? (
+                      <img
+                        src={group.productPhotoUrl}
+                        alt=""
+                        className="w-8 h-8 rounded object-cover shrink-0 border border-border"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded bg-muted border border-dashed border-border shrink-0" />
+                    )}
                     <span className="text-sm font-bold text-foreground flex-1">{group.productName}</span>
                     {group.productSupplierLink && (
                       <a href={group.productSupplierLink} target="_blank" rel="noopener noreferrer"
@@ -264,11 +276,33 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                           <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
                             <VariantSearchSelect
                               value={watch(`order_details.${i}.product_variant_id`)}
-                              onSelect={(id, _label, productId, productName, productSupplierLink) => {
+                              onSelect={(id, _label, productId, productName, productSupplierLink, productPhotoUrl) => {
                                 setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
                                 setValue(`order_details.${i}.product_id`, productId)
                                 setValue(`order_details.${i}.product_name`, productName)
                                 setValue(`order_details.${i}.product_supplier_link`, productSupplierLink)
+                                setValue(`order_details.${i}.product_photo_url`, productPhotoUrl)
+                              }}
+                              onQuickCreated={(variants) => {
+                                if (variants.length === 0) return
+                                const [first, ...rest] = variants
+                                setValue(`order_details.${i}.product_variant_id`, first.id, { shouldValidate: true })
+                                setValue(`order_details.${i}.product_id`, first.productId)
+                                setValue(`order_details.${i}.product_name`, first.productName)
+                                setValue(`order_details.${i}.product_supplier_link`, first.productSupplierLink)
+                                setValue(`order_details.${i}.product_photo_url`, first.productPhotoUrl)
+                                for (const v of rest) {
+                                  append({
+                                    product_variant_id: v.id,
+                                    product_id: v.productId,
+                                    product_name: v.productName,
+                                    product_supplier_link: v.productSupplierLink,
+                                    product_photo_url: v.productPhotoUrl,
+                                    ordered_qty: 1,
+                                    unit_price_foreign: 0,
+                                    discounted_unit_price_foreign: undefined,
+                                  })
+                                }
                               }}
                               placeholder="Select variant"
                               supplierId={watch('supplier_id')}
