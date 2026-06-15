@@ -17,19 +17,52 @@ let mockLastCurrency: string | null = null
 vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
   VariantSearchSelect: ({
     onSelect,
+    onQuickCreated,
+    selectedLabel,
     placeholder,
   }: {
     value: string
     selectedLabel?: string
     onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null) => void
+    onQuickCreated?: (variants: Array<{
+      id: string
+      label: string
+      productId: string
+      productName: string
+      productSupplierLink: string | null
+      productPhotoUrl: string | null
+      lastUnitPriceForeign: string | null
+      lastCurrency: string | null
+    }>) => void
     placeholder?: string
   }) => (
-    <button
-      data-testid="variant-search-select"
-      onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1', null, mockLastUnitPriceForeign, mockLastCurrency)}
-    >
-      {placeholder ?? 'Select variant'}
-    </button>
+    <>
+      <button
+        data-testid="variant-search-select"
+        onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1', null, mockLastUnitPriceForeign, mockLastCurrency)}
+      >
+        {selectedLabel || (placeholder ?? 'Select variant')}
+      </button>
+      {onQuickCreated && (
+        <button
+          data-testid="trigger-quick-created"
+          onClick={() =>
+            onQuickCreated([{
+              id: 'qv1',
+              label: 'Red / M (RED-M)',
+              productId: 'qprod1',
+              productName: 'Quick Product',
+              productSupplierLink: null,
+              productPhotoUrl: null,
+              lastUnitPriceForeign: null,
+              lastCurrency: null,
+            }])
+          }
+        >
+          Quick Create
+        </button>
+      )}
+    </>
   ),
 }))
 
@@ -195,6 +228,19 @@ describe('price auto-fill', () => {
       const input = getUnitPriceInput()
       expect(input).not.toBeNull()
     }, { timeout: 3000 })
+  })
+
+  it('shows correct variant label on selector after onQuickCreated fires', async () => {
+    renderModal()
+    expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+
+    const quickCreateBtns = screen.getAllByTestId('trigger-quick-created')
+    fireEvent.click(quickCreateBtns[0])
+
+    await waitFor(() => {
+      const selects = screen.getAllByTestId('variant-search-select')
+      expect(selects[0]).toHaveTextContent('Red / M (RED-M)')
+    })
   })
 
   it('test_price_not_auto_filled_when_currency_mismatch', async () => {

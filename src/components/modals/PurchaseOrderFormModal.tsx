@@ -60,6 +60,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   const [hasDiscount, setHasDiscount] = useState(false)
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const [avgWindow, setAvgWindow] = useState<7 | 30>(30)
+  const [variantLabels, setVariantLabels] = useState<Record<string, string>>({})
   const { data: replenishData } = useReplenishment()
   const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
     const m = new Map<string, ReplenishmentItem>()
@@ -67,7 +68,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
     return m
   }, [replenishData])
 
-  const handleClose = () => { reset(); setHasDiscount(false); onClose() }
+  const handleClose = () => { reset(); setHasDiscount(false); setVariantLabels({}); onClose() }
 
   const onSubmit = async (values: FormValues) => {
     const payload: Record<string, unknown> = {
@@ -276,7 +277,9 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                           <FormField label={''} error={errors.order_details?.[i]?.product_variant_id?.message}>
                             <VariantSearchSelect
                               value={watch(`order_details.${i}.product_variant_id`)}
-                              onSelect={(id, _label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
+                              selectedLabel={variantLabels[watch(`order_details.${i}.product_variant_id`)] || ''}
+                              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
+                                setVariantLabels(prev => ({ ...prev, [id]: label }))
                                 setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
                                 setValue(`order_details.${i}.product_id`, productId)
                                 setValue(`order_details.${i}.product_name`, productName)
@@ -297,6 +300,11 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                               onQuickCreated={(variants) => {
                                 if (variants.length === 0) return
                                 const [first, ...rest] = variants
+                                setVariantLabels(prev => ({
+                                  ...prev,
+                                  [first.id]: first.label,
+                                  ...Object.fromEntries(rest.map(v => [v.id, v.label])),
+                                }))
                                 setValue(`order_details.${i}.product_variant_id`, first.id, { shouldValidate: true })
                                 setValue(`order_details.${i}.product_id`, first.productId)
                                 setValue(`order_details.${i}.product_name`, first.productName)
