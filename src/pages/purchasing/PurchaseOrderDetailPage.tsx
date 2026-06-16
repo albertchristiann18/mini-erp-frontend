@@ -421,7 +421,8 @@ export default function PurchaseOrderDetailPage() {
     const upcoming = soh + incoming + item.ordered_qty
     const doi = avg > 0 ? Math.round((soh + incoming) / avg) : null
     const doiAfter = avg > 0 ? Math.round(upcoming / avg) : null
-    return { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot }
+    const recommendedQty = avg > 0 ? Math.max(0, Math.ceil(avg * 90 - soh - incoming)) : null
+    return { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot, recommendedQty }
   }
 
   const poExchangeRate = isCreating
@@ -511,6 +512,8 @@ export default function PurchaseOrderDetailPage() {
     const sumAvg = groupStockData.reduce((s, d) => s + d.avg, 0)
     const groupDoi = sumAvg > 0 ? Math.round((sumSOH + sumIncoming) / sumAvg) : null
     const groupDoiAfter = sumAvg > 0 ? Math.round(sumUpcoming / sumAvg) : null
+    const sumRecommended = groupStockData.reduce((s, d) => s + (d.recommendedQty ?? 0), 0)
+    const hasAnyRec = groupStockData.some(d => d.recommendedQty !== null)
     const sumOrdered = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
       group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
     const sumReceived = group.existingItems.reduce((s, i) => s + (i.received_qty ?? 0), 0)
@@ -552,8 +555,11 @@ export default function PurchaseOrderDetailPage() {
               )}
             </div>
           </td>
+          <td className="px-3 py-2 whitespace-nowrap font-medium text-violet-600">
+            {hasAnyRec ? sumRecommended : '\u2014'}
+          </td>
           <td className="px-3 py-2 whitespace-nowrap">{sumOrdered}</td>
-          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{sumReceived || '—'}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{sumReceived || '\u2014'}</td>
           <td className="px-3 py-2 whitespace-nowrap">{sumSOH}</td>
           <td className="px-3 py-2 whitespace-nowrap text-blue-600">{sumIncoming}</td>
           <td className="px-3 py-2 whitespace-nowrap">{sumUpcoming}</td>
@@ -583,7 +589,7 @@ export default function PurchaseOrderDetailPage() {
           const rowChanges = detailValues[item.id] ?? {}
           const isDetailEditable = (field: string) =>
             editMode && (isCreating || (po?.editable_fields.order_detail.includes(field) ?? false))
-          const { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot } = getItemStockData(item)
+          const { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot, recommendedQty } = getItemStockData(item)
 
           const effectiveUnitForeign = hasDiscount
             ? Number(rowChanges.discounted_unit_price_foreign ?? item.discounted_unit_price_foreign ?? item.unit_price_foreign ?? 0)
@@ -625,6 +631,9 @@ export default function PurchaseOrderDetailPage() {
                   </label>
                   <span className="font-mono font-medium">{item.product_variant_name}</span>
                 </div>
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-violet-600">
+                {recommendedQty !== null ? recommendedQty : '\u221E'}
               </td>
               <td className="px-3 py-1.5 whitespace-nowrap">
                 {isDetailEditable('ordered_qty') ? (
@@ -703,6 +712,9 @@ export default function PurchaseOrderDetailPage() {
           const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
           const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
           const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
+          const liveRec = liveStats && (avg ?? 0) > 0
+            ? Math.max(0, Math.ceil((avg ?? 0) * 90 - liveSoh - liveIncoming))
+            : null
           const unitForeign = Number(n.unit_price_foreign) || 0
           const unitIdr = Math.round(unitForeign * poExchangeRate)
           const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
@@ -732,6 +744,9 @@ export default function PurchaseOrderDetailPage() {
                   }}
                   placeholder="Select variant"
                 />
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-violet-600">
+                {liveRec !== null ? liveRec : (liveStats ? '\u221E' : '\u2014')}
               </td>
               <td className="px-2 py-1">
                 <Input type="number" className="h-7 w-14 text-xs"
@@ -1350,6 +1365,7 @@ export default function PurchaseOrderDetailPage() {
               <tr className="border-b bg-muted/30 text-muted-foreground">
                 <th className="w-8" />
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap min-w-[160px]">Variant</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Rec.</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Order</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Receive</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">SOH</th>

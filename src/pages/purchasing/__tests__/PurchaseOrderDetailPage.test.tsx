@@ -377,3 +377,131 @@ it('opens add item modal from the primary Add Item button', async () => {
 
   expect(await screen.findByRole('dialog', { name: /add item/i })).toBeInTheDocument()
 })
+
+it('renders the Rec. column header in the Order Items table', async () => {
+  const poWithItems = {
+    ...basePo,
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Red Variant',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: {},
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithItems))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('Rec.')).toBeInTheDocument()
+  })
+})
+
+it('shows calculated recommended qty when avg_sales > 0', async () => {
+  const poWithItems = {
+    ...basePo,
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Best Seller',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: 10,
+        avg_sales_7d: 12,
+        stock_on_hand: 20,
+        incoming_qty: 5,
+        variant_values: {},
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithItems))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  // avg=10 (default 30d window uses avg_sales), soh=20, incoming=5
+  // recommendedQty = max(0, ceil(10*90 - 20 - 5)) = max(0, 875) = 875
+  // 875 appears in both group header sum row and per-variant row
+  await waitFor(() => {
+    expect(screen.getAllByText('875')).toHaveLength(2)
+  })
+})
+
+it('shows infinity symbol when avg_sales is 0', async () => {
+  const poWithItems = {
+    ...basePo,
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Slow Mover',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: 0,
+        avg_sales_7d: 0,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: {},
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithItems))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  // When avg=0: Rec. shows ∞, DOI shows ∞, DOI+ shows ∞ in the per-variant row
+  // Group header shows '—' for all three
+  await waitFor(() => {
+    expect(screen.getAllByText('\u221E')).toHaveLength(3)
+  })
+})
