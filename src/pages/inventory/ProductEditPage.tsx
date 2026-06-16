@@ -229,21 +229,38 @@ function initializeDimensions(product: Product): VariantDimension[] {
   }))
 }
 
-function initializeRows(product: Product): VariantRow[] {
+// eslint-disable-next-line react-refresh/only-export-components
+export function initializeRows(product: Product, dims: VariantDimension[]): VariantRow[] {
+  const dimNames = new Set(dims.map(d => d.name))
   return (Array.isArray(product.variants) ? product.variants : [])
     .filter(v => v.is_active)
-    .map(v => ({
-      id: v.id,
-      variantValues: v.variant_values ?? {},
-      sku_variant_code: v.sku_variant_code,
-      base_price: v.base_price,
-      current_cogs: v.current_cogs ?? 0,
-      total_available_qty: v.total_available_qty ?? 0,
-      hasStock: (v.total_incoming_qty ?? 0) > 0 || (v.total_available_qty ?? 0) > 0,
-      removed: false,
-      photoUrl: v.photo_url ?? null,
-      pendingPhoto: null,
-    }))
+    .map(v => {
+      let variantValues: Record<string, string> = v.variant_values ?? {}
+
+      const unmatchedKeys = Object.keys(variantValues).filter(k => !dimNames.has(k))
+      const unmatchedDims = dims.filter(d => !(d.name in variantValues))
+      if (unmatchedKeys.length > 0 && unmatchedKeys.length === unmatchedDims.length) {
+        const repaired = { ...variantValues }
+        unmatchedDims.forEach((dim, i) => {
+          repaired[dim.name] = variantValues[unmatchedKeys[i]]
+          delete repaired[unmatchedKeys[i]]
+        })
+        variantValues = repaired
+      }
+
+      return {
+        id: v.id,
+        variantValues,
+        sku_variant_code: v.sku_variant_code,
+        base_price: v.base_price,
+        current_cogs: v.current_cogs ?? 0,
+        total_available_qty: v.total_available_qty ?? 0,
+        hasStock: (v.total_incoming_qty ?? 0) > 0 || (v.total_available_qty ?? 0) > 0,
+        removed: false,
+        photoUrl: v.photo_url ?? null,
+        pendingPhoto: null,
+      }
+    })
 }
 
 function suggestSku(productSku: string, dims: VariantDimension[], vv: Record<string, string>): string {
@@ -336,9 +353,8 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       setBrand(product.specifications?.Merek ?? product.specifications?.Brand ?? '')
       setPhotos(product.photos ?? [])
       const dims = initializeDimensions(product)
-      const initialRows = initializeRows(product)
       setDimensions(dims)
-      setRows(initialRows)
+      setRows(initializeRows(product, dims))
     }
   }, [product?.id, isEditing])
 
@@ -441,9 +457,19 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
   const handleRenameDimension = (dimIdx: number) => {
     const newName = renameDimValue.trim()
     if (!newName) return
+    const oldId = dimensions[dimIdx].id
     setDimensions(prev =>
-      prev.map((d, i) => (i === dimIdx ? { ...d, name: newName } : d)),
+      prev.map((d, i) => (i === dimIdx ? { ...d, name: newName, id: newName } : d)),
     )
+    if (oldId !== newName) {
+      setRows(prev =>
+        prev.map(r => {
+          if (!(oldId in r.variantValues)) return r
+          const { [oldId]: val, ...rest } = r.variantValues
+          return { ...r, variantValues: { ...rest, [newName]: val } }
+        })
+      )
+    }
     setRenamingDimIdx(null)
     setRenameDimValue('')
   }
@@ -561,7 +587,11 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
         ),
         variants: activeRows.map(r => ({
           ...(r.id ? { id: r.id } : {}),
-          variant_values: r.variantValues,
+          variant_values: Object.fromEntries(
+            dimensions
+              .map(d => [d.name, r.variantValues[d.name] ?? r.variantValues[d.id]])
+              .filter(([, v]) => v !== undefined && v !== ''),
+          ),
           sku_variant_code: r.sku_variant_code,
           base_price: r.base_price,
         })) as SaveVariantItem[],

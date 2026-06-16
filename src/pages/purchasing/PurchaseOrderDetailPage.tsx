@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
-import { useWarehouses, useSuppliers, useVariantSearch } from '../../hooks/useInventory'
+import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../types/purchasing'
-import type { ProductVariantStock } from '../../types/inventory'
+
 import { uploadVariantPhoto } from '../../api/inventory'
 import type { BadgeProps } from '../../components/ui/badge'
 
@@ -130,9 +130,7 @@ export default function PurchaseOrderDetailPage() {
     discounted_unit_price_foreign: string
   }>>([])
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
-  const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false)
-  const [showAddDropdown, setShowAddDropdown] = useState(false)
-  const addDropdownRef = useRef<HTMLDivElement>(null)
+
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
   const [hasDiscount, setHasDiscount] = useState(false)
@@ -200,16 +198,7 @@ export default function PurchaseOrderDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
 
-  useEffect(() => {
-    if (!showAddDropdown) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (addDropdownRef.current && !addDropdownRef.current.contains(e.target as Node)) {
-        setShowAddDropdown(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showAddDropdown])
+
 
   if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -1305,7 +1294,6 @@ export default function PurchaseOrderDetailPage() {
                       By {k.charAt(0).toUpperCase() + k.slice(1)}
                     </SelectItem>
                   ))}
-                  <SelectItem value="flat">Flat</SelectItem>
                 </SelectContent>
               </Select>
             )}
@@ -1321,41 +1309,14 @@ export default function PurchaseOrderDetailPage() {
               </label>
             )}
             {editMode && canAddDeleteItems && (
-              <div className="relative" ref={addDropdownRef}>
-                <div className="flex">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="rounded-r-none border-r-0"
-                    onClick={() => setAddItemModalOpen(true)}
-                  >
-                    <Plus className="h-3 w-3 mr-1" /> Add Item
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="rounded-l-none px-1.5"
-                    aria-label="More add options"
-                    onClick={() => setShowAddDropdown(prev => !prev)}
-                  >
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </div>
-                {showAddDropdown && (
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-card border rounded-md shadow-md min-w-[160px]">
-                    <button
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors flex items-center gap-2"
-                      onClick={() => { setBulkAddModalOpen(true); setShowAddDropdown(false) }}
-                    >
-                      <Plus className="h-3.5 w-3.5 shrink-0" />
-                      Bulk Add Variants
-                    </button>
-                  </div>
-                )}
-              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setAddItemModalOpen(true)}
+              >
+                <Plus className="h-3 w-3 mr-1" /> Add Item
+              </Button>
             )}
           </div>
         </div>
@@ -1409,15 +1370,7 @@ export default function PurchaseOrderDetailPage() {
         currency={po?.currency ?? String(headerValues.currency ?? '')}
         excludeVariantIds={usedVariantIds}
       />
-      <BulkAddVariantsModal
-        open={bulkAddModalOpen}
-        onClose={() => setBulkAddModalOpen(false)}
-        onAdd={(items) => {
-          for (const item of items) handleAddItemFromModal(item)
-        }}
-        currency={po?.currency ?? String(headerValues.currency ?? '')}
-        excludeVariantIds={usedVariantIds}
-      />
+
       {!isCreating && po && (
         <PurchaseOrderExportModal
           open={exportModalOpen}
@@ -1734,150 +1687,6 @@ function AddItemModal({
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
           <Button size="sm" onClick={handleAdd}>Add to Order</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function BulkAddVariantsModal({
-  open, onClose, onAdd, currency, excludeVariantIds,
-}: {
-  open: boolean
-  onClose: () => void
-  onAdd: (items: Array<{
-    product_variant_id: string
-    product_variant_label: string
-    product_id: string
-    product_name: string
-    product_supplier_link: string | null
-    product_photo_url: string | null
-    ordered_qty: string
-    unit_price_foreign: string
-    discounted_unit_price_foreign: string
-  }>) => void
-  currency: string
-  excludeVariantIds: Set<string>
-}) {
-  const [searchInput, setSearchInput] = useState('')
-  const [activeSearch, setActiveSearch] = useState('')
-  const [selected, setSelected] = useState<Map<string, ProductVariantStock>>(new Map())
-
-  const { data, isLoading } = useVariantSearch(
-    { search: activeSearch || undefined, page_size: 50 },
-    open,
-  )
-  const variants = (data?.results ?? []).filter(v => !excludeVariantIds.has(v.id))
-
-  useEffect(() => {
-    if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSearchInput('')
-      setActiveSearch('')
-      setSelected(new Map())
-    }
-  }, [open])
-
-  const toggleVariant = (v: ProductVariantStock) =>
-    setSelected(prev => {
-      const next = new Map(prev)
-      if (next.has(v.id)) next.delete(v.id)
-      else next.set(v.id, v)
-      return next
-    })
-
-  const handleConfirm = () => {
-    const selectedVariants = Array.from(selected.values())
-    const items = selectedVariants.map(v => {
-      const autoFill =
-        v.last_unit_price_foreign &&
-        v.last_currency &&
-        v.last_currency === currency &&
-        parseFloat(v.last_unit_price_foreign) > 0
-      return {
-        product_variant_id: v.id,
-        product_variant_label: `${v.name} (${v.sku_variant_code})`,
-        product_id: v.product,
-        product_name: v.product_name,
-        product_supplier_link: v.product_supplier_link ?? null,
-        product_photo_url: v.product_photo_url ?? null,
-        ordered_qty: '1',
-        unit_price_foreign: autoFill ? v.last_unit_price_foreign! : '',
-        discounted_unit_price_foreign: '',
-      }
-    })
-    onAdd(items)
-    onClose()
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Bulk Add Variants</DialogTitle>
-        </DialogHeader>
-        <div className="flex gap-1 mb-3">
-          <Input
-            className="h-8 text-sm"
-            placeholder="Search name or SKU..."
-            value={searchInput}
-            onChange={e => setSearchInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') setActiveSearch(searchInput) }}
-          />
-          <Button type="button" size="sm" variant="outline"
-            onClick={() => setActiveSearch(searchInput)}>
-            Search
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto min-h-0 border rounded-md divide-y">
-          {isLoading ? (
-            <div className="p-4 text-sm text-muted-foreground text-center">Loading...</div>
-          ) : variants.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground text-center">No variants found</div>
-          ) : (
-            variants.map(v => {
-              const isChecked = selected.has(v.id)
-              const hasPrice = v.last_unit_price_foreign &&
-                v.last_currency === currency &&
-                parseFloat(v.last_unit_price_foreign) > 0
-              return (
-                <label key={v.id}
-                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0"
-                    checked={isChecked}
-                    onChange={() => toggleVariant(v)}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{v.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {v.sku_variant_code} · {v.product_name}
-                    </div>
-                  </div>
-                  <div className="text-xs text-right shrink-0">
-                    <div className="text-muted-foreground">SOH: {v.total_available_qty}</div>
-                    {hasPrice && (
-                      <div className="text-primary font-medium">
-                        {v.last_currency} {v.last_unit_price_foreign}
-                      </div>
-                    )}
-                  </div>
-                </label>
-              )
-            })
-          )}
-        </div>
-        <DialogFooter className="mt-3">
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={selected.size === 0}
-            onClick={handleConfirm}
-          >
-            Add Selected ({selected.size})
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

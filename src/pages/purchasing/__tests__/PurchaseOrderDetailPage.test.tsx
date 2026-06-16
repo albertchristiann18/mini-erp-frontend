@@ -21,7 +21,7 @@ vi.mock('../../../hooks/usePurchasing', () => ({
   usePurchaseOrderSummary: vi.fn(() => ({ data: undefined })),
 }))
 
-let mockVariantSearchData: unknown = { results: [], count: 0, next: null, previous: null }
+const mockVariantSearchData: unknown = { results: [], count: 0, next: null, previous: null }
 
 vi.mock('../../../hooks/useInventory', () => ({
   useWarehouses: vi.fn(() => ({ data: { results: [] } })),
@@ -274,33 +274,9 @@ it('test_groupby_toggle_visible_when_variant_values_exist', async () => {
   expect(await screen.findByText('By Color')).toBeInTheDocument()
 })
 
-it('test_bulk_add_modal_renders_and_selects', async () => {
-  mockIsStaff = true
-  mockVariantSearchData = {
-    results: [
-      {
-        id: 'v1', name: 'Red Variant', sku_variant_code: 'RED-001',
-        product: 'prod-1', product_name: 'Product A',
-        product_supplier_link: null, product_photo_url: null,
-        base_price: 100, total_available_qty: 50, physical_qty: 50,
-        is_active: true, last_unit_price_foreign: null, last_currency: null,
-      },
-      {
-        id: 'v2', name: 'Blue Variant', sku_variant_code: 'BLU-001',
-        product: 'prod-1', product_name: 'Product A',
-        product_supplier_link: null, product_photo_url: null,
-        base_price: 100, total_available_qty: 30, physical_qty: 30,
-        is_active: true, last_unit_price_foreign: null, last_currency: null,
-      },
-    ],
-    count: 2, next: null, previous: null,
-  }
-
-  const poWithDetails = {
+it('no_flat_option_in_grouping_dropdown', async () => {
+  const poWithVariantValues = {
     ...basePo,
-    status: 'DRAFT',
-    editable_fields: { header: [], order_detail: [] },
-    next_status: 'ORDERED',
     order_details: [
       {
         id: 'detail-1',
@@ -325,11 +301,35 @@ it('test_bulk_add_modal_renders_and_selects', async () => {
         avg_sales_7d: null,
         stock_on_hand: 20,
         incoming_qty: 0,
-        variant_values: {},
+        variant_values: { color: 'Red' },
       },
     ],
   }
-  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithDetails))
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithVariantValues))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('By Product')).toBeInTheDocument()
+  })
+
+  // Open the group-by dropdown
+  const groupByTrigger = screen.getByRole('combobox')
+  await userEvent.click(groupByTrigger)
+
+  // Verify "Flat" is NOT present
+  expect(screen.queryByText('Flat')).not.toBeInTheDocument()
+
+  // Verify other options are present
+  const byProductElements = screen.getAllByText('By Product')
+  expect(byProductElements.length).toBeGreaterThanOrEqual(1)
+  expect(screen.getByText('By Color')).toBeInTheDocument()
+})
+
+it('single_add_item_button_no_split_button', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
   vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
 
   renderPage()
@@ -341,28 +341,19 @@ it('test_bulk_add_modal_renders_and_selects', async () => {
   const editButton = screen.getByRole('button', { name: /edit/i })
   await userEvent.click(editButton)
 
-  // Open the split button dropdown
-  const moreOptionsBtn = await screen.findByRole('button', { name: /more add options/i })
-  await userEvent.click(moreOptionsBtn)
+  // There should be exactly one "Add Item" button
+  const addItemButtons = screen.getAllByRole('button', { name: /add item/i })
+  expect(addItemButtons).toHaveLength(1)
 
-  // Click the "Bulk Add Variants" option in the dropdown
-  const bulkAddOption = await screen.findByText('Bulk Add Variants')
-  await userEvent.click(bulkAddOption)
+  // The chevron split button should NOT exist
+  expect(screen.queryByRole('button', { name: /more add options/i })).not.toBeInTheDocument()
 
-  // Modal should now be open
-  expect(await screen.findByText('Bulk Add Variants')).toBeInTheDocument()
-
-  const checkboxes = screen.getAllByRole('checkbox')
-  expect(checkboxes.length).toBeGreaterThanOrEqual(2)
-
-  await userEvent.click(checkboxes[0])
-  await userEvent.click(checkboxes[1])
-
-  const addSelectedButton = screen.getByRole('button', { name: /add selected \(2\)/i })
-  expect(addSelectedButton).toBeEnabled()
+  // "Bulk Add Variants" text should NOT be present
+  expect(screen.queryByText('Bulk Add Variants')).not.toBeInTheDocument()
 })
 
 it('opens add item modal from the primary Add Item button', async () => {
+  mockIsStaff = true
   renderPage()
 
   await waitFor(() => {
