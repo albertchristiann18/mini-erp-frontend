@@ -41,6 +41,8 @@ vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
     selectedLabel?: string
     onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null) => void
     placeholder?: string
+    supplierId?: string
+    excludeVariantIds?: Set<string>
   }) => (
     <div data-testid="variant-search-select" onClick={() =>
       onSelect('v1', 'Red Variant (RED-001)', 'prod-1', 'Product A', null, null, null, null)}
@@ -263,15 +265,15 @@ it('test_groupby_toggle_visible_when_variant_values_exist', async () => {
   renderPage()
 
   await waitFor(() => {
-    const byProductElements = screen.getAllByText('By Product')
-    expect(byProductElements.length).toBeGreaterThanOrEqual(1)
+    const productElements = screen.getAllByText('Product')
+    expect(productElements.length).toBeGreaterThanOrEqual(1)
   })
 
-  const groupByTriggers = screen.getAllByText('By Product')
+  const groupByTriggers = screen.getAllByText('Product')
   const groupByTrigger = groupByTriggers[0].closest('button') || groupByTriggers[0]
   await userEvent.click(groupByTrigger)
 
-  expect(await screen.findByText('By Color')).toBeInTheDocument()
+  expect(await screen.findByText('Color')).toBeInTheDocument()
 })
 
 it('no_flat_option_in_grouping_dropdown', async () => {
@@ -311,7 +313,7 @@ it('no_flat_option_in_grouping_dropdown', async () => {
   renderPage()
 
   await waitFor(() => {
-    expect(screen.getByText('By Product')).toBeInTheDocument()
+    expect(screen.getByText('Product')).toBeInTheDocument()
   })
 
   // Open the group-by dropdown
@@ -322,9 +324,9 @@ it('no_flat_option_in_grouping_dropdown', async () => {
   expect(screen.queryByText('Flat')).not.toBeInTheDocument()
 
   // Verify other options are present
-  const byProductElements = screen.getAllByText('By Product')
-  expect(byProductElements.length).toBeGreaterThanOrEqual(1)
-  expect(screen.getByText('By Color')).toBeInTheDocument()
+  const productElements = screen.getAllByText('Product')
+  expect(productElements.length).toBeGreaterThanOrEqual(1)
+  expect(screen.getByText('Color')).toBeInTheDocument()
 })
 
 it('single_add_item_button_no_split_button', async () => {
@@ -495,4 +497,232 @@ it('shows infinity symbol when avg_sales is 0', async () => {
   await waitFor(() => {
     expect(screen.getAllByText('\u221E')).toHaveLength(3)
   })
+})
+
+it('group_by_dropdown_renders_group_by_label', async () => {
+  const poWithVariantValues = {
+    ...basePo,
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Red Variant',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: { color: 'Red' },
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithVariantValues))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('Group by:')).toBeInTheDocument()
+  })
+})
+
+it('group_by_dropdown_options_say_Product_not_By_Product', async () => {
+  const poWithVariantValues = {
+    ...basePo,
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Red Variant',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: { color: 'Red' },
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithVariantValues))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('Product')).toBeInTheDocument()
+  })
+
+  expect(screen.queryByText('By Product')).not.toBeInTheDocument()
+
+  const trigger = screen.getByRole('combobox')
+  await userEvent.click(trigger)
+
+  expect(await screen.findByText('Color')).toBeInTheDocument()
+  expect(screen.queryByText('By Color')).not.toBeInTheDocument()
+})
+
+it('add_item_modal_add_to_list_shows_item_in_queue', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+
+  await userEvent.click(screen.getByTestId('variant-search-select'))
+
+  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
+
+  expect(screen.getByText('Added so far')).toBeInTheDocument()
+  expect(screen.getByText('Red Variant (RED-001)')).toBeInTheDocument()
+})
+
+it('add_item_modal_confirm_button_label_reflects_queue_count', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+
+  const confirmBtn = () => screen.getByRole('button', { name: /add (items|\d+)/i })
+
+  expect(confirmBtn()).toHaveTextContent('Add items')
+
+  await userEvent.click(screen.getByTestId('variant-search-select'))
+  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
+
+  expect(confirmBtn()).toHaveTextContent('Add 1 item')
+
+  await userEvent.click(screen.getByTestId('variant-search-select'))
+  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
+
+  expect(confirmBtn()).toHaveTextContent('Add 2 items')
+})
+
+it('add_item_modal_confirm_button_disabled_when_queue_empty', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+
+  const confirmBtn = screen.getByRole('button', { name: /add (items|\d+)/i })
+  expect(confirmBtn).toBeDisabled()
+})
+
+it('add_item_modal_confirm_calls_onAdd_with_array_of_all_queued_items', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+
+  await userEvent.click(screen.getByTestId('variant-search-select'))
+  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
+
+  expect(screen.getByText('Added so far')).toBeInTheDocument()
+
+  await userEvent.click(screen.getByRole('button', { name: /add 1 item/i }))
+
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: /add items/i })).not.toBeInTheDocument()
+  })
+
+  const variantSelects = screen.getAllByTestId('variant-search-select')
+  expect(variantSelects.length).toBeGreaterThanOrEqual(1)
+})
+
+it('add_item_modal_remove_from_queue_via_x_works', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+
+  await userEvent.click(screen.getByTestId('variant-search-select'))
+  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
+
+  expect(screen.getByText('Added so far')).toBeInTheDocument()
+
+  const removeBtn = screen.getByRole('button', { name: '' })
+  await userEvent.click(removeBtn)
+
+  expect(screen.queryByText('Added so far')).not.toBeInTheDocument()
 })

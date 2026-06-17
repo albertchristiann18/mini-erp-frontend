@@ -5,7 +5,8 @@ import { FormField } from '../../components/ui/form'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { CategorySelect } from '../../components/ui/CategorySelect'
-import { useCreateProduct } from '../../hooks/useInventory'
+import { useCreateProduct, useSuppliers } from '../../hooks/useInventory'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { useAuth } from '../../contexts/AuthContext'
 import { uploadProductPhoto } from '../../api/inventory'
 import { toast } from '../../lib/toast'
@@ -41,6 +42,8 @@ interface Props {
 export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }: Props) {
   const { user } = useAuth()
   const createProductMutation = useCreateProduct()
+  const { data: suppliersData } = useSuppliers({ active_only: 'true' })
+  const supplierOptions = suppliersData?.results ?? []
 
   const [productName, setProductName] = useState('')
   const [categoryId, setCategoryId] = useState('')
@@ -54,6 +57,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
   const [step, setStep] = useState<'form' | 'pick'>('form')
   const [createdVariants, setCreatedVariants] = useState<CreatedVariant[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [chosenSupplierId, setChosenSupplierId] = useState('')
   const productPhotoInputRef = useRef<HTMLInputElement>(null)
 
   const handleClose = () => {
@@ -67,6 +71,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     setStep('form')
     setCreatedVariants([])
     setSelectedIds(new Set())
+    setChosenSupplierId('')
     onClose()
   }
 
@@ -136,7 +141,8 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
         variant_options: variantOptions,
         variants: variantsPayload,
       }
-      if (supplierId) createPayload.supplier_id = supplierId
+      const effectiveSupplierId = supplierId || chosenSupplierId || null
+      if (effectiveSupplierId) createPayload.supplier_id = effectiveSupplierId
       if (supplierLink.trim()) createPayload.supplier_link = supplierLink.trim()
 
       const created = await createProductMutation.mutateAsync(createPayload)
@@ -243,6 +249,25 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
           <FormField label="Supplier Link">
             <Input type="url" value={supplierLink} onChange={e => setSupplierLink(e.target.value)} placeholder="https://..." />
           </FormField>
+
+          {!supplierId && (
+            <FormField label="Supplier">
+              <Select
+                value={chosenSupplierId || 'none'}
+                onValueChange={val => setChosenSupplierId(val === 'none' ? '' : val)}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="No supplier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No supplier</SelectItem>
+                  {supplierOptions.map((s: { id: string; name: string }) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          )}
 
           <div>
             <p className="text-xs font-medium mb-1">Product Photo</p>

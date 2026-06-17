@@ -21,6 +21,18 @@ import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../typ
 import { uploadVariantPhoto } from '../../api/inventory'
 import type { BadgeProps } from '../../components/ui/badge'
 
+type ModalDraftItem = {
+  product_variant_id: string
+  product_variant_label: string
+  product_id: string
+  product_name: string
+  product_supplier_link: string | null
+  product_photo_url: string | null
+  ordered_qty: string
+  unit_price_foreign: string
+  discounted_unit_price_foreign: string
+}
+
 function getCurrencySymbol(currency: string | null | undefined): string {
   const map: Record<string, string> = {
     CNY: '\xA5', RMB: '\xA5', USD: '$', EUR: '\u20AC',
@@ -129,6 +141,10 @@ export default function PurchaseOrderDetailPage() {
     unit_price_foreign: string
     discounted_unit_price_foreign: string
   }>>([])
+  const activeSupplierId: string | undefined =
+    (po?.supplier_id as string | undefined) ??
+    (headerValues.supplier_id ? String(headerValues.supplier_id) : undefined) ??
+    undefined
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
 
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
@@ -284,21 +300,15 @@ export default function PurchaseOrderDetailPage() {
   const updateNewItem = (_tempId: string, field: string, value: string) =>
     setNewItems(prev => prev.map(n => n._tempId === _tempId ? { ...n, [field]: value } : n))
 
-  const handleAddItemFromModal = (draft: {
-    product_variant_id: string
-    product_variant_label: string
-    product_id: string
-    product_name: string
-    product_supplier_link: string | null
-    product_photo_url: string | null
-    ordered_qty: string
-    unit_price_foreign: string
-    discounted_unit_price_foreign: string
-  }) => {
-    setNewItems(prev => [...prev, {
-      ...draft,
-      _tempId: `new-${Date.now()}-${prev.length}`,
-    }])
+  const handleAddItemFromModal = (items: ModalDraftItem[]) => {
+    const timestamp = Date.now()
+    setNewItems(prev => [
+      ...prev,
+      ...items.map((item, i) => ({
+        ...item,
+        _tempId: `new-${timestamp}-${prev.length + i}`,
+      })),
+    ])
   }
 
   const deleteExistingItem = (itemId: string) =>
@@ -714,6 +724,7 @@ export default function PurchaseOrderDetailPage() {
                 <VariantSearchSelect
                   value={n.product_variant_id}
                   selectedLabel={n.product_variant_label}
+                  supplierId={activeSupplierId}
                   onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
                     updateNewItem(n._tempId, 'product_variant_id', id)
                     updateNewItem(n._tempId, 'product_variant_label', label)
@@ -1282,20 +1293,23 @@ export default function PurchaseOrderDetailPage() {
                 onClick={() => setAvgWindow(30)}
               >30d</button>
             </div>
-            {availableGroupKeys.length > 0 && !isCreating && (
-              <Select value={groupBy} onValueChange={setGroupBy}>
-                <SelectTrigger className="h-6 text-xs w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="product">By Product</SelectItem>
-                  {availableGroupKeys.map(k => (
-                    <SelectItem key={k} value={k}>
-                      By {k.charAt(0).toUpperCase() + k.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {!isCreating && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Group by:</span>
+                <Select value={groupBy} onValueChange={setGroupBy}>
+                  <SelectTrigger className="h-6 text-xs w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">Product</SelectItem>
+                    {availableGroupKeys.map(k => (
+                      <SelectItem key={k} value={k}>
+                        {k.charAt(0).toUpperCase() + k.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             )}
             {editMode && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
@@ -1369,6 +1383,7 @@ export default function PurchaseOrderDetailPage() {
         commissionPerUnit={commissionPerUnit}
         currency={po?.currency ?? String(headerValues.currency ?? '')}
         excludeVariantIds={usedVariantIds}
+        supplierId={activeSupplierId}
       />
 
       {!isCreating && po && (
@@ -1491,21 +1506,11 @@ function StatBox({ label, value, highlight }: { label: string; value: string; hi
 }
 
 function AddItemModal({
-  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, poExchangeRate, freightPerUnit, commissionPerUnit, currency, excludeVariantIds,
+  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, poExchangeRate, freightPerUnit, commissionPerUnit, currency, excludeVariantIds, supplierId,
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (draft: {
-    product_variant_id: string
-    product_variant_label: string
-    product_id: string
-    product_name: string
-    product_supplier_link: string | null
-    product_photo_url: string | null
-    ordered_qty: string
-    unit_price_foreign: string
-    discounted_unit_price_foreign: string
-  }) => void
+  onAdd: (items: ModalDraftItem[]) => void
   hasDiscount: boolean
   stockMap: Map<string, ReplenishmentItem>
   avgWindow: 7 | 14 | 30
@@ -1514,6 +1519,7 @@ function AddItemModal({
   commissionPerUnit: number
   currency: string
   excludeVariantIds: Set<string>
+  supplierId?: string
 }) {
   const emptyDraft = {
     product_variant_id: '',
@@ -1528,15 +1534,25 @@ function AddItemModal({
   }
   const [draft, setDraft] = useState({ ...emptyDraft })
   const [error, setError] = useState('')
+  const [queue, setQueue] = useState<Array<ModalDraftItem & { tempId: string }>>([])
+  const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft({ ...emptyDraft })
+      setQueue([])
+      setShowAll(false)
       setError('')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  const allExcluded = useMemo(() => {
+    const combined = new Set(excludeVariantIds)
+    for (const q of queue) combined.add(q.product_variant_id)
+    return combined
+  }, [excludeVariantIds, queue])
 
   const liveStats = draft.product_variant_id ? stockMap.get(draft.product_variant_id) : undefined
   const ordQty = Number(draft.ordered_qty) || 0
@@ -1549,10 +1565,27 @@ function AddItemModal({
   const unitIdr = Math.round(unitForeign * poExchangeRate)
   const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
 
-  const handleAdd = () => {
+  const handleAddToQueue = () => {
     if (!draft.product_variant_id) { setError('Please select a variant'); return }
     if (!draft.ordered_qty || Number(draft.ordered_qty) <= 0) { setError('Quantity must be greater than 0'); return }
-    onAdd(draft)
+    setQueue(prev => [...prev, { ...draft, tempId: `q-${Date.now()}-${prev.length}` }])
+    setDraft({ ...emptyDraft })
+    setError('')
+  }
+
+  const handleConfirm = () => {
+    if (queue.length === 0) return
+    onAdd(queue.map(item => ({
+      product_variant_id: item.product_variant_id,
+      product_variant_label: item.product_variant_label,
+      product_id: item.product_id,
+      product_name: item.product_name,
+      product_supplier_link: item.product_supplier_link,
+      product_photo_url: item.product_photo_url,
+      ordered_qty: item.ordered_qty,
+      unit_price_foreign: item.unit_price_foreign,
+      discounted_unit_price_foreign: item.discounted_unit_price_foreign,
+    })))
     onClose()
   }
 
@@ -1560,15 +1593,50 @@ function AddItemModal({
     <Dialog open={open} onOpenChange={o => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Item</DialogTitle>
+          <DialogTitle>Add Items</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {queue.length > 0 && (
+            <div className="space-y-1 rounded-lg border p-2 bg-muted/20">
+              <p className="text-xs text-muted-foreground font-medium mb-1.5">Added so far</p>
+              {queue.map(q => (
+                <div key={q.tempId} className="flex items-center justify-between text-xs">
+                  <span className="font-medium">{q.product_variant_label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">qty {q.ordered_qty}</span>
+                    <button
+                      type="button"
+                      onClick={() => setQueue(prev => prev.filter(x => x.tempId !== q.tempId))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Variant <span className="text-red-500">*</span></p>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs text-muted-foreground">
+                Variant <span className="text-red-500">*</span>
+              </p>
+              {supplierId && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(prev => !prev)}
+                  className={`text-xs px-1.5 py-0.5 rounded border ${showAll ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+                >
+                  {showAll ? 'Filtered off' : 'Filter by supplier'}
+                </button>
+              )}
+            </div>
             <VariantSearchSelect
               value={draft.product_variant_id}
               selectedLabel={draft.product_variant_label}
-              excludeVariantIds={excludeVariantIds}
+              excludeVariantIds={allExcluded}
+              supplierId={showAll ? undefined : supplierId}
               onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) =>
                 setDraft(prev => {
                   const autoFill =
@@ -1684,9 +1752,25 @@ function AddItemModal({
 
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={handleAdd}>Add to Order</Button>
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleAddToQueue}
+            disabled={!draft.product_variant_id}
+          >
+            <Plus className="h-3 w-3 mr-1" /> Add to list
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleConfirm}
+            disabled={queue.length === 0}
+          >
+            Add {queue.length > 0 ? `${queue.length} item${queue.length > 1 ? 's' : ''}` : 'items'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
