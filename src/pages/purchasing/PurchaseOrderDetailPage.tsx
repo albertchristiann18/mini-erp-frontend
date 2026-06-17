@@ -535,7 +535,7 @@ export default function PurchaseOrderDetailPage() {
           className="bg-muted/40 border-b cursor-pointer hover:bg-muted/60 transition-colors font-semibold text-sm"
           onClick={() => toggleGroupCollapse(group.groupKey)}
         >
-          <td className="px-3 py-2 whitespace-nowrap">
+          <td colSpan={2} className="px-3 py-2 whitespace-nowrap">
             <div className="flex items-center gap-1.5">
               <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
               {group.productPhotoUrl ? (
@@ -601,7 +601,7 @@ export default function PurchaseOrderDetailPage() {
 
           return (
             <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
-              <td className="pl-4 pr-3 py-1.5 whitespace-nowrap">
+              <td colSpan={2} className="pl-4 pr-3 py-1.5 whitespace-nowrap">
                 <div className="flex items-center gap-2">
                   <label className={`relative w-7 h-7 rounded border overflow-hidden shrink-0 cursor-pointer
                     ${uploadingVariantPhoto[item.variant_id] ? 'opacity-50' : 'hover:opacity-80'}`}>
@@ -720,7 +720,7 @@ export default function PurchaseOrderDetailPage() {
 
           return (
             <tr key={n._tempId} className="border-b last:border-b-0">
-              <td className="px-2 py-1 min-w-[160px]">
+              <td colSpan={2} className="px-2 py-1 min-w-[160px]">
                 <VariantSearchSelect
                   value={n.product_variant_id}
                   selectedLabel={n.product_variant_label}
