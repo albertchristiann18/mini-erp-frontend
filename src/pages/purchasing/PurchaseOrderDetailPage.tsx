@@ -466,16 +466,16 @@ export default function PurchaseOrderDetailPage() {
         groupPhoto = null
       } else {
         const dimValue = item.variant_values?.[groupBy] ?? 'Other'
-        key = dimValue
-        groupLabel = dimValue
-        groupPhoto = null
+        key = `${item.product_id}_${dimValue}`
+        groupLabel = `${item.product_name} ${dimValue}`
+        groupPhoto = item.product_photo_url ?? null
       }
 
       if (!groupMap.has(key)) {
         groupMap.set(key, {
           groupKey: key,
           productName: groupLabel,
-          productSupplierLink: groupBy === 'product' ? item.product_supplier_link : null,
+          productSupplierLink: item.product_supplier_link,
           productPhotoUrl: groupPhoto,
           existingItems: [],
           newItemsList: [],
@@ -628,7 +628,7 @@ export default function PurchaseOrderDetailPage() {
                       }}
                     />
                   </label>
-                  <span className="font-mono font-medium">{item.product_variant_name}</span>
+                  <div className="flex flex-col min-w-0"><span className="font-mono font-medium">{item.product_variant_name}</span>{item.sku_variant_code && (<span className="text-[10px] text-muted-foreground font-mono leading-tight">{item.sku_variant_code}</span>)}</div>
                 </div>
               </td>
               <td className="px-3 py-1.5 whitespace-nowrap font-medium text-violet-600">

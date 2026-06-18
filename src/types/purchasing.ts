@@ -13,6 +13,7 @@ export interface PurchaseOrderDetail {
   id: string
   variant_id: string
   product_variant_name: string
+  sku_variant_code?: string
   product_id: string
   product_name: string
   product_supplier_link: string | null
