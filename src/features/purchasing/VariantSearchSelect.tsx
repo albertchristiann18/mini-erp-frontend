@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Search } from 'lucide-react'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
@@ -33,12 +34,13 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 288 })
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      const inContainer = containerRef.current?.contains(e.target as Node)
+      const inDropdown = dropdownRef.current?.contains(e.target as Node)
+      if (!inContainer && !inDropdown) setOpen(false)
     }
     if (open) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -99,8 +101,8 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
         <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
       </button>
 
-      {open && (
-        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="rounded-md border bg-card shadow-lg">
+      {open && createPortal(
+        <div ref={dropdownRef} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="rounded-md border bg-card shadow-lg">
           <div className="flex gap-1 border-b p-2">
             <Input
               className="h-7 text-xs"
@@ -159,7 +161,8 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
               <span>+</span> New product
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <QuickCreateProductModal
