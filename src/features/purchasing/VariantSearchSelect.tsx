@@ -31,6 +31,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
   const [activeSearch, setActiveSearch] = useState('')
   const [internalSelectedLabel, setInternalSelectedLabel] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 288 })
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -41,6 +42,23 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     }
     if (open) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !containerRef.current) return
+    const update = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect()
+        setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 288) })
+      }
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
   }, [open])
 
   const { data, isLoading } = useVariantSearch(
@@ -92,7 +110,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border bg-card shadow-lg">
+        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="rounded-md border bg-card shadow-lg">
           <div className="flex gap-1 border-b p-2">
             <Input
               className="h-7 text-xs"

@@ -1690,7 +1690,7 @@ function AddItemModal({
 
   return (
     <Dialog open={open} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-row items-center justify-between pr-8">
           <DialogTitle>Add Items</DialogTitle>
           {supplierId && (
@@ -1704,7 +1704,7 @@ function AddItemModal({
           )}
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        <div className="space-y-3 py-2 flex-1 min-h-0 overflow-y-auto">
           {/* Bulk price */}
           <div className="flex items-center gap-2">
             <label className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
@@ -1721,7 +1721,7 @@ function AddItemModal({
           </div>
 
           {/* Row list */}
-          <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
+          <div className="space-y-2 pr-1">
             {rows.map((row, idx) => (
               <AddItemRow
                 key={row.tempId}
