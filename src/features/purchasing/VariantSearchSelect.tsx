@@ -32,6 +32,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
   const [activeSearch, setActiveSearch] = useState('')
   const [internalSelectedLabel, setInternalSelectedLabel] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  const [portalTarget, setPortalTarget] = useState<Element | null>(null)
   const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 288 })
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -92,7 +93,18 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
         onClick={() => {
           if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect()
-            setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 288) })
+            const dialog = containerRef.current.closest('[role="dialog"]') ?? null
+            setPortalTarget(dialog)
+            if (dialog) {
+              const dialogRect = dialog.getBoundingClientRect()
+              setDropdownPos({
+                top: rect.bottom - dialogRect.top + 4,
+                left: rect.left - dialogRect.left,
+                width: Math.max(rect.width, 288),
+              })
+            } else {
+              setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 288) })
+            }
           }
           setOpen(o => !o)
         }}
@@ -102,7 +114,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
       </button>
 
       {open && createPortal(
-        <div ref={dropdownRef} style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="rounded-md border bg-card shadow-lg">
+        <div ref={dropdownRef} style={{ position: portalTarget ? 'absolute' : 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="rounded-md border bg-card shadow-lg">
           <div className="flex gap-1 border-b p-2">
             <Input
               className="h-7 text-xs"
@@ -162,7 +174,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
             </button>
           </div>
         </div>,
-        document.body
+        portalTarget ?? document.body
       )}
 
       <QuickCreateProductModal
