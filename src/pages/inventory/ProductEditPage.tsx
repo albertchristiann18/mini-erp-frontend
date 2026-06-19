@@ -263,11 +263,13 @@ export function initializeRows(product: Product, dims: VariantDimension[]): Vari
     })
 }
 
-function suggestSku(productSku: string, dims: VariantDimension[], vv: Record<string, string>): string {
-  const parts = [productSku]
+function suggestSku(productSku: string, dims: VariantDimension[], vv: Record<string, string>, categoryCode?: string): string {
+  const parts: string[] = []
+  if (categoryCode) parts.push(categoryCode.toUpperCase())
+  if (productSku) parts.push(productSku.toUpperCase())
   for (const dim of dims) {
     const valId = vv[dim.id]
-    if (valId) parts.push(valId.toUpperCase().replace(/-/g, ''))
+    if (valId) parts.push(valId.toUpperCase().replace(/[^A-Z0-9]/g, ''))
   }
   return parts.join('-')
 }
@@ -359,6 +361,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
   }, [product?.id, isEditing])
 
   const categories = categoriesData?.results ?? []
+  const selectedCategoryCode = categories.find(c => c.id === watch('category'))?.category_code ?? ''
 
   const handleAddValue = (dimIdx: number) => {
     const label = (addValueInputs[dimIdx] ?? '').trim()
@@ -383,7 +386,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
         ? cartesian(otherDimsWithValues.map(d => d.values))
         : [[]] as VariantDimensionValue[][]
 
-    const productSku = product?.sku_code ?? 'SKU'
+    const productSku = product?.sku_code ?? ''
     const allDimsAfterUpdate = dimensions.map((d, i) =>
       i === dimIdx ? { ...d, values: [...d.values, newValue] } : d,
     )
@@ -395,7 +398,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       })
       return {
         variantValues: vv,
-        sku_variant_code: suggestSku(productSku, allDimsAfterUpdate, vv),
+        sku_variant_code: suggestSku(productSku, allDimsAfterUpdate, vv, selectedCategoryCode),
         base_price: 0,
         current_cogs: 0,
         total_available_qty: 0,
@@ -497,7 +500,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       return
     }
     const combos = cartesian(activeDims.map(d => d.values))
-    const productSku = product?.sku_code ?? 'SKU'
+    const productSku = product?.sku_code ?? ''
     let added = 0
     const newRows: VariantRow[] = []
     for (const combo of combos) {
@@ -509,7 +512,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       if (!exists) {
         newRows.push({
           variantValues: vv,
-          sku_variant_code: suggestSku(productSku, dimensions, vv),
+          sku_variant_code: suggestSku(productSku, dimensions, vv, selectedCategoryCode),
           base_price: 0,
           current_cogs: 0,
           total_available_qty: 0,

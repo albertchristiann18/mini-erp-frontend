@@ -113,9 +113,11 @@ function PODocument({ po, groups, grandTotalForeign, currencySymbol, imageMap }:
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Purchase Order</Text>
           <View style={styles.headerRow}>
-            <Text><Text style={styles.headerLabel}>PO: </Text><Text style={styles.headerValue}>{po.purchase_order_number}</Text></Text>
-            <Text><Text style={styles.headerLabel}>Supplier: </Text><Text style={styles.headerValue}>{po.supplier_name ?? '—'}</Text></Text>
-            <Text><Text style={styles.headerLabel}>Date: </Text><Text style={styles.headerValue}>{fmtDate(po.cdate)}</Text></Text>
+            <Text style={{ flexShrink: 0 }}><Text style={styles.headerLabel}>PO: </Text><Text style={styles.headerValue}>{po.purchase_order_number}</Text></Text>
+            <View style={{ flex: 1 }}>
+              <Text><Text style={styles.headerLabel}>Supplier: </Text><Text style={styles.headerValue}>{po.supplier_name ?? '—'}</Text></Text>
+            </View>
+            <Text style={{ flexShrink: 0 }}><Text style={styles.headerLabel}>Date: </Text><Text style={styles.headerValue}>{fmtDate(po.cdate)}</Text></Text>
           </View>
           <View style={styles.headerRow}>
             <Text><Text style={styles.headerLabel}>Total Qty: </Text><Text style={styles.headerValue}>{po.total_ordered_qty} units</Text></Text>

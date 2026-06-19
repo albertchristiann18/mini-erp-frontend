@@ -44,22 +44,6 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
 
-  useEffect(() => {
-    if (!open || !containerRef.current) return
-    const update = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect()
-        setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 288) })
-      }
-    }
-    update()
-    window.addEventListener('scroll', update, true)
-    window.addEventListener('resize', update)
-    return () => {
-      window.removeEventListener('scroll', update, true)
-      window.removeEventListener('resize', update)
-    }
-  }, [open])
 
   const { data, isLoading } = useVariantSearch(
     {
@@ -103,7 +87,13 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
           'bg-background hover:bg-accent transition-colors',
           value ? 'text-foreground' : 'text-muted-foreground',
         )}
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect()
+            setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 288) })
+          }
+          setOpen(o => !o)
+        }}
       >
         <span className="truncate">{value ? (internalSelectedLabel || externalSelectedLabel || placeholder) : placeholder}</span>
         <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
