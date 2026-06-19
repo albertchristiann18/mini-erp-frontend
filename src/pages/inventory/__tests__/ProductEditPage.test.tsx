@@ -46,6 +46,7 @@ import {
 import { useParams } from 'react-router-dom'
 import { saveVariants } from '../../../api/inventory'
 import { toast } from '../../../lib/toast'
+import { initializeRows } from '../ProductEditPage'
 
 const baseProduct = {
   id: '123',
@@ -366,6 +367,114 @@ it('variant matrix shows photo column', () => {
   renderPage()
 
   expect(screen.getByText('Photo')).toBeInTheDocument()
+})
+
+it('initializeRows heals mismatched variant_values keys positionally', () => {
+  const baseVariant = {
+    product: 'prod-1', product_name: 'Test', company: 'c1',
+    sku: 'SKU', cdate: '', udate: '',
+    product_supplier_link: null, product_photo_url: null,
+  }
+  const product = {
+    ...baseProduct,
+    variant_options: { Size: ['S', 'M'] },
+    variants: [
+      {
+        ...baseVariant,
+        id: 'var-1', name: 'Small', sku_variant_code: 'SKU-S', base_price: 10000,
+        variant_values: { variant: 'S' }, is_active: true,
+        total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
+      },
+      {
+        ...baseVariant,
+        id: 'var-2', name: 'Medium', sku_variant_code: 'SKU-M', base_price: 11000,
+        variant_values: { variant: 'M' }, is_active: true,
+        total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
+      },
+    ],
+  }
+  const dims = [{ id: 'Size', name: 'Size', order: 1, values: [{ id: 'S', label: 'S' }, { id: 'M', label: 'M' }] }]
+
+  const rows = initializeRows(product, dims)
+
+  expect(rows).toHaveLength(2)
+  expect(rows[0].variantValues).toEqual({ Size: 'S' })
+  expect(rows[1].variantValues).toEqual({ Size: 'M' })
+})
+
+it('initializeRows leaves matching keys unchanged', () => {
+  const baseVariant = {
+    product: 'prod-1', product_name: 'Test', company: 'c1',
+    sku: 'SKU', cdate: '', udate: '',
+    product_supplier_link: null, product_photo_url: null,
+  }
+  const product = {
+    ...baseProduct,
+    variant_options: { Color: ['Red', 'Blue'] },
+    variants: [
+      {
+        ...baseVariant,
+        id: 'var-1', name: 'Red', sku_variant_code: 'SKU-R', base_price: 10000,
+        variant_values: { Color: 'Red' }, is_active: true,
+        total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
+      },
+    ],
+  }
+  const dims = [{ id: 'Color', name: 'Color', order: 1, values: [{ id: 'Red', label: 'Red' }] }]
+
+  const rows = initializeRows(product, dims)
+
+  expect(rows[0].variantValues).toEqual({ Color: 'Red' })
+})
+
+it('renaming a dimension updates variantValues keys in all rows', async () => {
+  const productWithDims = {
+    ...baseProduct,
+    variant_options: { Size: ['S', 'M'] },
+    variants: [
+      {
+        id: 'var-1', name: 'Small', sku_variant_code: 'SKU-S', base_price: 10000,
+        variant_values: { Size: 'S' }, is_active: true,
+        total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
+        product: 'prod-1', product_name: 'Test', company: 'c1',
+        sku: 'SKU', cdate: '', udate: '',
+        product_supplier_link: null, product_photo_url: null,
+      },
+    ],
+  }
+  vi.mocked(useParams).mockReturnValue({ id: '123' })
+  vi.mocked(useProduct).mockReturnValue(hookResult(productWithDims))
+  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
+  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+  vi.mocked(useProductSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
+  vi.mocked(useCreateProductSupplier).mockReturnValue(mutationMock())
+  vi.mocked(useDeleteProductSupplier).mockReturnValue(mutationMock())
+  vi.mocked(useSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
+
+  renderPage()
+
+  await waitFor(() => expect(screen.getByDisplayValue('SKU-S')).toBeInTheDocument())
+
+  // Click the rename button (title="Rename attribute")
+  const renameBtn = screen.getByTitle('Rename attribute')
+  await userEvent.click(renameBtn)
+
+  // Type new name
+  const renameInput = screen.getByDisplayValue('Size')
+  await userEvent.clear(renameInput)
+  await userEvent.type(renameInput, 'VariantSize')
+
+  // Confirm rename
+  const saveBtn = screen.getByRole('button', { name: /^save$/i })
+  await userEvent.click(saveBtn)
+
+  // Verify the new dimension name appears as the attribute label
+  await waitFor(() => {
+    const variantSizeElements = screen.getAllByText('VariantSize')
+    expect(variantSizeElements.length).toBeGreaterThanOrEqual(1)
+  })
 })
 
 it('variant photo cell shows ImagePlus placeholder when no photo', () => {

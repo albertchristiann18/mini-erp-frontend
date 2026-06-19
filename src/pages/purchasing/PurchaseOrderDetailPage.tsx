@@ -279,21 +279,6 @@ export default function PurchaseOrderDetailPage() {
       [itemId]: { ...(prev[itemId] ?? {}), [field]: value }
     }))
 
-  const addNewItem = () =>
-    setNewItems(prev => [...prev, {
-      _tempId: `new-${Date.now()}-${prev.length}`,
-      product_variant_id: '',
-      product_variant_label: '',
-      product_id: '',
-      product_name: '',
-      product_supplier_link: null,
-      product_photo_url: null,
-      ordered_qty: '1',
-      unit_price_foreign: '',
-      discounted_unit_price_foreign: '',
-    }])
-  void addNewItem
-
   const removeNewItem = (_tempId: string) =>
     setNewItems(prev => prev.filter(n => n._tempId !== _tempId))
 
@@ -1378,9 +1363,6 @@ export default function PurchaseOrderDetailPage() {
         hasDiscount={hasDiscount}
         stockMap={stockMap}
         avgWindow={avgWindow}
-        poExchangeRate={poExchangeRate}
-        freightPerUnit={freightPerUnit}
-        commissionPerUnit={commissionPerUnit}
         currency={po?.currency ?? String(headerValues.currency ?? '')}
         excludeVariantIds={usedVariantIds}
         supplierId={activeSupplierId}
@@ -1505,8 +1487,141 @@ function StatBox({ label, value, highlight }: { label: string; value: string; hi
   )
 }
 
+type RowDraft = ModalDraftItem & { tempId: string }
+
+function makeEmptyRow(): RowDraft {
+  return {
+    tempId: `r-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    product_variant_id: '',
+    product_variant_label: '',
+    product_id: '',
+    product_name: '',
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: '1',
+    unit_price_foreign: '',
+    discounted_unit_price_foreign: '',
+  }
+}
+
+function AddItemRow({
+  row, index, stockMap, avgWindow, currency, hasDiscount, showAll, supplierId,
+  allExcluded, onUpdate, onRemove, canRemove,
+}: {
+  row: RowDraft
+  index: number
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 14 | 30
+  currency: string
+  hasDiscount: boolean
+  showAll: boolean
+  supplierId?: string
+  allExcluded: Set<string>
+  onUpdate: (patch: Partial<RowDraft>) => void
+  onRemove: () => void
+  canRemove: boolean
+}) {
+  const rowExcluded = useMemo(() => {
+    const s = new Set(allExcluded)
+    if (row.product_variant_id) s.delete(row.product_variant_id)
+    return s
+  }, [allExcluded, row.product_variant_id])
+
+  const liveStats = row.product_variant_id ? stockMap.get(row.product_variant_id) : undefined
+  const ordQty = Number(row.ordered_qty) || 0
+  const liveSoh = liveStats?.stock_on_hand ?? 0
+  const liveIncoming = liveStats?.incoming_qty ?? 0
+  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+  const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
+  const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
+
+  return (
+    <div className="rounded-lg border bg-card p-2 space-y-1.5">
+      <div className="flex items-start gap-1.5">
+        <span className="text-xs text-muted-foreground w-4 pt-1.5 shrink-0 text-right">{index + 1}</span>
+
+        <div className="flex-1 min-w-0">
+          <VariantSearchSelect
+            value={row.product_variant_id}
+            selectedLabel={row.product_variant_label}
+            excludeVariantIds={rowExcluded}
+            supplierId={showAll ? undefined : supplierId}
+            onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
+              const autoFill =
+                lastUnitPriceForeign &&
+                lastCurrency &&
+                lastCurrency === currency &&
+                parseFloat(lastUnitPriceForeign) > 0
+              onUpdate({
+                product_variant_id: id,
+                product_variant_label: label,
+                product_id: productId,
+                product_name: productName,
+                product_supplier_link: productSupplierLink ?? null,
+                product_photo_url: productPhotoUrl ?? null,
+                ...(autoFill ? { unit_price_foreign: lastUnitPriceForeign! } : {}),
+              })
+            }}
+            placeholder="Search variant..."
+          />
+          {liveStats && (
+            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
+              SOH {liveSoh} · Inc {liveIncoming} · {avg > 0 ? `${avg.toFixed(1)}/d` : '—'} · DOI {doi !== null ? `${doi}d` : '∞'} → {doiAfter !== null ? `${doiAfter}d` : (ordQty > 0 ? '∞' : '—')}
+            </p>
+          )}
+        </div>
+
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive shrink-0 mt-1"
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 pl-5">
+        <div className="w-20 shrink-0">
+          <p className="text-[10px] text-muted-foreground mb-0.5">Qty <span className="text-red-500">*</span></p>
+          <Input
+            type="number"
+            min="1"
+            className="h-7 text-xs"
+            value={row.ordered_qty}
+            onChange={e => onUpdate({ ordered_qty: e.target.value })}
+          />
+        </div>
+        <div className="w-28 shrink-0">
+          <p className="text-[10px] text-muted-foreground mb-0.5">Unit Price ({getCurrencySymbol(currency)})</p>
+          <Input
+            type="number"
+            step="0.001"
+            className="h-7 text-xs"
+            value={row.unit_price_foreign}
+            onChange={e => onUpdate({ unit_price_foreign: e.target.value })}
+          />
+        </div>
+        {hasDiscount && (
+          <div className="w-28 shrink-0">
+            <p className="text-[10px] text-muted-foreground mb-0.5">Disc. Price ({getCurrencySymbol(currency)})</p>
+            <Input
+              type="number"
+              step="0.001"
+              className="h-7 text-xs"
+              value={row.discounted_unit_price_foreign}
+              onChange={e => onUpdate({ discounted_unit_price_foreign: e.target.value })}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AddItemModal({
-  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, poExchangeRate, freightPerUnit, commissionPerUnit, currency, excludeVariantIds, supplierId,
+  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, currency, excludeVariantIds, supplierId,
 }: {
   open: boolean
   onClose: () => void
@@ -1514,262 +1629,138 @@ function AddItemModal({
   hasDiscount: boolean
   stockMap: Map<string, ReplenishmentItem>
   avgWindow: 7 | 14 | 30
-  poExchangeRate: number
-  freightPerUnit: number
-  commissionPerUnit: number
   currency: string
   excludeVariantIds: Set<string>
   supplierId?: string
 }) {
-  const emptyDraft = {
-    product_variant_id: '',
-    product_variant_label: '',
-    product_id: '',
-    product_name: '',
-    product_supplier_link: null as string | null,
-    product_photo_url: null as string | null,
-    ordered_qty: '1',
-    unit_price_foreign: '',
-    discounted_unit_price_foreign: '',
-  }
-  const [draft, setDraft] = useState({ ...emptyDraft })
-  const [error, setError] = useState('')
-  const [queue, setQueue] = useState<Array<ModalDraftItem & { tempId: string }>>([])
+  const [rows, setRows] = useState<RowDraft[]>([makeEmptyRow()])
+  const [bulkPrice, setBulkPrice] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraft({ ...emptyDraft })
-      setQueue([])
+      setRows([makeEmptyRow()])
+      setBulkPrice('')
       setShowAll(false)
       setError('')
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const allExcluded = useMemo(() => {
     const combined = new Set(excludeVariantIds)
-    for (const q of queue) combined.add(q.product_variant_id)
+    for (const r of rows) if (r.product_variant_id) combined.add(r.product_variant_id)
     return combined
-  }, [excludeVariantIds, queue])
+  }, [excludeVariantIds, rows])
 
-  const liveStats = draft.product_variant_id ? stockMap.get(draft.product_variant_id) : undefined
-  const ordQty = Number(draft.ordered_qty) || 0
-  const liveSoh = liveStats?.stock_on_hand ?? 0
-  const liveIncoming = liveStats?.incoming_qty ?? 0
-  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
-  const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
-  const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
-  const unitForeign = Number(draft.unit_price_foreign) || 0
-  const unitIdr = Math.round(unitForeign * poExchangeRate)
-  const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
+  const addRow = () => setRows(prev => [...prev, makeEmptyRow()])
 
-  const handleAddToQueue = () => {
-    if (!draft.product_variant_id) { setError('Please select a variant'); return }
-    if (!draft.ordered_qty || Number(draft.ordered_qty) <= 0) { setError('Quantity must be greater than 0'); return }
-    setQueue(prev => [...prev, { ...draft, tempId: `q-${Date.now()}-${prev.length}` }])
-    setDraft({ ...emptyDraft })
-    setError('')
+  const removeRow = (tempId: string) =>
+    setRows(prev => prev.length > 1 ? prev.filter(r => r.tempId !== tempId) : prev)
+
+  const updateRow = (tempId: string, patch: Partial<RowDraft>) =>
+    setRows(prev => prev.map(r => r.tempId === tempId ? { ...r, ...patch } : r))
+
+  const handleBulkPrice = (val: string) => {
+    setBulkPrice(val)
+    setRows(prev => prev.map(r => ({
+      ...r,
+      unit_price_foreign: val,
+      ...(hasDiscount ? { discounted_unit_price_foreign: val } : {}),
+    })))
   }
 
   const handleConfirm = () => {
-    if (queue.length === 0) return
-    onAdd(queue.map(item => ({
-      product_variant_id: item.product_variant_id,
-      product_variant_label: item.product_variant_label,
-      product_id: item.product_id,
-      product_name: item.product_name,
-      product_supplier_link: item.product_supplier_link,
-      product_photo_url: item.product_photo_url,
-      ordered_qty: item.ordered_qty,
-      unit_price_foreign: item.unit_price_foreign,
-      discounted_unit_price_foreign: item.discounted_unit_price_foreign,
-    })))
+    const valid = rows.filter(r => r.product_variant_id && Number(r.ordered_qty) > 0)
+    if (valid.length === 0) { setError('Add at least one item with a variant and quantity.'); return }
+    onAdd(valid.map(r => ({
+  product_variant_id: r.product_variant_id,
+  product_variant_label: r.product_variant_label,
+  product_id: r.product_id,
+  product_name: r.product_name,
+  product_supplier_link: r.product_supplier_link,
+  product_photo_url: r.product_photo_url,
+  ordered_qty: r.ordered_qty,
+  unit_price_foreign: r.unit_price_foreign,
+  discounted_unit_price_foreign: r.discounted_unit_price_foreign,
+})))
     onClose()
   }
 
   return (
     <Dialog open={open} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader className="flex-row items-center justify-between pr-8">
           <DialogTitle>Add Items</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          {queue.length > 0 && (
-            <div className="space-y-1 rounded-lg border p-2 bg-muted/20">
-              <p className="text-xs text-muted-foreground font-medium mb-1.5">Added so far</p>
-              {queue.map(q => (
-                <div key={q.tempId} className="flex items-center justify-between text-xs">
-                  <span className="font-medium">{q.product_variant_label}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground">qty {q.ordered_qty}</span>
-                    <button
-                      type="button"
-                      onClick={() => setQueue(prev => prev.filter(x => x.tempId !== q.tempId))}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <XIcon className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+          {supplierId && (
+            <button
+              type="button"
+              onClick={() => setShowAll(prev => !prev)}
+              className={`text-xs px-2 py-1 rounded border ${showAll ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+            >
+              {showAll ? 'Filtered off' : 'Filter by supplier'}
+            </button>
           )}
+        </DialogHeader>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs text-muted-foreground">
-                Variant <span className="text-red-500">*</span>
-              </p>
-              {supplierId && (
-                <button
-                  type="button"
-                  onClick={() => setShowAll(prev => !prev)}
-                  className={`text-xs px-1.5 py-0.5 rounded border ${showAll ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
-                >
-                  {showAll ? 'Filtered off' : 'Filter by supplier'}
-                </button>
-              )}
-            </div>
-            <VariantSearchSelect
-              value={draft.product_variant_id}
-              selectedLabel={draft.product_variant_label}
-              excludeVariantIds={allExcluded}
-              supplierId={showAll ? undefined : supplierId}
-              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) =>
-                setDraft(prev => {
-                  const autoFill =
-                    lastUnitPriceForeign &&
-                    lastCurrency &&
-                    lastCurrency === currency &&
-                    parseFloat(lastUnitPriceForeign) > 0
-                  return {
-                    ...prev,
-                    product_variant_id: id,
-                    product_variant_label: label,
-                    product_id: productId,
-                    product_name: productName,
-                    product_supplier_link: productSupplierLink ?? null,
-                    product_photo_url: productPhotoUrl ?? null,
-                    ...(autoFill ? { unit_price_foreign: lastUnitPriceForeign! } : {}),
-                  }
-                })
-              }
-              placeholder="Search and select variant..."
+        <div className="space-y-3 py-2">
+          {/* Bulk price */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+              Bulk unit price ({getCurrencySymbol(currency)})
+            </label>
+            <Input
+              type="number"
+              step="0.001"
+              className="h-7 text-xs w-36"
+              placeholder="Apply to all rows"
+              value={bulkPrice}
+              onChange={e => handleBulkPrice(e.target.value)}
             />
           </div>
 
-          {liveStats && (
-            <div className="grid grid-cols-4 gap-2 rounded-lg bg-muted/40 p-3 text-xs">
-              <div>
-                <p className="text-muted-foreground">SOH</p>
-                <p className="font-semibold">{liveSoh}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Incoming</p>
-                <p className="font-semibold text-blue-600">{liveIncoming}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">AVG ({avgWindow}d)</p>
-                <p className="font-semibold">{avg > 0 ? `${avg.toFixed(1)}/d` : '\u2014'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">DOI</p>
-                <p className={cn('font-semibold', doi !== null && doi < 14 ? 'text-red-600' : '')}>{doi !== null ? `${doi}d` : '\u221E'}</p>
-              </div>
-            </div>
-          )}
+          {/* Row list */}
+          <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
+            {rows.map((row, idx) => (
+              <AddItemRow
+                key={row.tempId}
+                row={row}
+                index={idx}
+                stockMap={stockMap}
+                avgWindow={avgWindow}
+                currency={currency}
+                hasDiscount={hasDiscount}
+                showAll={showAll}
+                supplierId={supplierId}
+                allExcluded={allExcluded}
+                onUpdate={patch => updateRow(row.tempId, patch)}
+                onRemove={() => removeRow(row.tempId)}
+                canRemove={rows.length > 1}
+              />
+            ))}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Quantity <span className="text-red-500">*</span></p>
-              <Input
-                type="number"
-                min="1"
-                className="h-8 text-sm"
-                value={draft.ordered_qty}
-                onChange={e => setDraft(prev => ({ ...prev, ordered_qty: e.target.value }))}
-              />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Unit Price ({getCurrencySymbol(currency)})</p>
-              <Input
-                type="number"
-                step="0.001"
-                className="h-8 text-sm"
-                value={draft.unit_price_foreign}
-                onChange={e => setDraft(prev => ({
-                  ...prev,
-                  unit_price_foreign: e.target.value,
-                  discounted_unit_price_foreign: hasDiscount ? e.target.value : prev.discounted_unit_price_foreign,
-                }))}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={addRow}
+              className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+            >
+              <Plus className="h-3 w-3" /> Add row
+            </button>
           </div>
-
-          {hasDiscount && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Discounted Price ({getCurrencySymbol(currency)})</p>
-              <Input
-                type="number"
-                step="0.001"
-                className="h-8 text-sm"
-                value={draft.discounted_unit_price_foreign}
-                onChange={e => setDraft(prev => ({ ...prev, discounted_unit_price_foreign: e.target.value }))}
-              />
-            </div>
-          )}
-
-          {unitForeign > 0 && (
-            <div className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-xs">
-              <div>
-                <p className="text-muted-foreground">Unit Price (IDR)</p>
-                <p className="font-semibold">{formatIDR(unitIdr)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Total ({getCurrencySymbol(currency)})</p>
-                <p className="font-semibold">{getCurrencySymbol(currency)} {formatForeignAmount(unitForeign * ordQty)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Total (IDR)</p>
-                <p className="font-semibold">{formatIDR(unitIdr * ordQty)}</p>
-              </div>
-              {cogsPerUnit > 0 && (
-                <div>
-                  <p className="text-muted-foreground">COGS/unit</p>
-                  <p className="font-semibold text-amber-700">{formatIDR(cogsPerUnit)}</p>
-                </div>
-              )}
-              {doiAfter !== null && ordQty > 0 && (
-                <div className="col-span-2">
-                  <p className="text-muted-foreground">DOI after this order</p>
-                  <p className={cn('font-semibold', doiAfterColor(doiAfter))}>{doiAfter}d</p>
-                </div>
-              )}
-            </div>
-          )}
 
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
+
         <DialogFooter className="gap-2">
           <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
           <Button
             type="button"
             size="sm"
-            variant="outline"
-            onClick={handleAddToQueue}
-            disabled={!draft.product_variant_id}
-          >
-            <Plus className="h-3 w-3 mr-1" /> Add to list
-          </Button>
-          <Button
-            type="button"
-            size="sm"
             onClick={handleConfirm}
-            disabled={queue.length === 0}
+            disabled={rows.every(r => !r.product_variant_id)}
           >
-            Add {queue.length > 0 ? `${queue.length} item${queue.length > 1 ? 's' : ''}` : 'items'}
+            Add {rows.filter(r => r.product_variant_id && Number(r.ordered_qty) > 0).length || ''} item{rows.filter(r => r.product_variant_id && Number(r.ordered_qty) > 0).length !== 1 ? 's' : ''}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -7,6 +7,7 @@ const mockUploadProductPhoto = vi.fn()
 
 vi.mock('../../../hooks/useInventory', () => ({
   useCreateProduct: () => ({ mutateAsync: mockCreateProduct, isPending: false }),
+  useSuppliers: () => ({ data: { results: [] } }),
   useCategories: () => ({
     data: {
       results: [

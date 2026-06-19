@@ -589,7 +589,7 @@ it('group_by_dropdown_options_say_Product_not_By_Product', async () => {
   expect(screen.queryByText('By Color')).not.toBeInTheDocument()
 })
 
-it('add_item_modal_add_to_list_shows_item_in_queue', async () => {
+it('renders one empty row on open', async () => {
   mockIsStaff = true
   vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
   vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
@@ -601,20 +601,14 @@ it('add_item_modal_add_to_list_shows_item_in_queue', async () => {
   })
 
   await userEvent.click(screen.getByRole('button', { name: /edit/i }))
-
   await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
 
   expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
-
-  await userEvent.click(screen.getByTestId('variant-search-select'))
-
-  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
-
-  expect(screen.getByText('Added so far')).toBeInTheDocument()
-  expect(screen.getByText('Red Variant (RED-001)')).toBeInTheDocument()
+  expect(screen.getByText('1')).toBeInTheDocument()
+  expect(screen.getAllByTestId('variant-search-select')).toHaveLength(1)
 })
 
-it('add_item_modal_confirm_button_label_reflects_queue_count', async () => {
+it('bulk price fills all rows', async () => {
   mockIsStaff = true
   vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
   vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
@@ -626,27 +620,29 @@ it('add_item_modal_confirm_button_label_reflects_queue_count', async () => {
   })
 
   await userEvent.click(screen.getByRole('button', { name: /edit/i }))
-
   await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
 
   expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
 
-  const confirmBtn = () => screen.getByRole('button', { name: /add (items|\d+)/i })
+  // Add a second row first
+  await userEvent.click(screen.getByText(/add row/i))
+  await waitFor(() => {
+    expect(screen.getAllByTestId('variant-search-select')).toHaveLength(2)
+  })
 
-  expect(confirmBtn()).toHaveTextContent('Add items')
+  // Type in bulk price
+  const bulkInput = screen.getByPlaceholderText('Apply to all rows')
+  await userEvent.clear(bulkInput)
+  await userEvent.type(bulkInput, '15.50')
 
-  await userEvent.click(screen.getByTestId('variant-search-select'))
-  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
-
-  expect(confirmBtn()).toHaveTextContent('Add 1 item')
-
-  await userEvent.click(screen.getByTestId('variant-search-select'))
-  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
-
-  expect(confirmBtn()).toHaveTextContent('Add 2 items')
+  // Wait a tick for the state update
+  await waitFor(() => {
+    const priceInputs = screen.getAllByDisplayValue('15.5')
+    expect(priceInputs.length).toBeGreaterThanOrEqual(2)
+  })
 })
 
-it('add_item_modal_confirm_button_disabled_when_queue_empty', async () => {
+it('add row appends a new empty row', async () => {
   mockIsStaff = true
   vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
   vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
@@ -658,16 +654,16 @@ it('add_item_modal_confirm_button_disabled_when_queue_empty', async () => {
   })
 
   await userEvent.click(screen.getByRole('button', { name: /edit/i }))
-
   await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
 
   expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+  expect(screen.getAllByTestId('variant-search-select')).toHaveLength(1)
 
-  const confirmBtn = screen.getByRole('button', { name: /add (items|\d+)/i })
-  expect(confirmBtn).toBeDisabled()
+  await userEvent.click(screen.getByText(/add row/i))
+  expect(screen.getAllByTestId('variant-search-select')).toHaveLength(2)
 })
 
-it('add_item_modal_confirm_calls_onAdd_with_array_of_all_queued_items', async () => {
+it('remove row removes a row', async () => {
   mockIsStaff = true
   vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
   vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
@@ -679,27 +675,52 @@ it('add_item_modal_confirm_calls_onAdd_with_array_of_all_queued_items', async ()
   })
 
   await userEvent.click(screen.getByRole('button', { name: /edit/i }))
-
   await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
 
   expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
 
+  // Add a second row so remove buttons appear
+  await userEvent.click(screen.getByText(/add row/i))
+  await waitFor(() => {
+    expect(screen.getAllByTestId('variant-search-select')).toHaveLength(2)
+  })
+
+  // Click the first remove button
+  const removeBtns = screen.getAllByRole('button', { name: '' })
+  await userEvent.click(removeBtns[0])
+
+  expect(screen.getAllByTestId('variant-search-select')).toHaveLength(1)
+})
+
+it('confirm calls onAdd with only rows that have a variant set', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+
+  // Select a variant in the first row
   await userEvent.click(screen.getByTestId('variant-search-select'))
-  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
 
-  expect(screen.getByText('Added so far')).toBeInTheDocument()
-
-  await userEvent.click(screen.getByRole('button', { name: /add 1 item/i }))
+  // Confirm
+  const confirmBtn = screen.getByRole('button', { name: /add 1 item/i })
+  await userEvent.click(confirmBtn)
 
   await waitFor(() => {
     expect(screen.queryByRole('dialog', { name: /add items/i })).not.toBeInTheDocument()
   })
-
-  const variantSelects = screen.getAllByTestId('variant-search-select')
-  expect(variantSelects.length).toBeGreaterThanOrEqual(1)
 })
 
-it('add_item_modal_remove_from_queue_via_x_works', async () => {
+it('confirm button disabled when no rows have variant', async () => {
   mockIsStaff = true
   vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
   vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
@@ -711,18 +732,50 @@ it('add_item_modal_remove_from_queue_via_x_works', async () => {
   })
 
   await userEvent.click(screen.getByRole('button', { name: /edit/i }))
-
   await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
 
   expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
 
-  await userEvent.click(screen.getByTestId('variant-search-select'))
-  await userEvent.click(screen.getByRole('button', { name: /add to list/i }))
+  const confirmBtn = screen.getByRole('button', { name: /add items/i })
+  expect(confirmBtn).toBeDisabled()
+})
 
-  expect(screen.getByText('Added so far')).toBeInTheDocument()
+it('resets rows and bulkPrice on reopen', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
 
-  const removeBtn = screen.getByRole('button', { name: '' })
-  await userEvent.click(removeBtn)
+  renderPage()
 
-  expect(screen.queryByText('Added so far')).not.toBeInTheDocument()
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  expect(await screen.findByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+
+  // Add a row and type a bulk price
+  await userEvent.click(screen.getByText(/add row/i))
+  const bulkInput = screen.getByPlaceholderText('Apply to all rows')
+  await userEvent.type(bulkInput, '10')
+
+  // Close dialog
+  await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: /add items/i })).not.toBeInTheDocument()
+  })
+
+  // Reopen
+  await userEvent.click(await screen.findByRole('button', { name: /add item/i }))
+
+  await waitFor(() => {
+    expect(screen.getByRole('dialog', { name: /add items/i })).toBeInTheDocument()
+  })
+
+  // Should be back to one row and empty bulk price
+  expect(screen.getAllByTestId('variant-search-select')).toHaveLength(1)
+  const reopenedBulkInput = screen.getByPlaceholderText('Apply to all rows')
+  expect(reopenedBulkInput).toHaveValue(null)
 })
