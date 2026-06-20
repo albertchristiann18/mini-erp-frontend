@@ -127,7 +127,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
           dimEntries.forEach(([key], i) => { variantValues[key] = combo[i] })
           // Auto-generate SKU suffix from first 4 chars of each dimension value
           const skuSuffix = combo
-            .map(v => v.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '').slice(0, 4))
+            .map(v => v.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, ''))
             .join('-')
           return { variant_values: variantValues, sku_variant_code: skuSuffix, base_price: 0 as const }
         })
