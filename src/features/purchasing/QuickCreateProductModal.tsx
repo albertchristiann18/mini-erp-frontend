@@ -12,8 +12,10 @@ import { uploadProductPhoto } from '../../api/inventory'
 import { toast } from '../../lib/toast'
 
 type DimensionRow = {
+  id: string
   name: string
-  values: string
+  values: string[]
+  inputValue: string
 }
 
 function cartesian(arrays: string[][]): string[][] {
@@ -94,7 +96,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     if (!categoryId) errs.categoryId = 'Category is required'
     dimensionRows.forEach((d, i) => {
       if (!d.name.trim()) errs[`dim_${i}_name`] = 'Dimension name is required'
-      if (!d.values.trim()) errs[`dim_${i}_values`] = 'At least one value required'
+      if (d.values.length === 0) errs[`dim_${i}_values`] = 'At least one value required'
     })
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -110,9 +112,8 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
       const variantOptions: Record<string, string[]> = {}
       for (const dim of dimensionRows) {
         const dimName = dim.name.trim()
-        const dimVals = dim.values.split(',').map(v => v.trim()).filter(Boolean)
-        if (dimName && dimVals.length > 0) {
-          variantOptions[dimName] = dimVals
+        if (dimName && dim.values.length > 0) {
+          variantOptions[dimName] = dim.values
         }
       }
 
@@ -191,6 +192,25 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     }
     onCreated(selected)
     handleClose()
+  }
+
+  const addValueToDimension = (idx: number) => {
+    setDimensionRows(prev =>
+      prev.map((d, i) => {
+        if (i !== idx) return d
+        const val = d.inputValue.trim()
+        if (!val || d.values.includes(val)) return { ...d, inputValue: '' }
+        return { ...d, values: [...d.values, val], inputValue: '' }
+      }),
+    )
+  }
+
+  const removeValueFromDimension = (dimIdx: number, valIdx: number) => {
+    setDimensionRows(prev =>
+      prev.map((d, i) =>
+        i !== dimIdx ? d : { ...d, values: d.values.filter((_, vi) => vi !== valIdx) },
+      ),
+    )
   }
 
   if (step === 'pick') {
@@ -294,7 +314,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
               </p>
               <Button
                 type="button" variant="outline" size="sm"
-                onClick={() => setDimensionRows(prev => [...prev, { name: '', values: '' }])}
+                onClick={() => setDimensionRows(prev => [...prev, { id: String(Date.now()), name: '', values: [], inputValue: '' }])}
               >
                 <Plus className="h-3 w-3 mr-1" /> Add Dimension
               </Button>
@@ -307,8 +327,8 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
             ) : (
               <div className="space-y-2">
                 {dimensionRows.map((dim, idx) => (
-                  <div key={idx} className="flex items-start gap-2">
-                    <div className="w-28 shrink-0">
+                  <div key={dim.id} className="rounded-md border p-2 space-y-2">
+                    <div className="flex items-center gap-2">
                       <Input
                         value={dim.name}
                         onChange={e =>
@@ -316,44 +336,78 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
                             prev.map((d, i) => i === idx ? { ...d, name: e.target.value } : d),
                           )
                         }
-                        placeholder="e.g. color"
-                        className={`h-7 text-xs ${errors[`dim_${idx}_name`] ? 'border-destructive' : ''}`}
+                        placeholder="Dimension name (e.g. Size, Color)"
+                        className={`h-7 text-xs flex-1 ${errors[`dim_${idx}_name`] ? 'border-destructive' : ''}`}
                       />
-                      {errors[`dim_${idx}_name`] && (
-                        <p className="text-xs text-destructive mt-0.5">{errors[`dim_${idx}_name`]}</p>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDimensionRows(prev => prev.filter((_, i) => i !== idx))}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
+                    {errors[`dim_${idx}_name`] && (
+                      <p className="text-xs text-destructive">{errors[`dim_${idx}_name`]}</p>
+                    )}
 
-                    <div className="flex-1">
+                    {dim.values.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {dim.values.map((val, vi) => (
+                          <span
+                            key={vi}
+                            className="inline-flex items-center gap-0.5 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium"
+                          >
+                            {val}
+                            <button
+                              type="button"
+                              onClick={() => removeValueFromDimension(idx, vi)}
+                              className="text-muted-foreground hover:text-destructive ml-0.5"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-1">
                       <Input
-                        value={dim.values}
+                        value={dim.inputValue}
                         onChange={e =>
                           setDimensionRows(prev =>
-                            prev.map((d, i) => i === idx ? { ...d, values: e.target.value } : d),
+                            prev.map((d, i) => i === idx ? { ...d, inputValue: e.target.value } : d),
                           )
                         }
-                        placeholder="e.g. Red, Blue, Green"
-                        className={`h-7 text-xs ${errors[`dim_${idx}_values`] ? 'border-destructive' : ''}`}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addValueToDimension(idx)
+                          }
+                        }}
+                        placeholder="Type a value and press Enter (e.g. S)"
+                        className="h-7 text-xs flex-1"
                       />
-                      {errors[`dim_${idx}_values`] && (
-                        <p className="text-xs text-destructive mt-0.5">{errors[`dim_${idx}_values`]}</p>
-                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs shrink-0"
+                        onClick={() => addValueToDimension(idx)}
+                      >
+                        Add
+                      </Button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setDimensionRows(prev => prev.filter((_, i) => i !== idx))}
-                      className="text-muted-foreground hover:text-destructive mt-1 shrink-0"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+                    {errors[`dim_${idx}_values`] && (
+                      <p className="text-xs text-destructive">{errors[`dim_${idx}_values`]}</p>
+                    )}
                   </div>
                 ))}
                 {/* Show count of combinations */}
-                {dimensionRows.some(d => d.name.trim() && d.values.trim()) && (() => {
+                {dimensionRows.some(d => d.name.trim() && d.values.length > 0) && (() => {
                   const count = dimensionRows
-                    .filter(d => d.name.trim() && d.values.trim())
-                    .reduce((acc, d) => acc * d.values.split(',').filter(v => v.trim()).length, 1)
+                    .filter(d => d.name.trim() && d.values.length > 0)
+                    .reduce((acc, d) => acc * d.values.length, 1)
                   return (
                     <p className="text-xs text-muted-foreground mt-1">
                       → {count} variant{count !== 1 ? 's' : ''} will be created
