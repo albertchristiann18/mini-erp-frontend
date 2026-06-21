@@ -206,11 +206,7 @@ export default function PurchaseOrderDetailPage() {
     if (!po) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setGroupBy('product')
-    const anyDiscounted = (po.order_details ?? []).some(item =>
-      item.discounted_unit_price_foreign != null &&
-      item.discounted_unit_price_foreign !== item.unit_price_foreign
-    )
-      setHasDiscount(anyDiscounted)
+    setHasDiscount(po.has_discount ?? false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
 
@@ -328,13 +324,26 @@ export default function PurchaseOrderDetailPage() {
     try {
       await createMutation.mutateAsync(payload)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to create purchase order'
-      toast.error(msg)
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
+      if (data && typeof data === 'object') {
+        const messages: string[] = []
+        for (const [field, msg] of Object.entries(data)) {
+          const label = HEADER_FIELD_CONFIG[field]?.label ?? field
+          const text = Array.isArray(msg) ? msg.join(', ') : String(msg)
+          messages.push(`${label}: ${text}`)
+        }
+        if (messages.length > 0) {
+          setValidationErrors(messages)
+          return
+        }
+      }
+      toast.error('Failed to create purchase order')
     }
   }
 
   const handleSave = async () => {
     const payload: Record<string, unknown> = {}
+    payload.has_discount = hasDiscount
     for (const [key, value] of Object.entries(headerValues)) {
       if (value !== '' && value !== null && value !== undefined) payload[key] = value
     }
@@ -1378,6 +1387,7 @@ export default function PurchaseOrderDetailPage() {
       <ValidationModal
         errors={validationErrors}
         onClose={() => setValidationErrors([])}
+        title="Save Error"
       />
       <SupplierFormModal
         open={showNewSupplierModal}
@@ -1836,13 +1846,13 @@ function AddItemModal({
   )
 }
 
-function ValidationModal({ errors, onClose }: { errors: string[]; onClose: () => void }) {
+function ValidationModal({ errors, onClose, title }: { errors: string[]; onClose: () => void; title?: string }) {
   if (errors.length === 0) return null
   return (
     <Dialog open={errors.length > 0} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Required Fields Missing</DialogTitle>
+          <DialogTitle>{title ?? 'Validation Error'}</DialogTitle>
         </DialogHeader>
         <ul className="space-y-2 py-2">
           {errors.map((e, i) => (

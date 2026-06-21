@@ -81,6 +81,7 @@ export interface PurchaseOrder {
   delivery_order_invoice_file: string | null
   packing_list_file: string | null
   note: string | null
+  has_discount: boolean
   editable_fields: {
     header: string[]
     order_detail: string[]
