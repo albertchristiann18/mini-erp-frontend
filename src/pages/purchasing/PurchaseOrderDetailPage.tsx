@@ -408,9 +408,11 @@ export default function PurchaseOrderDetailPage() {
     const liveStats = !hasSnapshot ? stockMap.get(item.variant_id) : undefined
     const soh = hasSnapshot ? item.stock_on_hand : (liveStats?.stock_on_hand ?? 0)
     const incoming = hasSnapshot ? item.incoming_qty : (liveStats?.incoming_qty ?? 0)
-    const avg = hasSnapshot
+    const rawAvg = hasSnapshot
       ? (avgWindow === 7 ? Number(item.avg_sales_7d ?? 0) : Number(item.avg_sales ?? 0))
       : (avgWindow === 7 ? (liveStats?.avg_sales_7d ?? 0) : avgWindow === 14 ? (liveStats?.avg_sales_14d ?? 0) : (liveStats?.avg_sales_30d ?? 0))
+    const hasData = hasSnapshot || liveStats !== undefined
+    const avg = rawAvg > 0 ? rawAvg : (hasData ? 1 / avgWindow : 0)
     const upcoming = soh + incoming + item.ordered_qty
     const doi = avg > 0 ? Math.round((soh + incoming) / avg) : null
     const doiAfter = avg > 0 ? Math.round(upcoming / avg) : null
@@ -493,6 +495,17 @@ export default function PurchaseOrderDetailPage() {
         }
         groupMap.get(key)!.newItemsList.push(n)
       }
+    }
+
+    for (const group of groupMap.values()) {
+      group.existingItems.sort((a, b) => {
+        const aKeys = Object.keys(a.variant_values ?? {})
+        const dim1Key = aKeys[0] ?? ''
+        const dim2Key = aKeys[1] ?? ''
+        const cmp2 = String(a.variant_values?.[dim2Key] ?? '').localeCompare(String(b.variant_values?.[dim2Key] ?? ''))
+        if (cmp2 !== 0) return cmp2
+        return String(a.variant_values?.[dim1Key] ?? '').localeCompare(String(b.variant_values?.[dim1Key] ?? ''))
+      })
     }
 
     return Array.from(groupMap.values()).map(group => {
@@ -702,11 +715,12 @@ export default function PurchaseOrderDetailPage() {
           const liveSoh = liveStats?.stock_on_hand ?? 0
           const liveIncoming = liveStats?.incoming_qty ?? 0
           const liveUpcoming = liveStats ? liveSoh + liveIncoming + ordQty : null
-          const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+          const rawAvgLive = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+          const avg = rawAvgLive > 0 ? rawAvgLive : (liveStats ? 1 / avgWindow : 0)
           const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
           const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
-          const liveRec = liveStats && (avg ?? 0) > 0
-            ? Math.max(0, Math.ceil((avg ?? 0) * 90 - liveSoh - liveIncoming))
+          const liveRec = liveStats && avg > 0
+            ? Math.max(0, Math.ceil(avg * 90 - liveSoh - liveIncoming))
             : null
           const unitForeign = Number(n.unit_price_foreign) || 0
           const unitIdr = Math.round(unitForeign * poExchangeRate)
@@ -1583,7 +1597,8 @@ function AddItemRow({
   const ordQty = Number(row.ordered_qty) || 0
   const liveSoh = liveStats?.stock_on_hand ?? 0
   const liveIncoming = liveStats?.incoming_qty ?? 0
-  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+  const rawAvg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+  const avg = rawAvg > 0 ? rawAvg : (liveStats ? 1 / avgWindow : 0)
   const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
   const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
 

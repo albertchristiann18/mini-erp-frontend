@@ -42,6 +42,16 @@ export function groupByProduct(details: PurchaseOrderDetail[]): ProductGroup[] {
     }
     map.get(item.product_id)!.items.push(item)
   }
+  for (const group of map.values()) {
+    group.items.sort((a, b) => {
+      const aKeys = Object.keys(a.variant_values ?? {})
+      const dim1Key = aKeys[0] ?? ''
+      const dim2Key = aKeys[1] ?? ''
+      const cmp2 = String(a.variant_values?.[dim2Key] ?? '').localeCompare(String(b.variant_values?.[dim2Key] ?? ''))
+      if (cmp2 !== 0) return cmp2
+      return String(a.variant_values?.[dim1Key] ?? '').localeCompare(String(b.variant_values?.[dim1Key] ?? ''))
+    })
+  }
   return Array.from(map.values())
 }
 
