@@ -116,9 +116,14 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
       toast.success(`Status updated to ${targetStatus}`)
       onClose()
     } catch (err: unknown) {
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
       const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-        ?? "Failed to update status"
+        (data?.error as string | undefined) ||
+        Object.values(data ?? {})
+          .flatMap(v => (Array.isArray(v) ? v : [v]))
+          .filter(v => typeof v === "string")
+          .join(" ") ||
+        "Failed to update status"
       toast.error(msg)
     }
   }
