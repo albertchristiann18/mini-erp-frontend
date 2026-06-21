@@ -1151,8 +1151,16 @@ export default function PurchaseOrderDetailPage() {
               const estGoods = newItems.reduce((s, n) => {
                 const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
                 return s + price * (Number(n.ordered_qty) || 0)
-              }, 0) * poExchangeRate
-              const commPct = Number(headerValues.commission_fee_pct) || 0
+  }, 0) * poExchangeRate
+  const estGoodsForeign = newItems.reduce((s, n) => {
+    const price = hasDiscount
+      ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0)
+      : (Number(n.unit_price_foreign) || 0)
+    return s + price * (Number(n.ordered_qty) || 0)
+  }, 0)
+  const estCurrencySymbol = getCurrencySymbol(String(headerValues.currency ?? ''))
+  const estForeignLabel = `Total (${String(headerValues.currency ?? 'Foreign')})`
+  const commPct = Number(headerValues.commission_fee_pct) || 0
               const estCommission = Math.round(newItems.reduce((s, n) => {
                 const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
                 return s + price * (Number(n.ordered_qty) || 0)
@@ -1164,6 +1172,12 @@ export default function PurchaseOrderDetailPage() {
               return (
                 <div className="space-y-3 text-sm">
                   <SummaryRow label="Goods" value={estGoods > 0 ? formatIDR(Math.round(estGoods)) : '—'} />
+                  {estGoodsForeign > 0 && (
+                    <SummaryRow
+                      label={estForeignLabel}
+                      value={`${estCurrencySymbol} ${formatForeignAmount(estGoodsForeign)}`}
+                    />
+                  )}
                   <SummaryRow label="Commission" value={estCommission > 0 ? formatIDR(estCommission) : '—'} />
                   <SummaryRow label="Forecast Freight" value={estFreight > 0 ? formatIDR(estFreight) : '—'} />
                   <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
@@ -1173,23 +1187,41 @@ export default function PurchaseOrderDetailPage() {
                   <p className="text-xs text-muted-foreground pt-1">{totalUnits} units · {totalSkus} SKUs</p>
                 </div>
               )
-            })() : (
-              <>
-                <div className="space-y-3 text-sm">
-                  <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
-                  <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
-                  <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
-                  <SummaryRow label="Freight" value={po!.shipping_fee != null ? formatIDR(po!.shipping_fee) : '—'} />
-                  <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
-                    <span>Total Amount</span>
-                    <span>{formatIDR(po!.total_amount)}</span>
+            })() : (() => {
+              const totalForeignAmount = (po!.order_details ?? []).reduce(
+                (s, i) => s + Number(
+                  hasDiscount
+                    ? (i.discounted_total_price_foreign ?? i.total_price_foreign ?? 0)
+                    : (i.total_price_foreign ?? i.discounted_total_price_foreign ?? 0)
+                ),
+                0
+              )
+              const currencySymbol = getCurrencySymbol(po!.currency)
+              const foreignLabel = `Total (${po!.currency ?? 'Foreign'})`
+              return (
+                <>
+                  <div className="space-y-3 text-sm">
+                    <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
+                    {totalForeignAmount > 0 && (
+                      <SummaryRow
+                        label={foreignLabel}
+                        value={`${currencySymbol} ${formatForeignAmount(totalForeignAmount)}`}
+                      />
+                    )}
+                    <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
+                    <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
+                    <SummaryRow label="Freight" value={po!.shipping_fee != null ? formatIDR(po!.shipping_fee) : '—'} />
+                    <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                      <span>Total Amount</span>
+                      <span>{formatIDR(po!.total_amount)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="border-t pt-3 mt-3 space-y-3">
-                  <StatBox label="COGS Ratio" value={po!.cost_ratio_cogs != null ? `${po!.cost_ratio_cogs.toFixed(2)}%` : '—'} />
-                </div>
-              </>
-            )}
+                  <div className="border-t pt-3 mt-3 space-y-3">
+                    <StatBox label="COGS Ratio" value={po!.cost_ratio_cogs != null ? `${po!.cost_ratio_cogs.toFixed(2)}%` : '—'} />
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           {/* Order Summary card */}
