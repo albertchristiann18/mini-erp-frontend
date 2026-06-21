@@ -10,7 +10,7 @@ import { QuickCreateProductModal } from './QuickCreateProductModal'
 interface Props {
   value: string
   selectedLabel?: string
-  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null) => void
+  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null, lastDiscountedUnitPriceForeign: string | null) => void
   onQuickCreated?: (variants: Array<{
     id: string
     label: string
@@ -20,6 +20,7 @@ interface Props {
     productPhotoUrl: string | null
     lastUnitPriceForeign: string | null
     lastCurrency: string | null
+    lastDiscountedUnitPriceForeign: string | null
   }>) => void
   placeholder?: string
   excludeVariantIds?: Set<string>
@@ -72,10 +73,11 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     id: string, label: string, productId: string, productName: string,
     productSupplierLink: string | null, productPhotoUrl: string | null,
     lastUnitPriceForeign: string | null, lastCurrency: string | null,
+    lastDiscountedUnitPriceForeign: string | null,
   ) => {
     setInternalSelectedLabel(label)
     onSelect(id, label, productId, productName, productSupplierLink, productPhotoUrl,
-      lastUnitPriceForeign, lastCurrency)
+      lastUnitPriceForeign, lastCurrency, lastDiscountedUnitPriceForeign)
     setOpen(false)
     setSearchInput('')
     setActiveSearch('')
@@ -154,6 +156,7 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
                     v.product_photo_url ?? null,
                     v.last_unit_price_foreign ?? null,
                     v.last_currency ?? null,
+                    v.last_discounted_unit_price_foreign ?? null,
                   )}
                 >
                   <div className="font-medium">{v.name}</div>
@@ -190,13 +193,14 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
             ...v,
             lastUnitPriceForeign: null as string | null,
             lastCurrency: null as string | null,
+            lastDiscountedUnitPriceForeign: null as string | null,
           }))
           if (onQuickCreated) {
             onQuickCreated(enrichedVariants)
           } else {
             const first = enrichedVariants[0]
             setInternalSelectedLabel(first.label)
-            onSelect(first.id, first.label, first.productId, first.productName, first.productSupplierLink, first.productPhotoUrl, null, null)
+            onSelect(first.id, first.label, first.productId, first.productName, first.productSupplierLink, first.productPhotoUrl, null, null, null)
           }
           setQuickCreateOpen(false)
         }}

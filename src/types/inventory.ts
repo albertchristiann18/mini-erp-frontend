@@ -130,6 +130,7 @@ export interface ProductVariantStock {
   is_active: boolean
   last_unit_price_foreign: string | null
   last_currency: string | null
+  last_discounted_unit_price_foreign: string | null
 }
 
 export interface AvgSalesVariant {

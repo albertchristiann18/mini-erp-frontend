@@ -719,21 +719,18 @@ export default function PurchaseOrderDetailPage() {
                   value={n.product_variant_id}
                   selectedLabel={n.product_variant_label}
                   supplierId={activeSupplierId}
-                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
+                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, _lastCurrency, lastDiscountedUnitPriceForeign) => {
                     updateNewItem(n._tempId, 'product_variant_id', id)
                     updateNewItem(n._tempId, 'product_variant_label', label)
                     updateNewItem(n._tempId, 'product_id', productId)
                     updateNewItem(n._tempId, 'product_name', productName)
                     updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
                     updateNewItem(n._tempId, 'product_photo_url', productPhotoUrl ?? '')
-                    const effectiveCurrency = po?.currency ?? String(headerValues.currency ?? '')
-                    if (
-                      lastUnitPriceForeign &&
-                      lastCurrency &&
-                      lastCurrency === effectiveCurrency &&
-                      parseFloat(lastUnitPriceForeign) > 0
-                    ) {
+                    if (lastUnitPriceForeign && parseFloat(lastUnitPriceForeign) > 0) {
                       updateNewItem(n._tempId, 'unit_price_foreign', lastUnitPriceForeign)
+                    }
+                    if (hasDiscount && lastDiscountedUnitPriceForeign && parseFloat(lastDiscountedUnitPriceForeign) > 0) {
+                      updateNewItem(n._tempId, 'discounted_unit_price_foreign', lastDiscountedUnitPriceForeign)
                     }
                   }}
                   placeholder="Select variant"
@@ -1573,6 +1570,7 @@ function AddItemRow({
     productPhotoUrl: string | null
     lastUnitPriceForeign: string | null
     lastCurrency: string | null
+    lastDiscountedUnitPriceForeign: string | null
   }>) => void
 }) {
   const rowExcluded = useMemo(() => {
@@ -1600,12 +1598,17 @@ function AddItemRow({
             selectedLabel={row.product_variant_label}
             excludeVariantIds={rowExcluded}
             supplierId={showAll ? undefined : supplierId}
-            onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
+            onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency, lastDiscountedUnitPriceForeign) => {
               const autoFill =
                 lastUnitPriceForeign &&
                 lastCurrency &&
                 lastCurrency === currency &&
                 parseFloat(lastUnitPriceForeign) > 0
+              const autoFillDiscount =
+                hasDiscount &&
+                lastDiscountedUnitPriceForeign &&
+                lastCurrency === currency &&
+                parseFloat(lastDiscountedUnitPriceForeign) > 0
               onUpdate({
                 product_variant_id: id,
                 product_variant_label: label,
@@ -1614,6 +1617,7 @@ function AddItemRow({
                 product_supplier_link: productSupplierLink ?? null,
                 product_photo_url: productPhotoUrl ?? null,
                 ...(autoFill ? { unit_price_foreign: lastUnitPriceForeign! } : {}),
+                ...(autoFillDiscount ? { discounted_unit_price_foreign: lastDiscountedUnitPriceForeign! } : {}),
               })
             }}
             onQuickCreated={onQuickCreated}
@@ -1730,6 +1734,7 @@ function AddItemModal({
       productPhotoUrl: string | null
       lastUnitPriceForeign: string | null
       lastCurrency: string | null
+      lastDiscountedUnitPriceForeign: string | null
     }>,
   ) => {
     if (variants.length === 0) return
@@ -1738,6 +1743,10 @@ function AddItemModal({
       first.lastUnitPriceForeign &&
       first.lastCurrency === currency &&
       parseFloat(first.lastUnitPriceForeign) > 0
+    const autoFillDiscFirst =
+      hasDiscount &&
+      first.lastDiscountedUnitPriceForeign &&
+      parseFloat(first.lastDiscountedUnitPriceForeign) > 0
 
     updateRow(tempId, {
       product_variant_id: first.id,
@@ -1747,6 +1756,7 @@ function AddItemModal({
       product_supplier_link: first.productSupplierLink,
       product_photo_url: first.productPhotoUrl,
       ...(autoFillFirst ? { unit_price_foreign: first.lastUnitPriceForeign! } : {}),
+      ...(autoFillDiscFirst ? { discounted_unit_price_foreign: first.lastDiscountedUnitPriceForeign! } : {}),
     })
 
     const rest = variants.slice(1)
@@ -1757,6 +1767,10 @@ function AddItemModal({
             v.lastUnitPriceForeign &&
             v.lastCurrency === currency &&
             parseFloat(v.lastUnitPriceForeign) > 0
+          const autoFillDisc =
+            hasDiscount &&
+            v.lastDiscountedUnitPriceForeign &&
+            parseFloat(v.lastDiscountedUnitPriceForeign) > 0
           return {
             ...makeEmptyRow(),
             product_variant_id: v.id,
@@ -1766,6 +1780,7 @@ function AddItemModal({
             product_supplier_link: v.productSupplierLink,
             product_photo_url: v.productPhotoUrl,
             ...(autoFill ? { unit_price_foreign: v.lastUnitPriceForeign! } : {}),
+            ...(autoFillDisc ? { discounted_unit_price_foreign: v.lastDiscountedUnitPriceForeign! } : {}),
           }
         })
         const currentIdx = prev.findIndex(r => r.tempId === tempId)
