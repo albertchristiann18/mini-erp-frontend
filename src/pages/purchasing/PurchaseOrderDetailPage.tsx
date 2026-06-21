@@ -1506,7 +1506,7 @@ function makeEmptyRow(): RowDraft {
 
 function AddItemRow({
   row, index, stockMap, avgWindow, currency, hasDiscount, showAll, supplierId,
-  allExcluded, onUpdate, onRemove, canRemove,
+  allExcluded, onUpdate, onRemove, canRemove, onQuickCreated,
 }: {
   row: RowDraft
   index: number
@@ -1520,6 +1520,16 @@ function AddItemRow({
   onUpdate: (patch: Partial<RowDraft>) => void
   onRemove: () => void
   canRemove: boolean
+  onQuickCreated?: (variants: Array<{
+    id: string
+    label: string
+    productId: string
+    productName: string
+    productSupplierLink: string | null
+    productPhotoUrl: string | null
+    lastUnitPriceForeign: string | null
+    lastCurrency: string | null
+  }>) => void
 }) {
   const rowExcluded = useMemo(() => {
     const s = new Set(allExcluded)
@@ -1562,6 +1572,7 @@ function AddItemRow({
                 ...(autoFill ? { unit_price_foreign: lastUnitPriceForeign! } : {}),
               })
             }}
+            onQuickCreated={onQuickCreated}
             placeholder="Search variant..."
           />
           {liveStats && (
@@ -1662,6 +1673,62 @@ function AddItemModal({
   const updateRow = (tempId: string, patch: Partial<RowDraft>) =>
     setRows(prev => prev.map(r => r.tempId === tempId ? { ...r, ...patch } : r))
 
+  const handleQuickCreated = (
+    tempId: string,
+    variants: Array<{
+      id: string
+      label: string
+      productId: string
+      productName: string
+      productSupplierLink: string | null
+      productPhotoUrl: string | null
+      lastUnitPriceForeign: string | null
+      lastCurrency: string | null
+    }>,
+  ) => {
+    if (variants.length === 0) return
+    const first = variants[0]
+    const autoFillFirst =
+      first.lastUnitPriceForeign &&
+      first.lastCurrency === currency &&
+      parseFloat(first.lastUnitPriceForeign) > 0
+
+    updateRow(tempId, {
+      product_variant_id: first.id,
+      product_variant_label: first.label,
+      product_id: first.productId,
+      product_name: first.productName,
+      product_supplier_link: first.productSupplierLink,
+      product_photo_url: first.productPhotoUrl,
+      ...(autoFillFirst ? { unit_price_foreign: first.lastUnitPriceForeign! } : {}),
+    })
+
+    const rest = variants.slice(1)
+    if (rest.length > 0) {
+      setRows(prev => {
+        const newRows = rest.map(v => {
+          const autoFill =
+            v.lastUnitPriceForeign &&
+            v.lastCurrency === currency &&
+            parseFloat(v.lastUnitPriceForeign) > 0
+          return {
+            ...makeEmptyRow(),
+            product_variant_id: v.id,
+            product_variant_label: v.label,
+            product_id: v.productId,
+            product_name: v.productName,
+            product_supplier_link: v.productSupplierLink,
+            product_photo_url: v.productPhotoUrl,
+            ...(autoFill ? { unit_price_foreign: v.lastUnitPriceForeign! } : {}),
+          }
+        })
+        const currentIdx = prev.findIndex(r => r.tempId === tempId)
+        if (currentIdx === -1) return [...prev, ...newRows]
+        return [...prev.slice(0, currentIdx + 1), ...newRows, ...prev.slice(currentIdx + 1)]
+      })
+    }
+  }
+
   const handleBulkPrice = (val: string) => {
     setBulkPrice(val)
     setRows(prev => prev.map(r => ({
@@ -1737,6 +1804,7 @@ function AddItemModal({
                 onUpdate={patch => updateRow(row.tempId, patch)}
                 onRemove={() => removeRow(row.tempId)}
                 canRemove={rows.length > 1}
+                onQuickCreated={variants => handleQuickCreated(row.tempId, variants)}
               />
             ))}
 

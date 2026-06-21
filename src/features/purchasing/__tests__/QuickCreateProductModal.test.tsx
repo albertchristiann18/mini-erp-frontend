@@ -62,14 +62,14 @@ it('shows no dimensions message when no dimensions added', () => {
 it('can add and remove a dimension row', () => {
   render(<QuickCreateProductModal open={true} onClose={vi.fn()} onCreated={vi.fn()} />)
   fireEvent.click(screen.getByText('Add Dimension'))
-  expect(screen.getByPlaceholderText('e.g. color')).toBeInTheDocument()
-  expect(screen.getByPlaceholderText('e.g. Red, Blue, Green')).toBeInTheDocument()
+  expect(screen.getByPlaceholderText('Dimension name (e.g. Size, Color)')).toBeInTheDocument()
+  expect(screen.getByPlaceholderText('Type a value and press Enter (e.g. S)')).toBeInTheDocument()
 
   const xButtons = screen.getAllByRole('button').filter(b =>
     b.querySelector('svg.lucide-x')
   )
   fireEvent.click(xButtons[0])
-  expect(screen.queryByPlaceholderText('e.g. color')).not.toBeInTheDocument()
+  expect(screen.queryByPlaceholderText('Dimension name (e.g. Size, Color)')).not.toBeInTheDocument()
 })
 
 it('validates required fields', async () => {
@@ -136,14 +136,20 @@ it('submits with correct dimension payload for 2 dimensions', async () => {
   fireEvent.click(screen.getByText('SelectCategory'))
 
   fireEvent.click(screen.getByText('Add Dimension'))
-  fireEvent.change(screen.getByPlaceholderText('e.g. color'), { target: { value: 'color' } })
-  fireEvent.change(screen.getByPlaceholderText('e.g. Red, Blue, Green'), { target: { value: 'Red, Blue' } })
+  fireEvent.change(screen.getByPlaceholderText('Dimension name (e.g. Size, Color)'), { target: { value: 'color' } })
+  fireEvent.change(screen.getByPlaceholderText('Type a value and press Enter (e.g. S)'), { target: { value: 'Red' } })
+  fireEvent.click(screen.getByText('Add'))
+  fireEvent.change(screen.getByPlaceholderText('Type a value and press Enter (e.g. S)'), { target: { value: 'Blue' } })
+  fireEvent.click(screen.getByText('Add'))
 
   fireEvent.click(screen.getByText('Add Dimension'))
-  const nameInputs = screen.getAllByPlaceholderText('e.g. color')
-  const valuesInputs = screen.getAllByPlaceholderText('e.g. Red, Blue, Green')
+  const nameInputs = screen.getAllByPlaceholderText('Dimension name (e.g. Size, Color)')
+  const valueInputs = screen.getAllByPlaceholderText('Type a value and press Enter (e.g. S)')
   fireEvent.change(nameInputs[1], { target: { value: 'size' } })
-  fireEvent.change(valuesInputs[1], { target: { value: 'S, M' } })
+  fireEvent.change(valueInputs[1], { target: { value: 'S' } })
+  fireEvent.click(screen.getAllByText('Add')[1])
+  fireEvent.change(valueInputs[1], { target: { value: 'M' } })
+  fireEvent.click(screen.getAllByText('Add')[1])
 
   fireEvent.click(screen.getByText('Create & Add'))
 
@@ -183,14 +189,20 @@ it('shows picker step when 2+ variants created', async () => {
   fireEvent.click(screen.getByText('SelectCategory'))
 
   fireEvent.click(screen.getByText('Add Dimension'))
-  fireEvent.change(screen.getByPlaceholderText('e.g. color'), { target: { value: 'color' } })
-  fireEvent.change(screen.getByPlaceholderText('e.g. Red, Blue, Green'), { target: { value: 'Red, Blue' } })
+  fireEvent.change(screen.getByPlaceholderText('Dimension name (e.g. Size, Color)'), { target: { value: 'color' } })
+  fireEvent.change(screen.getByPlaceholderText('Type a value and press Enter (e.g. S)'), { target: { value: 'Red' } })
+  fireEvent.click(screen.getByText('Add'))
+  fireEvent.change(screen.getByPlaceholderText('Type a value and press Enter (e.g. S)'), { target: { value: 'Blue' } })
+  fireEvent.click(screen.getByText('Add'))
 
   fireEvent.click(screen.getByText('Add Dimension'))
-  const nameInputs = screen.getAllByPlaceholderText('e.g. color')
-  const valuesInputs = screen.getAllByPlaceholderText('e.g. Red, Blue, Green')
+  const nameInputs = screen.getAllByPlaceholderText('Dimension name (e.g. Size, Color)')
+  const valueInputs = screen.getAllByPlaceholderText('Type a value and press Enter (e.g. S)')
   fireEvent.change(nameInputs[1], { target: { value: 'size' } })
-  fireEvent.change(valuesInputs[1], { target: { value: 'S, M' } })
+  fireEvent.change(valueInputs[1], { target: { value: 'S' } })
+  fireEvent.click(screen.getAllByText('Add')[1])
+  fireEvent.change(valueInputs[1], { target: { value: 'M' } })
+  fireEvent.click(screen.getAllByText('Add')[1])
 
   fireEvent.click(screen.getByText('Create & Add'))
 

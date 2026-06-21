@@ -11,10 +11,12 @@ import { useAuth } from '../../contexts/AuthContext'
 import { uploadProductPhoto } from '../../api/inventory'
 import { toast } from '../../lib/toast'
 
+type DimensionChip = { label: string; code: string }
+
 type DimensionRow = {
   id: string
   name: string
-  values: string[]
+  values: DimensionChip[]
   inputValue: string
 }
 
@@ -55,6 +57,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
   const [dimensionRows, setDimensionRows] = useState<DimensionRow[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [skuError, setSkuError] = useState<string | null>(null)
 
   const [step, setStep] = useState<'form' | 'pick'>('form')
   const [createdVariants, setCreatedVariants] = useState<CreatedVariant[]>([])
@@ -70,6 +73,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     setProductPhotoPreview(null)
     setDimensionRows([])
     setErrors({})
+    setSkuError(null)
     setStep('form')
     setCreatedVariants([])
     setSelectedIds(new Set())
@@ -97,7 +101,19 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     dimensionRows.forEach((d, i) => {
       if (!d.name.trim()) errs[`dim_${i}_name`] = 'Dimension name is required'
       if (d.values.length === 0) errs[`dim_${i}_values`] = 'At least one value required'
+      d.values.forEach((v, vi) => {
+        if (!v.code.trim()) errs[`dim_${i}_val_${vi}_code`] = 'Code required'
+      })
     })
+    const allCodes = dimensionRows.flatMap(d => d.values.map(v => v.code.trim())).filter(Boolean)
+    const seen = new Set<string>()
+    for (const code of allCodes) {
+      if (seen.has(code)) {
+        errs['sku_duplicate'] = `Duplicate code "${code}" — each value must have a unique code.`
+        break
+      }
+      seen.add(code)
+    }
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -108,16 +124,21 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     try {
       const description = `${productName.trim()} — added via Purchase Order. Update description from the Products page.`
 
-      // Build variant_options from dimensions
+      // Build variant_options from dimensions (uses labels for display)
       const variantOptions: Record<string, string[]> = {}
+      const codeMap: Record<string, Record<string, string>> = {}
       for (const dim of dimensionRows) {
         const dimName = dim.name.trim()
         if (dimName && dim.values.length > 0) {
-          variantOptions[dimName] = dim.values
+          variantOptions[dimName] = dim.values.map(v => v.label)
+          codeMap[dimName] = {}
+          for (const v of dim.values) {
+            codeMap[dimName][v.label] = v.code
+          }
         }
       }
 
-      // Build Cartesian product of all dimension values
+      // Build Cartesian product — variant_values use labels, SKU suffix uses codes
       const dimEntries = Object.entries(variantOptions)
       let variantsPayload: Array<{ variant_values: Record<string, string>; sku_variant_code: string; base_price: 0 }> = []
       if (dimEntries.length > 0) {
@@ -125,9 +146,8 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
         variantsPayload = combos.map(combo => {
           const variantValues: Record<string, string> = {}
           dimEntries.forEach(([key], i) => { variantValues[key] = combo[i] })
-          // Auto-generate SKU suffix from first 4 chars of each dimension value
           const skuSuffix = combo
-            .map(v => v.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, ''))
+            .map((label, i) => codeMap[dimEntries[i][0]]?.[label] ?? label.toUpperCase().replace(/[^A-Z0-9]/g, ''))
             .join('-')
           return { variant_values: variantValues, sku_variant_code: skuSuffix, base_price: 0 as const }
         })
@@ -177,8 +197,14 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
         setSelectedIds(new Set(resultVariants.map(v => v.id)))
         setStep('pick')
       }
-    } catch {
-      toast.error('Failed to create product')
+    } catch (err: unknown) {
+      const responseData = (err as { response?: { data?: unknown } })?.response?.data
+      const errStr = JSON.stringify(responseData ?? '').toLowerCase()
+      if (errStr.includes('sku_variant_code') || errStr.includes('unique') || errStr.includes('already exists')) {
+        setSkuError('Some variant codes already exist in the system. Update the codes on the chips above and try again.')
+      } else {
+        toast.error('Failed to create product')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -198,11 +224,32 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
     setDimensionRows(prev =>
       prev.map((d, i) => {
         if (i !== idx) return d
-        const val = d.inputValue.trim()
-        if (!val || d.values.includes(val)) return { ...d, inputValue: '' }
-        return { ...d, values: [...d.values, val], inputValue: '' }
+        const label = d.inputValue.trim()
+        if (!label) return { ...d, inputValue: '' }
+        if (d.values.some(v => v.label === label)) return { ...d, inputValue: '' }
+        const code = label.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '')
+        return { ...d, values: [...d.values, { label, code }], inputValue: '' }
       }),
     )
+    setSkuError(null)
+  }
+
+  const updateValueCode = (dimIdx: number, valIdx: number, newCode: string) => {
+    setDimensionRows(prev =>
+      prev.map((d, i) =>
+        i !== dimIdx
+          ? d
+          : {
+              ...d,
+              values: d.values.map((v, vi) =>
+                vi !== valIdx
+                  ? v
+                  : { ...v, code: newCode.toUpperCase().replace(/[^A-Z0-9]/g, '') },
+              ),
+            },
+      ),
+    )
+    setSkuError(null)
   }
 
   const removeValueFromDimension = (dimIdx: number, valIdx: number) => {
@@ -356,9 +403,17 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
                         {dim.values.map((val, vi) => (
                           <span
                             key={vi}
-                            className="inline-flex items-center gap-0.5 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium"
+                            className="inline-flex items-center gap-1 rounded-md border bg-secondary/50 px-2 py-0.5 text-xs"
                           >
-                            {val}
+                            <span className="font-medium">{val.label}</span>
+                            <span className="text-muted-foreground">·</span>
+                            <input
+                              value={val.code}
+                              onChange={e => updateValueCode(idx, vi, e.target.value)}
+                              className="w-16 bg-transparent font-mono text-[10px] uppercase focus:outline-none border-b border-dashed border-muted-foreground/30 focus:border-primary"
+                              maxLength={12}
+                              placeholder="CODE"
+                            />
                             <button
                               type="button"
                               onClick={() => removeValueFromDimension(idx, vi)}
@@ -414,6 +469,14 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
                     </p>
                   )
                 })()}
+                {errors['sku_duplicate'] && (
+                  <p className="text-xs text-destructive mt-1">{errors['sku_duplicate']}</p>
+                )}
+              </div>
+            )}
+            {skuError && (
+              <div className="rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-xs text-destructive mt-2">
+                {skuError}
               </div>
             )}
           </div>
