@@ -631,7 +631,7 @@ it('bulk price fills all rows', async () => {
   })
 
   // Type in bulk price
-  const bulkInput = screen.getByPlaceholderText('Apply to all rows')
+  const [bulkInput] = screen.getAllByPlaceholderText('Apply to all rows')
   await userEvent.clear(bulkInput)
   await userEvent.type(bulkInput, '15.50')
 
@@ -758,8 +758,8 @@ it('resets rows and bulkPrice on reopen', async () => {
 
   // Add a row and type a bulk price
   await userEvent.click(screen.getByText(/add row/i))
-  const bulkInput = screen.getByPlaceholderText('Apply to all rows')
-  await userEvent.type(bulkInput, '10')
+  const [bulkPriceInput] = screen.getAllByPlaceholderText('Apply to all rows')
+  await userEvent.type(bulkPriceInput, '10')
 
   // Close dialog
   await userEvent.click(screen.getByRole('button', { name: /cancel/i }))
@@ -776,6 +776,6 @@ it('resets rows and bulkPrice on reopen', async () => {
 
   // Should be back to one row and empty bulk price
   expect(screen.getAllByTestId('variant-search-select')).toHaveLength(1)
-  const reopenedBulkInput = screen.getByPlaceholderText('Apply to all rows')
+  const [reopenedBulkInput] = screen.getAllByPlaceholderText('Apply to all rows')
   expect(reopenedBulkInput).toHaveValue(null)
 })

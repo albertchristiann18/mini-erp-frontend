@@ -1210,7 +1210,7 @@ export default function PurchaseOrderDetailPage() {
                     )}
                     <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
                     <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
-                    <SummaryRow label="Freight" value={po!.shipping_fee != null ? formatIDR(po!.shipping_fee) : '—'} />
+                    <SummaryRow label="Freight" value={(po!.shipping_fee ?? 0) > 0 ? formatIDR(po!.shipping_fee!) : '—'} />
                     <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
                       <span>Total Amount</span>
                       <span>{formatIDR(po!.total_amount)}</span>
@@ -1688,6 +1688,7 @@ function AddItemModal({
 }) {
   const [rows, setRows] = useState<RowDraft[]>([makeEmptyRow()])
   const [bulkPrice, setBulkPrice] = useState('')
+  const [bulkQty, setBulkQty] = useState('')
   const [showAll, setShowAll] = useState(false)
   const [error, setError] = useState('')
 
@@ -1696,6 +1697,7 @@ function AddItemModal({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRows([makeEmptyRow()])
       setBulkPrice('')
+      setBulkQty('')
       setShowAll(false)
       setError('')
     }
@@ -1780,6 +1782,14 @@ function AddItemModal({
     })))
   }
 
+  const handleBulkQty = (val: string) => {
+    setBulkQty(val)
+    setRows(prev => prev.map(r => ({
+      ...r,
+      ordered_qty: val,
+    })))
+  }
+
   const handleConfirm = () => {
     const valid = rows.filter(r => r.product_variant_id && Number(r.ordered_qty) > 0)
     if (valid.length === 0) { setError('Add at least one item with a variant and quantity.'); return }
@@ -1814,19 +1824,35 @@ function AddItemModal({
         </DialogHeader>
 
         <div className="space-y-3 py-2 flex-1 min-h-0 overflow-y-auto">
-          {/* Bulk price */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
-              Bulk unit price ({getCurrencySymbol(currency)})
-            </label>
-            <Input
-              type="number"
-              step="0.001"
-              className="h-7 text-xs w-36"
-              placeholder="Apply to all rows"
-              value={bulkPrice}
-              onChange={e => handleBulkPrice(e.target.value)}
-            />
+          {/* Bulk inputs */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                Bulk unit price ({getCurrencySymbol(currency)})
+              </label>
+              <Input
+                type="number"
+                step="0.001"
+                className="h-7 text-xs w-36"
+                placeholder="Apply to all rows"
+                value={bulkPrice}
+                onChange={e => handleBulkPrice(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                Bulk qty
+              </label>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                className="h-7 text-xs w-24"
+                placeholder="Apply to all rows"
+                value={bulkQty}
+                onChange={e => handleBulkQty(e.target.value)}
+              />
+            </div>
           </div>
 
           {/* Row list */}
