@@ -1166,7 +1166,8 @@ export default function PurchaseOrderDetailPage() {
                 return s + price * (Number(n.ordered_qty) || 0)
               }, 0) * (commPct / 100) * poExchangeRate)
               const estFreight = Math.round((Number(headerValues.forecast_cbm) || 0) * (Number(headerValues.forecast_shipping_fee_per_cbm) || 0))
-              const estTotal = Math.round(estGoods) + estCommission + estFreight
+              const estDelivery = Math.round((Number(headerValues.delivery_fee) || 0) * poExchangeRate)
+              const estTotal = Math.round(estGoods) + estCommission + estFreight + estDelivery
               const totalUnits = newItems.reduce((s, n) => s + (Number(n.ordered_qty) || 0), 0)
               const totalSkus = newItems.filter(n => n.product_variant_id).length
               return (
@@ -1180,6 +1181,7 @@ export default function PurchaseOrderDetailPage() {
                   )}
                   <SummaryRow label="Commission" value={estCommission > 0 ? formatIDR(estCommission) : '—'} />
                   <SummaryRow label="Forecast Freight" value={estFreight > 0 ? formatIDR(estFreight) : '—'} />
+                  <SummaryRow label="Supplier Delivery" value={estDelivery > 0 ? formatIDR(estDelivery) : '—'} />
                   <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
                     <span>Est. Total</span>
                     <span>{estTotal > 0 ? formatIDR(estTotal) : '—'}</span>
