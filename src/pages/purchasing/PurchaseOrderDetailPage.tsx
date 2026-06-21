@@ -1159,7 +1159,7 @@ export default function PurchaseOrderDetailPage() {
     return s + price * (Number(n.ordered_qty) || 0)
   }, 0)
   const estCurrencySymbol = getCurrencySymbol(String(headerValues.currency ?? ''))
-  const estForeignLabel = `Total (${String(headerValues.currency ?? 'Foreign')})`
+  const estForeignLabel = `Goods (${String(headerValues.currency ?? 'Foreign')})`
   const commPct = Number(headerValues.commission_fee_pct) || 0
               const estCommission = Math.round(newItems.reduce((s, n) => {
                 const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
@@ -1197,7 +1197,7 @@ export default function PurchaseOrderDetailPage() {
                 0
               )
               const currencySymbol = getCurrencySymbol(po!.currency)
-              const foreignLabel = `Total (${po!.currency ?? 'Foreign'})`
+              const foreignLabel = `Goods (${po!.currency ?? 'Foreign'})`
               return (
                 <>
                   <div className="space-y-3 text-sm">
