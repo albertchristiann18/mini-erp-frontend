@@ -14,6 +14,7 @@ import {
 } from '../api/inventory'
 import type { SaveVariantsPayload } from '../api/inventory'
 import client from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 import type { Product } from '../types/inventory'
 
 export const useCategories = (params?: Record<string, string | number>) =>
@@ -94,12 +95,14 @@ export const useVariantSearch = (
     enabled,
   })
 
-export const useWarehouses = (page = 1, pageSize = 100) =>
-  useQuery({
-    queryKey: ['warehouses', page, pageSize],
+export function useWarehouses(page = 1, pageSize = 100) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['warehouses', user?.company_id ?? null, page, pageSize],
     queryFn: () => getWarehouses({ page, page_size: pageSize }).then(r => r.data),
     staleTime: 1000 * 60 * 10,
   })
+}
 
 export const useCreateWarehouse = () => {
   const qc = useQueryClient()
