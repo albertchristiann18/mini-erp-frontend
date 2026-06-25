@@ -23,7 +23,7 @@ vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
   }: {
     value: string
     selectedLabel?: string
-    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null) => void
+    onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null, lastDiscountedUnitPriceForeign: string | null) => void
     onQuickCreated?: (variants: Array<{
       id: string
       label: string
@@ -39,7 +39,7 @@ vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
     <>
       <button
         data-testid="variant-search-select"
-        onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1', null, mockLastUnitPriceForeign, mockLastCurrency)}
+        onClick={() => onSelect('v1', 'Variant 1 (V1)', 'prod1', 'Product A', 'https://supplier.example.com/prod1', null, mockLastUnitPriceForeign, mockLastCurrency, null)}
       >
         {selectedLabel || (placeholder ?? 'Select variant')}
       </button>

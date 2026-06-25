@@ -159,9 +159,9 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
                     v.last_discounted_unit_price_foreign ?? null,
                   )}
                 >
-                  <div className="font-medium">{v.name}</div>
+                  <div className="font-medium">{v.product_name}</div>
                   <div className="text-muted-foreground">
-                    {v.sku_variant_code} · {v.product_name}
+                    {v.name} · {v.sku_variant_code}
                   </div>
                 </button>
               ))

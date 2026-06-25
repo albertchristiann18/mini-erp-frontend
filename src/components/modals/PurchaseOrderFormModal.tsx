@@ -51,7 +51,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
     navigate(`/purchasing/orders/${id}`)
   })
 
-  const { register, handleSubmit, reset, setValue, watch, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, setValue, watch, getValues, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { supplier_id: '', currency: 'CNY', order_details: [{ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, product_photo_url: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined }] },
   })
@@ -61,6 +61,11 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const [avgWindow, setAvgWindow] = useState<7 | 30>(30)
   const [variantLabels, setVariantLabels] = useState<Record<string, string>>({})
+  const [lastPriceData, setLastPriceData] = useState<Record<string, {
+    lastUnitPriceForeign: string | null
+    lastCurrency: string | null
+    lastDiscountedUnitPriceForeign: string | null
+  }>>({})
   const { data: replenishData } = useReplenishment()
   const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
     const m = new Map<string, ReplenishmentItem>()
@@ -68,19 +73,38 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
     return m
   }, [replenishData])
 
-  const handleClose = () => { reset(); setHasDiscount(false); setVariantLabels({}); onClose() }
+  const handleClose = () => { reset(); setHasDiscount(false); setVariantLabels({}); setLastPriceData({}); onClose() }
 
   const onSubmit = async (values: FormValues) => {
     const payload: Record<string, unknown> = {
       ...values,
-      order_details: values.order_details.map(({ product_variant_id, ordered_qty, unit_price_foreign, discounted_unit_price_foreign }) => ({
-        product_variant_id,
-        ordered_qty,
-        unit_price_foreign,
-        ...(hasDiscount && discounted_unit_price_foreign != null
-          ? { discounted_unit_price_foreign }
-          : {}),
-      }))
+      order_details: values.order_details.map(({ product_variant_id, ordered_qty, unit_price_foreign, discounted_unit_price_foreign }) => {
+        let finalPrice = unit_price_foreign
+        let finalDiscountedPrice = discounted_unit_price_foreign
+
+        if (!finalPrice || finalPrice === 0) {
+          const stored = lastPriceData[product_variant_id]
+          if (stored?.lastUnitPriceForeign && stored.lastCurrency === values.currency) {
+            const price = parseFloat(stored.lastUnitPriceForeign)
+            if (!isNaN(price) && price > 0) {
+              finalPrice = price
+              if (stored.lastDiscountedUnitPriceForeign) {
+                const discPrice = parseFloat(stored.lastDiscountedUnitPriceForeign)
+                if (!isNaN(discPrice) && discPrice > 0) finalDiscountedPrice = discPrice
+              }
+            }
+          }
+        }
+
+        return {
+          product_variant_id,
+          ordered_qty,
+          unit_price_foreign: finalPrice,
+          ...(hasDiscount && finalDiscountedPrice != null
+            ? { discounted_unit_price_foreign: finalDiscountedPrice }
+            : {}),
+        }
+      })
     }
     if (!payload.supplier_id) delete payload.supplier_id
     if (!payload.currency) delete payload.currency
@@ -177,7 +201,28 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
             <FormField label="Currency">
               <Select
                 value={watch('currency')}
-                onValueChange={(v) => setValue('currency', v)}
+                onValueChange={(v) => {
+                  setValue('currency', v)
+                  const currentItems = getValues('order_details')
+                  currentItems.forEach((item, idx) => {
+                    const currentPrice = item.unit_price_foreign
+                    if ((!currentPrice || currentPrice === 0) && item.product_variant_id) {
+                      const stored = lastPriceData[item.product_variant_id]
+                      if (stored?.lastUnitPriceForeign && stored.lastCurrency === v) {
+                        const price = parseFloat(stored.lastUnitPriceForeign)
+                        if (!isNaN(price) && price > 0) {
+                          setValue(`order_details.${idx}.unit_price_foreign`, price, { shouldValidate: true })
+                        }
+                        if (hasDiscount && stored.lastDiscountedUnitPriceForeign) {
+                          const discPrice = parseFloat(stored.lastDiscountedUnitPriceForeign)
+                          if (!isNaN(discPrice) && discPrice > 0) {
+                            setValue(`order_details.${idx}.discounted_unit_price_foreign`, discPrice)
+                          }
+                        }
+                      }
+                    }
+                  })
+                }}
               >
                 <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
                 <SelectContent>
@@ -278,22 +323,28 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                             <VariantSearchSelect
                               value={watch(`order_details.${i}.product_variant_id`)}
                               selectedLabel={variantLabels[watch(`order_details.${i}.product_variant_id`)] || ''}
-                              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency) => {
+                              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency, lastDiscountedUnitPriceForeign) => {
                                 setVariantLabels(prev => ({ ...prev, [id]: label }))
                                 setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
                                 setValue(`order_details.${i}.product_id`, productId)
                                 setValue(`order_details.${i}.product_name`, productName)
                                 setValue(`order_details.${i}.product_supplier_link`, productSupplierLink)
                                 setValue(`order_details.${i}.product_photo_url`, productPhotoUrl)
+                                setLastPriceData(prev => ({
+                                  ...prev,
+                                  [id]: { lastUnitPriceForeign, lastCurrency, lastDiscountedUnitPriceForeign },
+                                }))
                                 const poCurrency = watch('currency')
-                                if (
-                                  lastUnitPriceForeign &&
-                                  lastCurrency &&
-                                  lastCurrency === poCurrency
-                                ) {
+                                if (lastUnitPriceForeign && lastCurrency && lastCurrency === poCurrency) {
                                   const price = parseFloat(lastUnitPriceForeign)
                                   if (!isNaN(price) && price > 0) {
                                     setValue(`order_details.${i}.unit_price_foreign`, price, { shouldValidate: true })
+                                  }
+                                  if (hasDiscount && lastDiscountedUnitPriceForeign) {
+                                    const discPrice = parseFloat(lastDiscountedUnitPriceForeign)
+                                    if (!isNaN(discPrice) && discPrice > 0) {
+                                      setValue(`order_details.${i}.discounted_unit_price_foreign`, discPrice)
+                                    }
                                   }
                                 }
                               }}

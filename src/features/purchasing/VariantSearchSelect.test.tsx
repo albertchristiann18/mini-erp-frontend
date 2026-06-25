@@ -28,6 +28,7 @@ const mockVariant = {
   is_active: true,
   last_unit_price_foreign: '15.50',
   last_currency: 'CNY',
+  last_discounted_unit_price_foreign: null,
 }
 
 function renderSelect(onSelect = vi.fn()) {
@@ -60,5 +61,6 @@ it('test_on_select_passes_last_price', async () => {
     null,
     '15.50',
     'CNY',
+    null,
   )
 })
