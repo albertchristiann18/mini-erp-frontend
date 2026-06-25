@@ -838,3 +838,94 @@ it('shows_compression_toast_when_files_compressed', async () => {
     )
   })
 })
+
+it('test_currency_change_autofills_zero_price_items', async () => {
+  mockIsStaff = true
+  const poWithItems = {
+    ...basePo,
+    status: 'DRAFT',
+    currency: 'USD',
+    editable_fields: { header: ['currency', 'exchange_rate'], order_detail: ['unit_price_foreign', 'ordered_qty', 'discounted_unit_price_foreign'] },
+    order_details: [
+      {
+        id: 'detail-1',
+        variant_id: 'var-1',
+        product_variant_name: 'Red Variant',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: null,
+        unit_price_base: null,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: null,
+        total_price_base: null,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: {},
+        last_currency: 'CNY',
+        last_unit_price_foreign: '25.0000',
+      },
+      {
+        id: 'detail-2',
+        variant_id: 'var-2',
+        product_variant_name: 'Blue Variant',
+        product_id: 'prod-1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 3,
+        received_qty: null,
+        unit_price_foreign: '50.00',
+        unit_price_base: null,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: null,
+        total_price_base: null,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 15,
+        incoming_qty: 0,
+        variant_values: {},
+        last_currency: 'CNY',
+        last_unit_price_foreign: '30.0000',
+      },
+    ],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithItems))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  await waitFor(() => {
+    expect(screen.getByTestId('currency-select-trigger')).toBeInTheDocument()
+  })
+
+  const currencyTrigger = screen.getByTestId('currency-select-trigger')
+  await userEvent.click(currencyTrigger)
+
+  const cnyOption = await screen.findByText('CNY (¥ Yuan)')
+  await userEvent.click(cnyOption)
+
+  await waitFor(() => {
+    expect(vi.mocked(toast.info)).toHaveBeenCalledWith('Unit prices auto-filled from last purchase price')
+  })
+})

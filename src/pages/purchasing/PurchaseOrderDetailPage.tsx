@@ -275,6 +275,25 @@ export default function PurchaseOrderDetailPage() {
       [itemId]: { ...(prev[itemId] ?? {}), [field]: value }
     }))
 
+  const handleCurrencyChange = (field: string, val: string | File) => {
+    setHeaderField(field, val)
+    if (field !== 'currency' || typeof val !== 'string') return
+    const newCurrency = val
+    let filledCount = 0
+    for (const item of po?.order_details ?? []) {
+      if (deletedDetailIds.has(item.id)) continue
+      const currentPrice = detailValues[item.id]?.unit_price_foreign ?? item.unit_price_foreign
+      const isEmpty = !currentPrice || Number(currentPrice) === 0
+      if (isEmpty && item.last_currency === newCurrency && item.last_unit_price_foreign) {
+        setDetailField(item.id, 'unit_price_foreign', item.last_unit_price_foreign)
+        filledCount++
+      }
+    }
+    if (filledCount > 0) {
+      toast.info('Unit prices auto-filled from last purchase price')
+    }
+  }
+
   const removeNewItem = (_tempId: string) =>
     setNewItems(prev => prev.filter(n => n._tempId !== _tempId))
 
@@ -1023,7 +1042,7 @@ export default function PurchaseOrderDetailPage() {
                 editMode={editMode}
                 editable={isCreating || (po?.editable_fields?.header?.includes('currency') ?? false)}
                 headerValues={headerValues}
-                setHeaderField={setHeaderField}
+                setHeaderField={handleCurrencyChange}
               />
               <EditableInfoItem
                 field="exchange_rate"
@@ -1474,7 +1493,7 @@ function EditableInfoItem({
             value={String(headerValues[field] ?? value ?? '')}
             onValueChange={val => setHeaderField(field, val)}
           >
-            <SelectTrigger className="h-7 text-xs">
+            <SelectTrigger className="h-7 text-xs" data-testid={field === 'currency' ? 'currency-select-trigger' : undefined}>
               <SelectValue placeholder="Select..." />
             </SelectTrigger>
             <SelectContent>

@@ -34,6 +34,8 @@ export interface PurchaseOrderDetail {
   stock_on_hand: number
   incoming_qty: number
   variant_values: Record<string, string>
+  last_unit_price_foreign: string | null
+  last_currency: string | null
 }
 
 export interface PurchaseOrder {
