@@ -375,8 +375,15 @@ export default function PurchaseOrderDetailPage() {
     }
     if (Object.keys(payload).length === 0) { cancelEditMode(); return }
     try {
-      await updateMutation.mutateAsync({ id: po!.id, data: payload })
+      const result = await updateMutation.mutateAsync({ id: po!.id, data: payload })
       toast.success('Purchase order updated')
+      const compressedFiles = (result as { data?: { compressed_files?: string[] } }).data?.compressed_files
+      if (compressedFiles && compressedFiles.length > 0) {
+        const labels = compressedFiles.map(
+          (f: string) => HEADER_FIELD_CONFIG[f]?.label ?? f
+        )
+        toast.info(`PDF compressed to reduce size: ${labels.join(', ')}`)
+      }
       cancelEditMode()
     } catch (err: unknown) {
       const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data

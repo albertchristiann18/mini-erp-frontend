@@ -67,11 +67,12 @@ vi.mock('../../../api/inventory', () => ({
 }))
 
 vi.mock('../../../lib/toast', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-import { usePurchaseOrder } from '../../../hooks/usePurchasing'
+import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../../hooks/usePurchasing'
 import { useParams } from 'react-router-dom'
+import { toast } from '../../../lib/toast'
 
 const basePo = {
   id: 'po-1',
@@ -778,4 +779,62 @@ it('resets rows and bulkPrice on reopen', async () => {
   expect(screen.getAllByTestId('variant-search-select')).toHaveLength(1)
   const [reopenedBulkInput] = screen.getAllByPlaceholderText('Apply to all rows')
   expect(reopenedBulkInput).toHaveValue(null)
+})
+
+it('does_not_show_compression_toast_when_no_files_compressed', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+  vi.mocked(useUpdatePurchaseOrder).mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({ data: {} }),
+    isPending: false,
+  } as never)
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const saveButton = await screen.findByRole('button', { name: /save/i })
+  await userEvent.click(saveButton)
+
+  await waitFor(() => {
+    expect(vi.mocked(toast).success).toHaveBeenCalledWith('Purchase order updated')
+  })
+  expect(vi.mocked(toast).info).not.toHaveBeenCalled()
+})
+
+it('shows_compression_toast_when_files_compressed', async () => {
+  mockIsStaff = true
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(basePo))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+  vi.mocked(useUpdatePurchaseOrder).mockReturnValue({
+    mutateAsync: vi.fn().mockResolvedValue({
+      data: { compressed_files: ['purchase_order_invoice_file'] },
+    }),
+    isPending: false,
+  } as never)
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const saveButton = await screen.findByRole('button', { name: /save/i })
+  await userEvent.click(saveButton)
+
+  await waitFor(() => {
+    expect(vi.mocked(toast).success).toHaveBeenCalledWith('Purchase order updated')
+    expect(vi.mocked(toast).info).toHaveBeenCalledWith(
+      expect.stringContaining('PO Invoice File')
+    )
+  })
 })
