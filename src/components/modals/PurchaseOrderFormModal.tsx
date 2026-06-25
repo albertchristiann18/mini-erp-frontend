@@ -324,6 +324,14 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                               value={watch(`order_details.${i}.product_variant_id`)}
                               selectedLabel={variantLabels[watch(`order_details.${i}.product_variant_id`)] || ''}
                               onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency, lastDiscountedUnitPriceForeign) => {
+                                const currentItems = getValues('order_details')
+                                const duplicateIdx = currentItems.findIndex((item, j) => j !== i && item.product_variant_id === id)
+                                if (duplicateIdx !== -1) {
+                                  const existingQty = currentItems[duplicateIdx].ordered_qty || 0
+                                  setValue(`order_details.${duplicateIdx}.ordered_qty`, existingQty + 1, { shouldValidate: true })
+                                  toast.info(`Qty merged — "${label}" already in this order`)
+                                  return
+                                }
                                 setVariantLabels(prev => ({ ...prev, [id]: label }))
                                 setValue(`order_details.${i}.product_variant_id`, id, { shouldValidate: true })
                                 setValue(`order_details.${i}.product_id`, productId)

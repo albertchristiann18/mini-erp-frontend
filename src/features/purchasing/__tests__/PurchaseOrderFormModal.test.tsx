@@ -116,7 +116,7 @@ vi.mock('../../../hooks/useInventory', () => ({
 }))
 
 vi.mock('../../../lib/toast', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
 function renderModal() {
@@ -240,6 +240,25 @@ describe('price auto-fill', () => {
     await waitFor(() => {
       const selects = screen.getAllByTestId('variant-search-select')
       expect(selects[0]).toHaveTextContent('Red / M (RED-M)')
+    })
+  })
+
+  it('test_duplicate_variant_merges_qty_and_shows_toast', async () => {
+    const { toast } = await import('../../../lib/toast')
+    renderModal()
+    expect(await screen.findByText('New Purchase Order')).toBeInTheDocument()
+
+    const selects = screen.getAllByTestId('variant-search-select')
+    fireEvent.click(selects[0])
+
+    const addBtn = screen.getByText('Add Item')
+    fireEvent.click(addBtn)
+
+    const updatedSelects = screen.getAllByTestId('variant-search-select')
+    fireEvent.click(updatedSelects[updatedSelects.length - 1])
+
+    await waitFor(() => {
+      expect(vi.mocked(toast.info)).toHaveBeenCalledWith(expect.stringContaining('Qty merged'))
     })
   })
 
