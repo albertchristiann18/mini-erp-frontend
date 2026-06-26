@@ -717,7 +717,7 @@ export default function PurchaseOrderDetailPage() {
                 <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
                 <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
                 <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
-                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{item.cogs_per_unit_idr != null ? '—' : (cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—')}</td>
                 <td className="px-3 py-1.5">
                   {showRemarks ? (
                     <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
@@ -1126,6 +1126,8 @@ export default function PurchaseOrderDetailPage() {
                   headerValues.shipping_fee_per_cbm ?? po?.shipping_fee_per_cbm ?? 0
                 )
                 if (effectiveShippingPerCbm <= 0) return null
+                const poStatus = po?.status
+                if (poStatus === 'DELIVERED' || poStatus === 'COMPLETED' || poStatus === 'CANCELLED') return null
                 const noDimsCount = (po?.order_details ?? []).filter(
                   item => item.product_has_dimensions === false
                 ).length
