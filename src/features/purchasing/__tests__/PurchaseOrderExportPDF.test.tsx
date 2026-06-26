@@ -1,5 +1,18 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { vi, it, expect } from 'vitest'
+
+vi.mock('../../../api/client', () => ({
+  default: { get: vi.fn().mockResolvedValue({ data: new Blob() }) },
+}))
+
+vi.mock('../purchaseOrderPDFUtils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../purchaseOrderPDFUtils')>()
+  return {
+    ...actual,
+    fetchPhotoViaProxy: vi.fn().mockResolvedValue(null),
+  }
+})
 
 vi.mock('@react-pdf/renderer', () => ({
   Document: ({ children }: { children: React.ReactNode }) => <div data-testid="pdf-document">{children}</div>,
@@ -14,10 +27,13 @@ vi.mock('@react-pdf/renderer', () => ({
   ),
   StyleSheet: { create: () => ({}) },
   PDFViewer: ({ children }: { children: React.ReactNode }) => <div data-testid="pdf-viewer">{children}</div>,
-  pdf: () => ({ toBlob: () => new Blob() }),
+  pdf: vi.fn(() => ({ toBlob: () => new Blob() })),
 }))
 
-import PurchaseOrderExportPDF, { groupByProduct } from '../PurchaseOrderExportPDF'
+import { pdf } from '@react-pdf/renderer'
+import PurchaseOrderExportPDF from '../PurchaseOrderExportPDF'
+import { groupBySubGroup } from '../purchaseOrderPDFUtils'
+import type { SubGroup } from '../purchaseOrderPDFUtils'
 import type { PurchaseOrder } from '../../../types/purchasing'
 
 const mockPo = {
@@ -74,6 +90,48 @@ const mockPo = {
   order_details: [],
 }
 
+function makeDetail(
+  id: string,
+  productId: string,
+  productName: string,
+  variantName: string,
+  variantValues: Record<string, string>,
+) {
+  return {
+    id,
+    variant_id: id,
+    product_variant_name: variantName,
+    product_id: productId,
+    product_name: productName,
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: 5,
+    received_qty: null,
+    unit_price_foreign: '10.00',
+    unit_price_base: 15000,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: '50.00',
+    total_price_base: 75000,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: '',
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 20,
+    incoming_qty: 0,
+    variant_values: variantValues,
+    last_unit_price_foreign: null,
+    last_currency: null,
+    last_discounted_unit_price_foreign: null,
+    shipping_per_unit_idr: null,
+    delivery_per_unit_idr: null,
+    commission_per_unit_idr: null,
+    cogs_per_unit_idr: null,
+    product_has_dimensions: null,
+  }
+}
+
 it('PO export shows supplier link when available', () => {
   const poWithSupplierLink = {
     ...mockPo,
@@ -105,6 +163,7 @@ it('PO export shows supplier link when available', () => {
         variant_values: {},
         last_unit_price_foreign: null,
         last_currency: null,
+        last_discounted_unit_price_foreign: null,
         shipping_per_unit_idr: null,
         delivery_per_unit_idr: null,
         commission_per_unit_idr: null,
@@ -153,6 +212,7 @@ it('PO export shows image placeholder when no photo', () => {
         variant_values: {},
         last_unit_price_foreign: null,
         last_currency: null,
+        last_discounted_unit_price_foreign: null,
         shipping_per_unit_idr: null,
         delivery_per_unit_idr: null,
         commission_per_unit_idr: null,
@@ -168,75 +228,184 @@ it('PO export shows image placeholder when no photo', () => {
   expect(images.length).toBe(0)
 })
 
-it('groupByProduct sets product_name correctly', () => {
+it('groupBySubGroup groups same-product variants into sub-groups by first dimension value', () => {
   const details = [
-    {
-      id: 'd1',
-      variant_id: 'v1',
-      product_variant_name: 'Red',
-      product_id: 'p1',
-      product_name: 'Product A',
-      product_supplier_link: null,
-      product_photo_url: null,
-      ordered_qty: 5,
-      received_qty: null,
-      unit_price_foreign: '10.00',
-      unit_price_base: 15000,
-      discounted_unit_price_foreign: null,
-      discounted_unit_price_base: null,
-      total_price_foreign: '50.00',
-      total_price_base: 75000,
-      discounted_total_price_foreign: null,
-      discounted_total_price_base: null,
-      remarks: '',
-      avg_sales: null,
-      avg_sales_7d: null,
-      stock_on_hand: 20,
-      incoming_qty: 0,
-      variant_values: {},
-      last_unit_price_foreign: null,
-      last_currency: null,
-      shipping_per_unit_idr: null,
-      delivery_per_unit_idr: null,
-      commission_per_unit_idr: null,
-      cogs_per_unit_idr: null,
-      product_has_dimensions: null,
-    },
-    {
-      id: 'd2',
-      variant_id: 'v2',
-      product_variant_name: 'Blue',
-      product_id: 'p1',
-      product_name: 'Product A',
-      product_supplier_link: null,
-      product_photo_url: null,
-      ordered_qty: 3,
-      received_qty: null,
-      unit_price_foreign: '10.00',
-      unit_price_base: 15000,
-      discounted_unit_price_foreign: null,
-      discounted_unit_price_base: null,
-      total_price_foreign: '30.00',
-      total_price_base: 45000,
-      discounted_total_price_foreign: null,
-      discounted_total_price_base: null,
-      remarks: '',
-      avg_sales: null,
-      avg_sales_7d: null,
-      stock_on_hand: 10,
-      incoming_qty: 0,
-      variant_values: {},
-      last_unit_price_foreign: null,
-      last_currency: null,
-      shipping_per_unit_idr: null,
-      delivery_per_unit_idr: null,
-      commission_per_unit_idr: null,
-      cogs_per_unit_idr: null,
-      product_has_dimensions: null,
-    },
+    makeDetail('d1', 'p1', 'Product A', 'L / Orange Clam', { Color: 'Orange Clam', Size: 'L' }),
+    makeDetail('d2', 'p1', 'Product A', 'M / Orange Clam', { Color: 'Orange Clam', Size: 'M' }),
+    makeDetail('d3', 'p1', 'Product A', 'L / White Cherry', { Color: 'White Cherry', Size: 'L' }),
   ]
-  const groups = groupByProduct(details)
-  expect(groups).toHaveLength(1)
-  expect(groups[0].product_name).toBe('Product A')
-  expect(groups[0].items).toHaveLength(2)
+  const sgs = groupBySubGroup(details)
+  expect(sgs).toHaveLength(2)
+  const orange = sgs.find(sg => sg.first_dim_value === 'Orange Clam')!
+  expect(orange.items).toHaveLength(2)
+  expect(orange.key).toBe('p1::Orange Clam')
+  const white = sgs.find(sg => sg.first_dim_value === 'White Cherry')!
+  expect(white.items).toHaveLength(1)
+})
+
+it('groupBySubGroup assigns empty first_dim_value for items with no variant_values', () => {
+  const details = [
+    makeDetail('d1', 'p1', 'Product A', 'One Size', {}),
+    makeDetail('d2', 'p1', 'Product A', 'One Size Alt', {}),
+  ]
+  const sgs = groupBySubGroup(details)
+  expect(sgs).toHaveLength(1)
+  expect(sgs[0].first_dim_value).toBe('')
+  expect(sgs[0].key).toBe('p1::')
+  expect(sgs[0].items).toHaveLength(2)
+})
+
+it('groupBySubGroup sorts items within a sub-group by second dimension value', () => {
+  const details = [
+    makeDetail('d1', 'p1', 'Product A', 'XL / Orange Clam', { Color: 'Orange Clam', Size: 'XL' }),
+    makeDetail('d2', 'p1', 'Product A', 'S / Orange Clam', { Color: 'Orange Clam', Size: 'S' }),
+    makeDetail('d3', 'p1', 'Product A', 'M / Orange Clam', { Color: 'Orange Clam', Size: 'M' }),
+  ]
+  const sgs = groupBySubGroup(details)
+  expect(sgs).toHaveLength(1)
+  const sizes = sgs[0].items.map(i => i.variant_values['Size'])
+  expect(sizes).toEqual(['M', 'S', 'XL'])
+})
+
+it('groupBySubGroup maintains separate sub-groups for same color name across different products', () => {
+  const details = [
+    makeDetail('d1', 'p1', 'Product A', 'L / Red', { Color: 'Red', Size: 'L' }),
+    makeDetail('d2', 'p2', 'Product B', 'L / Red', { Color: 'Red', Size: 'L' }),
+  ]
+  const sgs = groupBySubGroup(details)
+  expect(sgs).toHaveLength(2)
+  expect(sgs[0].key).toBe('p1::Red')
+  expect(sgs[1].key).toBe('p2::Red')
+})
+
+it('PDF sub-group block omits the color label when first_dim_value is empty', () => {
+  const poNoVariantValues = {
+    ...mockPo,
+    status: 'ORDERED' as const,
+    order_details: [
+      {
+        id: 'd1',
+        variant_id: 'v1',
+        product_variant_name: 'One Size',
+        product_id: 'p1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 5,
+        received_qty: null,
+        unit_price_foreign: '10.00',
+        unit_price_base: 15000,
+        discounted_unit_price_foreign: null,
+        discounted_unit_price_base: null,
+        total_price_foreign: '50.00',
+        total_price_base: 75000,
+        discounted_total_price_foreign: null,
+        discounted_total_price_base: null,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 20,
+        incoming_qty: 0,
+        variant_values: {},
+        last_unit_price_foreign: null,
+        last_currency: null,
+        last_discounted_unit_price_foreign: null,
+        shipping_per_unit_idr: null,
+        delivery_per_unit_idr: null,
+        commission_per_unit_idr: null,
+        cogs_per_unit_idr: null,
+        product_has_dimensions: null,
+      },
+    ],
+  } satisfies PurchaseOrder
+
+  const { container } = render(<PurchaseOrderExportPDF po={poNoVariantValues} />)
+  const allTexts = Array.from(container.querySelectorAll('[data-testid="pdf-text"]')).map(
+    el => el.textContent,
+  )
+  expect(allTexts.some(t => t?.includes('One Size'))).toBe(true)
+  const occurrences = allTexts.filter(t => t === 'One Size').length
+  expect(occurrences).toBe(1)
+})
+
+it('download button shows downloading state while in progress', async () => {
+  vi.mocked(pdf).mockReturnValueOnce({
+    container: document.createElement('div'),
+    isDirty: () => false,
+    toString: () => '',
+    toBlob: () => new Promise(() => {}),
+    toBuffer: () => new Promise(() => {}),
+    on: () => {},
+    removeListener: () => {},
+    updateContainer: () => {},
+  } as never)
+
+  const oneSubGroup: SubGroup[] = [{
+    key: 'p1::',
+    product_id: 'p1',
+    product_name: 'Product A',
+    product_supplier_link: null,
+    product_photo_url: null,
+    first_dim_value: '',
+    items: [],
+  }]
+
+  const user = userEvent.setup()
+  render(<PurchaseOrderExportPDF po={{ ...mockPo, status: 'ORDERED' as const }} subGroups={oneSubGroup} />)
+
+  const button = screen.getByRole('button', { name: /download pdf/i })
+  await user.click(button)
+
+  expect(screen.getByRole('button', { name: /downloading\.\.\./i })).toBeInTheDocument()
+  expect(button).toBeDisabled()
+})
+
+it('PDF sub-group uses discounted_total_price_foreign for total when available', () => {
+  const poWithDiscount = {
+    ...mockPo,
+    status: 'ORDERED' as const,
+    order_details: [
+      {
+        id: 'd1',
+        variant_id: 'v1',
+        product_variant_name: 'L / Blue',
+        product_id: 'p1',
+        product_name: 'Product A',
+        product_supplier_link: null,
+        product_photo_url: null,
+        ordered_qty: 2,
+        received_qty: null,
+        unit_price_foreign: '20.00',
+        unit_price_base: 30000,
+        discounted_unit_price_foreign: '15.00',
+        discounted_unit_price_base: 22500,
+        total_price_foreign: '40.00',
+        total_price_base: 60000,
+        discounted_total_price_foreign: '30.00',
+        discounted_total_price_base: 45000,
+        remarks: '',
+        avg_sales: null,
+        avg_sales_7d: null,
+        stock_on_hand: 10,
+        incoming_qty: 0,
+        variant_values: { Color: 'Blue', Size: 'L' },
+        last_unit_price_foreign: null,
+        last_currency: null,
+        last_discounted_unit_price_foreign: null,
+        shipping_per_unit_idr: null,
+        delivery_per_unit_idr: null,
+        commission_per_unit_idr: null,
+        cogs_per_unit_idr: null,
+        product_has_dimensions: null,
+      },
+    ],
+  } satisfies PurchaseOrder
+
+  const { container } = render(<PurchaseOrderExportPDF po={poWithDiscount} />)
+  const allTexts = Array.from(container.querySelectorAll('[data-testid="pdf-text"]')).map(
+    el => el.textContent,
+  )
+  // discounted total (30.00) should appear, not base total (40.00)
+  expect(allTexts.some(t => t?.includes('30.00'))).toBe(true)
+  expect(allTexts.every(t => !t?.includes('40.00'))).toBe(true)
 })

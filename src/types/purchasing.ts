@@ -36,6 +36,7 @@ export interface PurchaseOrderDetail {
   variant_values: Record<string, string>
   last_unit_price_foreign: string | null
   last_currency: string | null
+  last_discounted_unit_price_foreign: string | null
   shipping_per_unit_idr: number | null
   delivery_per_unit_idr: number | null
   commission_per_unit_idr: number | null

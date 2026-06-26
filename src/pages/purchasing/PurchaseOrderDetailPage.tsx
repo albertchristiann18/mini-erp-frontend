@@ -280,17 +280,33 @@ export default function PurchaseOrderDetailPage() {
     if (field !== 'currency' || typeof val !== 'string') return
     const newCurrency = val
     let filledCount = 0
+    let existingPricedCount = 0
     for (const item of po?.order_details ?? []) {
       if (deletedDetailIds.has(item.id)) continue
       const currentPrice = detailValues[item.id]?.unit_price_foreign ?? item.unit_price_foreign
       const isEmpty = !currentPrice || Number(currentPrice) === 0
+      if (!isEmpty) {
+        existingPricedCount++
+      }
       if (isEmpty && item.last_currency === newCurrency && item.last_unit_price_foreign) {
         setDetailField(item.id, 'unit_price_foreign', item.last_unit_price_foreign)
+        if (po?.has_discount && item.last_discounted_unit_price_foreign) {
+          const currentDiscounted =
+            detailValues[item.id]?.discounted_unit_price_foreign ??
+            item.discounted_unit_price_foreign
+          const isDiscountedEmpty = !currentDiscounted || Number(currentDiscounted) === 0
+          if (isDiscountedEmpty) {
+            setDetailField(item.id, 'discounted_unit_price_foreign', item.last_discounted_unit_price_foreign)
+          }
+        }
         filledCount++
       }
     }
     if (filledCount > 0) {
       toast.info('Unit prices auto-filled from last purchase price')
+    }
+    if (existingPricedCount > 0) {
+      toast.warning('Currency changed — existing prices may be in the old currency')
     }
   }
 
