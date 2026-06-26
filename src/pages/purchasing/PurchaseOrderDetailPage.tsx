@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
 import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
@@ -633,106 +633,125 @@ export default function PurchaseOrderDetailPage() {
           const cogsPerUnit = unitPriceIdr + freightPerUnit + commissionPerUnit
 
           return (
-            <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
-              <td colSpan={2} className="pl-4 pr-3 py-1.5 whitespace-nowrap">
-                <div className="flex items-center gap-2">
-                  <label className={`relative w-7 h-7 rounded border overflow-hidden shrink-0 cursor-pointer
-                    ${uploadingVariantPhoto[item.variant_id] ? 'opacity-50' : 'hover:opacity-80'}`}>
-                    {variantPhotoOverrides[item.variant_id] || item.product_photo_url ? (
-                      <img
-                        src={variantPhotoOverrides[item.variant_id] ?? item.product_photo_url ?? ''}
-                        alt=""
-                        className="w-full h-full object-cover"
+            <React.Fragment key={item.id}>
+              <tr className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
+                <td colSpan={2} className="pl-4 pr-3 py-1.5 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <label className={`relative w-7 h-7 rounded border overflow-hidden shrink-0 cursor-pointer
+                      ${uploadingVariantPhoto[item.variant_id] ? 'opacity-50' : 'hover:opacity-80'}`}>
+                      {variantPhotoOverrides[item.variant_id] || item.product_photo_url ? (
+                        <img
+                          src={variantPhotoOverrides[item.variant_id] ?? item.product_photo_url ?? ''}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                          <ImagePlus className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingVariantPhoto[item.variant_id]}
+                        onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (file) handleVariantPhotoUpload(item.variant_id, item.product_id, file)
+                          e.target.value = ''
+                        }}
                       />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-                        <ImagePlus className="w-3.5 h-3.5" />
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      disabled={uploadingVariantPhoto[item.variant_id]}
-                      onChange={e => {
-                        const file = e.target.files?.[0]
-                        if (file) handleVariantPhotoUpload(item.variant_id, item.product_id, file)
-                        e.target.value = ''
-                      }}
-                    />
-                  </label>
-                  <div className="flex flex-col min-w-0"><span className="font-mono font-medium">{item.product_variant_name}</span>{item.sku_variant_code && (<span className="text-[10px] text-muted-foreground font-mono leading-tight">{item.sku_variant_code}</span>)}</div>
-                </div>
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-violet-600">
-                {recommendedQty !== null ? recommendedQty : '\u221E'}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                {isDetailEditable('ordered_qty') ? (
-                  <Input type="number" className="h-7 w-14 text-xs"
-                    value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
-                    onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
-                ) : item.ordered_qty}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                {isDetailEditable('received_qty') ? (
-                  <Input type="number" className="h-7 w-14 text-xs"
-                    value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
-                    onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
-                ) : (item.received_qty ?? '—')}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{soh}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{incoming}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{upcoming}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
-                {avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
-                {hasSnapshot && <span className="text-[10px] text-muted-foreground/50 ml-0.5">*</span>}
-              </td>
-              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : doi !== null && doi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                {doi !== null ? `${doi}d` : '\u221E'}
-              </td>
-              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
-                {doiAfter !== null ? `${doiAfter}d` : '\u221E'}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                {isDetailEditable('unit_price_foreign') ? (
-                  <Input type="number" step="0.001" className="h-7 w-20 text-xs"
-                    value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
-                    onChange={e => {
-                      setDetailField(item.id, 'unit_price_foreign', e.target.value)
-                      if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
-                    }} />
-                ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
-              </td>
-              {hasDiscount && (
+                    </label>
+                    <div className="flex flex-col min-w-0"><span className="font-mono font-medium">{item.product_variant_name}</span>{item.sku_variant_code && (<span className="text-[10px] text-muted-foreground font-mono leading-tight">{item.sku_variant_code}</span>)}</div>
+                  </div>
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-violet-600">
+                  {recommendedQty !== null ? recommendedQty : '\u221E'}
+                </td>
                 <td className="px-3 py-1.5 whitespace-nowrap">
-                  {isDetailEditable('discounted_unit_price_foreign') ? (
+                  {isDetailEditable('ordered_qty') ? (
+                    <Input type="number" className="h-7 w-14 text-xs"
+                      value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
+                      onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
+                  ) : item.ordered_qty}
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap">
+                  {isDetailEditable('received_qty') ? (
+                    <Input type="number" className="h-7 w-14 text-xs"
+                      value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
+                      onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
+                  ) : (item.received_qty ?? '—')}
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{soh}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{incoming}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium">{upcoming}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
+                  {avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
+                  {hasSnapshot && <span className="text-[10px] text-muted-foreground/50 ml-0.5">*</span>}
+                </td>
+                <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : doi !== null && doi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                  {doi !== null ? `${doi}d` : '\u221E'}
+                </td>
+                <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
+                  {doiAfter !== null ? `${doiAfter}d` : '\u221E'}
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap">
+                  {isDetailEditable('unit_price_foreign') ? (
                     <Input type="number" step="0.001" className="h-7 w-20 text-xs"
-                      value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
-                      onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                  ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                      value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
+                      onChange={e => {
+                        setDetailField(item.id, 'unit_price_foreign', e.target.value)
+                        if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
+                      }} />
+                  ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
                 </td>
-              )}
-              <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
-              <td className="px-3 py-1.5">
-                {showRemarks ? (
-                  <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
-                    value={rowChanges.remarks ?? String(item.remarks ?? '')}
-                    onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
-                ) : <span className="text-muted-foreground">{item.remarks || ''}</span>}
-              </td>
-              {editMode && canAddDeleteItems && (
-                <td className="px-2 py-1 w-8">
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600"
-                    onClick={() => deleteExistingItem(item.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {hasDiscount && (
+                  <td className="px-3 py-1.5 whitespace-nowrap">
+                    {isDetailEditable('discounted_unit_price_foreign') ? (
+                      <Input type="number" step="0.001" className="h-7 w-20 text-xs"
+                        value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
+                        onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
+                    ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                  </td>
+                )}
+                <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
+                <td className="px-3 py-1.5">
+                  {showRemarks ? (
+                    <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
+                      value={rowChanges.remarks ?? String(item.remarks ?? '')}
+                      onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
+                  ) : <span className="text-muted-foreground">{item.remarks || ''}</span>}
                 </td>
+                {editMode && canAddDeleteItems && (
+                  <td className="px-2 py-1 w-8">
+                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600"
+                      onClick={() => deleteExistingItem(item.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
+                )}
+              </tr>
+              {item.cogs_per_unit_idr != null && (
+                <tr className="bg-muted/20">
+                  <td colSpan={20} className="pl-10 pr-3 py-1 text-[10px] text-muted-foreground">
+                    <span className="font-medium text-foreground">Shipping/unit:</span>{' '}
+                    {formatIDR(item.shipping_per_unit_idr ?? 0)}
+                    {' · '}
+                    <span className="font-medium text-foreground">Delivery/unit:</span>{' '}
+                    {formatIDR(item.delivery_per_unit_idr ?? 0)}
+                    {' · '}
+                    <span className="font-medium text-foreground">Commission/unit:</span>{' '}
+                    {formatIDR(item.commission_per_unit_idr ?? 0)}
+                    {' · '}
+                    <span className="font-medium text-amber-700">COGS/unit:</span>{' '}
+                    <span className="font-bold text-amber-700">{formatIDR(item.cogs_per_unit_idr)}</span>
+                  </td>
+                </tr>
               )}
-            </tr>
+            </React.Fragment>
           )
         })}
         {editMode && canAddDeleteItems && group.newItemsList.map(n => {
@@ -1102,6 +1121,24 @@ export default function PurchaseOrderDetailPage() {
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
+              {(() => {
+                const effectiveShippingPerCbm = Number(
+                  headerValues.shipping_fee_per_cbm ?? po?.shipping_fee_per_cbm ?? 0
+                )
+                if (effectiveShippingPerCbm <= 0) return null
+                const noDimsCount = (po?.order_details ?? []).filter(
+                  item => item.product_has_dimensions === false
+                ).length
+                if (noDimsCount === 0) return null
+                return (
+                  <div className="col-span-2 flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                    <span>⚠</span>
+                    <span>
+                      {noDimsCount} item{noDimsCount > 1 ? 's' : ''} have no product dimensions — shipping fee not allocated to those items.
+                    </span>
+                  </div>
+                )
+              })()}
               <EditableInfoItem
                 field="forecast_cbm"
                 label="Forecast CBM"

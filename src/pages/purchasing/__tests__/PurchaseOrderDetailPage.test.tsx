@@ -839,6 +839,108 @@ it('shows_compression_toast_when_files_compressed', async () => {
   })
 })
 
+it('test_dimension_warning_banner_shows_when_missing_dimensions', async () => {
+  const baseDetail = {
+    id: 'detail-1',
+    variant_id: 'var-1',
+    product_variant_name: 'Red Variant',
+    product_id: 'prod-1',
+    product_name: 'Product A',
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: 10,
+    received_qty: 10,
+    unit_price_foreign: '50000.00',
+    unit_price_base: 50000,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: '500000.00',
+    total_price_base: 500000,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: '',
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 0,
+    incoming_qty: 0,
+    variant_values: {},
+    last_unit_price_foreign: null,
+    last_currency: null,
+  }
+
+  const dimWarningDetail = {
+    ...baseDetail,
+    product_has_dimensions: false,
+    shipping_per_unit_idr: null,
+    delivery_per_unit_idr: null,
+    commission_per_unit_idr: null,
+    cogs_per_unit_idr: null,
+  }
+
+  const poWithDimWarning = {
+    ...basePo,
+    status: 'SHIPPED',
+    shipping_fee_per_cbm: 100000,
+    order_details: [dimWarningDetail],
+  }
+
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(poWithDimWarning))
+  renderPage()
+
+  await waitFor(() => expect(screen.getByText(/have no product dimensions/)).toBeInTheDocument())
+})
+
+it('test_freight_strip_shows_in_delivered_po', async () => {
+  const baseDetail = {
+    id: 'detail-1',
+    variant_id: 'var-1',
+    product_variant_name: 'Red Variant',
+    product_id: 'prod-1',
+    product_name: 'Product A',
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: 10,
+    received_qty: 10,
+    unit_price_foreign: '50000.00',
+    unit_price_base: 50000,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: '500000.00',
+    total_price_base: 500000,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: '',
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 0,
+    incoming_qty: 0,
+    variant_values: {},
+    last_unit_price_foreign: null,
+    last_currency: null,
+  }
+
+  const freightDetail = {
+    ...baseDetail,
+    product_has_dimensions: true,
+    shipping_per_unit_idr: 10000,
+    delivery_per_unit_idr: 10000,
+    commission_per_unit_idr: 2000,
+    cogs_per_unit_idr: 72000,
+  }
+
+  const deliveredPo = {
+    ...basePo,
+    status: 'DELIVERED',
+    order_details: [freightDetail],
+  }
+
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(deliveredPo))
+  renderPage()
+
+  await waitFor(() => expect(screen.getByText(/COGS\/unit/)).toBeInTheDocument())
+  expect(screen.getByText(/Shipping\/unit/)).toBeInTheDocument()
+})
+
 it('test_currency_change_autofills_zero_price_items', async () => {
   mockIsStaff = true
   const poWithItems = {
