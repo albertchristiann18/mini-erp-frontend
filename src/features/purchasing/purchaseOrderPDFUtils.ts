@@ -27,11 +27,16 @@ export async function fetchPhotoViaProxy(productId: string): Promise<string | nu
   }
 }
 
-export function groupBySubGroup(details: PurchaseOrderDetail[]): SubGroup[] {
+export function groupBySubGroup(details: PurchaseOrderDetail[], groupByKey?: string | null): SubGroup[] {
   const map = new Map<string, SubGroup>()
   for (const item of details) {
     const keys = Object.keys(item.variant_values ?? {})
-    const firstDimValue = keys.length > 0 ? (item.variant_values[keys[0]] ?? '') : ''
+    const firstDimValue =
+      groupByKey === undefined
+        ? (keys.length > 0 ? (item.variant_values[keys[0]] ?? '') : '')
+        : groupByKey === null
+          ? ''
+          : (item.variant_values[groupByKey] ?? '')
     const key = `${item.product_id}::${firstDimValue}`
     if (!map.has(key)) {
       map.set(key, {
@@ -49,16 +54,24 @@ export function groupBySubGroup(details: PurchaseOrderDetail[]): SubGroup[] {
 
   for (const sg of map.values()) {
     sg.items.sort((a, b) => {
-      const aKeys = Object.keys(a.variant_values ?? {})
-      const dim2Key = aKeys[1] ?? ''
-      const dim1Key = aKeys[0] ?? ''
-      const cmp2 = String(a.variant_values?.[dim2Key] ?? '').localeCompare(
-        String(b.variant_values?.[dim2Key] ?? ''),
-      )
-      if (cmp2 !== 0) return cmp2
-      return String(a.variant_values?.[dim1Key] ?? '').localeCompare(
-        String(b.variant_values?.[dim1Key] ?? ''),
-      )
+      const allKeys = Object.keys(a.variant_values ?? {})
+      let sortKeys: string[]
+      if (groupByKey === undefined) {
+        sortKeys = allKeys.length > 1 ? [allKeys[1], allKeys[0]] : allKeys
+      } else if (groupByKey === null) {
+        sortKeys = allKeys
+      } else {
+        sortKeys = allKeys.filter(k => k !== groupByKey)
+      }
+      for (const k of sortKeys) {
+        const cmp = String(a.variant_values?.[k] ?? '').localeCompare(
+          String(b.variant_values?.[k] ?? ''),
+          undefined,
+          { numeric: true },
+        )
+        if (cmp !== 0) return cmp
+      }
+      return 0
     })
   }
 
@@ -69,7 +82,7 @@ export function groupBySubGroup(details: PurchaseOrderDetail[]): SubGroup[] {
   }
   const result: SubGroup[] = []
   for (const sgs of byProduct.values()) {
-    sgs.sort((a, b) => a.first_dim_value.localeCompare(b.first_dim_value))
+    sgs.sort((a, b) => a.first_dim_value.localeCompare(b.first_dim_value, undefined, { numeric: true }))
     result.push(...sgs)
   }
   return result

@@ -129,6 +129,9 @@ function makeDetail(
     commission_per_unit_idr: null,
     cogs_per_unit_idr: null,
     product_has_dimensions: null,
+    sourcing_item_id: null,
+    is_draft: false,
+    draft_product_name: '',
   }
 }
 
@@ -169,6 +172,9 @@ it('PO export shows supplier link when available', () => {
         commission_per_unit_idr: null,
         cogs_per_unit_idr: null,
         product_has_dimensions: null,
+        sourcing_item_id: null,
+        is_draft: false,
+        draft_product_name: '',
       },
     ],
   } satisfies PurchaseOrder
@@ -218,6 +224,9 @@ it('PO export shows image placeholder when no photo', () => {
         commission_per_unit_idr: null,
         cogs_per_unit_idr: null,
         product_has_dimensions: null,
+        sourcing_item_id: null,
+        is_draft: false,
+        draft_product_name: '',
       },
     ],
   } satisfies PurchaseOrder
@@ -315,6 +324,9 @@ it('PDF sub-group block omits the color label when first_dim_value is empty', ()
         commission_per_unit_idr: null,
         cogs_per_unit_idr: null,
         product_has_dimensions: null,
+        sourcing_item_id: null,
+        is_draft: false,
+        draft_product_name: '',
       },
     ],
   } satisfies PurchaseOrder
@@ -397,6 +409,9 @@ it('PDF sub-group uses discounted_total_price_foreign for total when available',
         commission_per_unit_idr: null,
         cogs_per_unit_idr: null,
         product_has_dimensions: null,
+        sourcing_item_id: null,
+        is_draft: false,
+        draft_product_name: '',
       },
     ],
   } satisfies PurchaseOrder
@@ -408,4 +423,44 @@ it('PDF sub-group uses discounted_total_price_foreign for total when available',
   // discounted total (30.00) should appear, not base total (40.00)
   expect(allTexts.some(t => t?.includes('30.00'))).toBe(true)
   expect(allTexts.every(t => !t?.includes('40.00'))).toBe(true)
+})
+
+it('groupBySubGroup with null groupByKey produces one sub-group per product with empty first_dim_value', () => {
+  const details = [
+    makeDetail('d1', 'p1', 'Product A', 'L / Orange Clam', { Color: 'Orange Clam', Size: 'L' }),
+    makeDetail('d2', 'p1', 'Product A', 'M / White Cherry', { Color: 'White Cherry', Size: 'M' }),
+    makeDetail('d3', 'p2', 'Product B', 'L / Red', { Color: 'Red', Size: 'L' }),
+  ]
+  const sgs = groupBySubGroup(details, null)
+  expect(sgs).toHaveLength(2)
+  expect(sgs.every(sg => sg.first_dim_value === '')).toBe(true)
+  const p1 = sgs.find(sg => sg.product_id === 'p1')!
+  expect(p1.items).toHaveLength(2)
+  expect(p1.key).toBe('p1::')
+})
+
+it('groupBySubGroup with explicit groupByKey groups by that dimension value', () => {
+  const details = [
+    makeDetail('d1', 'p1', 'Product A', 'L / Orange Clam', { Color: 'Orange Clam', Size: 'L' }),
+    makeDetail('d2', 'p1', 'Product A', 'M / Orange Clam', { Color: 'Orange Clam', Size: 'M' }),
+    makeDetail('d3', 'p1', 'Product A', 'L / White Cherry', { Color: 'White Cherry', Size: 'L' }),
+  ]
+  const sgs = groupBySubGroup(details, 'Size')
+  expect(sgs).toHaveLength(2)
+  const lGroup = sgs.find(sg => sg.first_dim_value === 'L')!
+  expect(lGroup.items).toHaveLength(2)
+  expect(lGroup.key).toBe('p1::L')
+  const mGroup = sgs.find(sg => sg.first_dim_value === 'M')!
+  expect(mGroup.items).toHaveLength(1)
+})
+
+it('groupBySubGroup with a groupByKey absent from variant_values collapses all variants into one sub-group per product', () => {
+  const details = [
+    makeDetail('d1', 'p1', 'Product A', 'L / Red', { Color: 'Red', Size: 'L' }),
+    makeDetail('d2', 'p1', 'Product A', 'M / Red', { Color: 'Red', Size: 'M' }),
+  ]
+  const sgs = groupBySubGroup(details, 'Weight')
+  expect(sgs).toHaveLength(1)
+  expect(sgs[0].first_dim_value).toBe('')
+  expect(sgs[0].items).toHaveLength(2)
 })

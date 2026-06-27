@@ -14,10 +14,29 @@ interface Props {
 }
 
 export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
-  const allSubGroups = useMemo(
-    () => groupBySubGroup(po.order_details ?? []),
+  const dimensionKeys = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const d of po.order_details ?? []) {
+      for (const k of Object.keys(d.variant_values ?? {})) {
+        if (!seen.has(k)) { seen.add(k); result.push(k) }
+      }
+    }
+    return result
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [po.id],
+  }, [po.id])
+
+  const initialGroupByKey = useMemo(
+    () => (dimensionKeys.length >= 2 ? dimensionKeys[1] : dimensionKeys[0] ?? null),
+    [dimensionKeys],
+  )
+
+  const [groupByKey, setGroupByKey] = useState<string | null>(initialGroupByKey)
+
+  const allSubGroups = useMemo(
+    () => groupBySubGroup(po.order_details ?? [], groupByKey),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [po.id, groupByKey],
   )
 
   const [deselectedKeys, setDeselectedKeys] = useState<Set<string>>(new Set())
@@ -57,6 +76,17 @@ export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
     return () => { cancelled = true }
   }, [open, po.id, allSubGroups])
 
+  useEffect(() => {
+    if (open) {
+      setDeselectedKeys(new Set())
+      setGroupByKey(initialGroupByKey)
+    }
+  }, [open, initialGroupByKey])
+
+  useEffect(() => {
+    setDeselectedKeys(new Set())
+  }, [groupByKey])
+
   const filteredSubGroups = useMemo(
     () => allSubGroups.filter(sg => selectedKeys.has(sg.key)),
     [allSubGroups, selectedKeys],
@@ -95,6 +125,10 @@ export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
     })
   }, [allSubGroups])
 
+  const handleGroupByChange = useCallback((key: string | null) => {
+    setGroupByKey(key)
+  }, [])
+
   return (
     <Dialog open={open} onOpenChange={o => !o && onClose()}>
       <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
@@ -104,6 +138,22 @@ export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
 
         <div className="flex-1 overflow-hidden flex">
           <aside className="w-52 shrink-0 border-r overflow-y-auto px-3 py-4">
+            <div className="mb-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                Group by
+              </p>
+              <select
+                value={groupByKey ?? ''}
+                onChange={e => handleGroupByChange(e.target.value || null)}
+                className="w-full text-xs border rounded px-2 py-1 bg-background"
+                aria-label="Group by dimension"
+              >
+                <option value="">Product only</option>
+                {dimensionKeys.map(k => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               Selection
             </p>
@@ -131,7 +181,7 @@ export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
                         {product.product_name}
                       </span>
                     </label>
-                    {productSGs.map(sg => (
+                    {groupByKey !== null && productSGs.map(sg => (
                       <label
                         key={sg.key}
                         className="flex items-center gap-1.5 pl-5 py-0.5 cursor-pointer"

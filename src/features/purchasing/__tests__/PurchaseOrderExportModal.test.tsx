@@ -90,9 +90,12 @@ const basePo: PurchaseOrder = {
       shipping_per_unit_idr: null, delivery_per_unit_idr: null,
       commission_per_unit_idr: null, cogs_per_unit_idr: null,
       product_has_dimensions: null,
+      sourcing_item_id: null,
+      is_draft: false,
+      draft_product_name: '',
     },
     {
-      id: 'd2', variant_id: 'v2', product_variant_name: 'L / White Cherry',
+      id: 'd2', variant_id: 'v2', product_variant_name: 'M / White Cherry',
       product_id: 'p1', product_name: 'Lisa Swimwear',
       product_supplier_link: null, product_photo_url: null,
       ordered_qty: 2, received_qty: null,
@@ -102,15 +105,18 @@ const basePo: PurchaseOrder = {
       discounted_total_price_foreign: null, discounted_total_price_base: null,
       remarks: '', avg_sales: null, avg_sales_7d: null,
       stock_on_hand: 0, incoming_qty: 0,
-      variant_values: { Color: 'White Cherry', Size: 'L' },
+      variant_values: { Color: 'White Cherry', Size: 'M' },
       last_unit_price_foreign: null, last_currency: null,
       last_discounted_unit_price_foreign: null,
       shipping_per_unit_idr: null, delivery_per_unit_idr: null,
       commission_per_unit_idr: null, cogs_per_unit_idr: null,
       product_has_dimensions: null,
+      sourcing_item_id: null,
+      is_draft: false,
+      draft_product_name: '',
     },
     {
-      id: 'd3', variant_id: 'v3', product_variant_name: 'L / Red',
+      id: 'd3', variant_id: 'v3', product_variant_name: 'S / Red',
       product_id: 'p2', product_name: 'Product B',
       product_supplier_link: null, product_photo_url: null,
       ordered_qty: 2, received_qty: null,
@@ -120,39 +126,42 @@ const basePo: PurchaseOrder = {
       discounted_total_price_foreign: null, discounted_total_price_base: null,
       remarks: '', avg_sales: null, avg_sales_7d: null,
       stock_on_hand: 0, incoming_qty: 0,
-      variant_values: { Color: 'Red', Size: 'L' },
+      variant_values: { Color: 'Red', Size: 'S' },
       last_unit_price_foreign: null, last_currency: null,
       last_discounted_unit_price_foreign: null,
       shipping_per_unit_idr: null, delivery_per_unit_idr: null,
       commission_per_unit_idr: null, cogs_per_unit_idr: null,
       product_has_dimensions: null,
+      sourcing_item_id: null,
+      is_draft: false,
+      draft_product_name: '',
     },
   ],
 }
 
-it('export modal sidebar shows all products and sub-groups with item counts', async () => {
+it('sidebar shows all products and sub-groups with item counts', async () => {
   render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
   expect(screen.getByText('Lisa Swimwear')).toBeInTheDocument()
   expect(screen.getByText('Product B')).toBeInTheDocument()
-  expect(screen.getByText(/Orange Clam.*\(1\)/)).toBeInTheDocument()
-  expect(screen.getByText(/White Cherry.*\(1\)/)).toBeInTheDocument()
-  expect(screen.getByText(/Red.*\(1\)/)).toBeInTheDocument()
+  expect(screen.getByText('L (1)')).toBeInTheDocument()
+  expect(screen.getByText('M (1)')).toBeInTheDocument()
+  expect(screen.getByText('S (1)')).toBeInTheDocument()
 })
 
-it('export modal renders all sub-groups selected by default', async () => {
+it('renders all sub-groups selected by default', async () => {
   render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
   const checkboxes = screen.getAllByRole('checkbox')
   expect(checkboxes).toHaveLength(5)
   checkboxes.forEach(cb => expect(cb).toBeChecked())
 })
 
-it('unchecking a sub-group checkbox reduces filteredSubGroups passed to PDF', async () => {
+it('unchecking a sub-group checkbox reduces filteredSubGroups', async () => {
   const user = userEvent.setup()
   render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
 
-  const orangeClamCheckbox = screen.getByRole('checkbox', { name: /Orange Clam/i })
-  await user.click(orangeClamCheckbox)
-  expect(orangeClamCheckbox).not.toBeChecked()
+  const lCheckbox = screen.getByRole('checkbox', { name: 'L' })
+  await user.click(lCheckbox)
+  expect(lCheckbox).not.toBeChecked()
 
   const pdfContent = await screen.findByTestId('pdf-content')
   expect(pdfContent).toHaveAttribute('data-subgroup-count', '2')
@@ -166,9 +175,9 @@ it('unchecking a product checkbox deselects all its sub-groups', async () => {
   await user.click(lisaCheckbox)
 
   expect(lisaCheckbox).not.toBeChecked()
-  expect(screen.getByRole('checkbox', { name: /Orange Clam/i })).not.toBeChecked()
-  expect(screen.getByRole('checkbox', { name: /White Cherry/i })).not.toBeChecked()
-  expect(screen.getByRole('checkbox', { name: /Red/i })).toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'L' })).not.toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'M' })).not.toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'S' })).toBeChecked()
 
   const pdfContent = await screen.findByTestId('pdf-content')
   expect(pdfContent).toHaveAttribute('data-subgroup-count', '1')
@@ -183,8 +192,8 @@ it('re-checking a product checkbox restores all its sub-groups', async () => {
   await user.click(lisaCheckbox)
 
   expect(lisaCheckbox).toBeChecked()
-  expect(screen.getByRole('checkbox', { name: /Orange Clam/i })).toBeChecked()
-  expect(screen.getByRole('checkbox', { name: /White Cherry/i })).toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'L' })).toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'M' })).toBeChecked()
 
   const pdfContent = await screen.findByTestId('pdf-content')
   expect(pdfContent).toHaveAttribute('data-subgroup-count', '3')
@@ -194,12 +203,95 @@ it('product checkbox is indeterminate when only some sub-groups are selected', a
   const user = userEvent.setup()
   render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
 
-  // Uncheck one sub-group of Lisa Swimwear (which has 2 sub-groups: Orange Clam, White Cherry)
-  const orangeClamCheckbox = screen.getByRole('checkbox', { name: /Orange Clam/i })
-  await user.click(orangeClamCheckbox)
+  // Uncheck one sub-group of Lisa Swimwear (which has 2 sub-groups: L, M)
+  const lCheckbox = screen.getByRole('checkbox', { name: 'L' })
+  await user.click(lCheckbox)
 
   const lisaCheckbox = screen.getByRole('checkbox', { name: /Lisa Swimwear/i })
   // indeterminate is a DOM property, not an attribute — check via element property
   expect((lisaCheckbox as HTMLInputElement).indeterminate).toBe(true)
   expect(lisaCheckbox).not.toBeChecked()
+})
+
+it('Group by select shows Product only and all dimension keys from PO variant values', async () => {
+  render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
+  const select = screen.getByRole('combobox', { name: /group by dimension/i })
+  expect(select).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: 'Product only' })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: 'Color' })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: 'Size' })).toBeInTheDocument()
+  // default is second key ('Size')
+  expect(select).toHaveValue('Size')
+})
+
+it('changing Group by dimension resets selection so all sub-groups are checked', async () => {
+  const user = userEvent.setup()
+  render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
+
+  // Deselect the 'L' sub-group (exact name match avoids collision with 'Lisa Swimwear')
+  const lCheckbox = screen.getByRole('checkbox', { name: 'L' })
+  await user.click(lCheckbox)
+  expect(lCheckbox).not.toBeChecked()
+
+  // Change grouping to Color
+  const select = screen.getByRole('combobox', { name: /group by dimension/i })
+  await user.selectOptions(select, 'Color')
+
+  // All checkboxes should now be checked (deselectedKeys reset)
+  const allCbs = screen.getAllByRole('checkbox')
+  allCbs.forEach(cb => expect(cb).toBeChecked())
+})
+
+it('Product only grouping hides sub-group checkboxes showing only product checkboxes', async () => {
+  const user = userEvent.setup()
+  render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
+
+  const select = screen.getByRole('combobox', { name: /group by dimension/i })
+  await user.selectOptions(select, '')  // empty string = 'Product only'
+
+  // Only 2 product-level checkboxes visible (no sub-group checkboxes)
+  const checkboxes = screen.getAllByRole('checkbox')
+  expect(checkboxes).toHaveLength(2)
+  // PDF receives 2 sub-groups (one per product)
+  const pdfContent = await screen.findByTestId('pdf-content')
+  expect(pdfContent).toHaveAttribute('data-subgroup-count', '2')
+})
+
+it('Group by select for PO with a single dimension key shows only that dimension as option', async () => {
+  const singleDimPo: PurchaseOrder = {
+    ...basePo,
+    order_details: [
+      {
+        ...basePo.order_details![0],
+        variant_values: { Size: 'L' },
+        product_variant_name: 'L',
+      },
+      {
+        ...basePo.order_details![1],
+        variant_values: { Size: 'M' },
+        product_variant_name: 'M',
+      },
+    ],
+  }
+  render(<PurchaseOrderExportModal open po={singleDimPo} onClose={() => {}} />)
+  const select = screen.getByRole('combobox', { name: /group by dimension/i })
+  expect(screen.getByRole('option', { name: 'Product only' })).toBeInTheDocument()
+  expect(screen.getByRole('option', { name: 'Size' })).toBeInTheDocument()
+  expect(screen.queryByRole('option', { name: 'Color' })).not.toBeInTheDocument()
+  // default is first (and only) key = 'Size'
+  expect(select).toHaveValue('Size')
+})
+
+it('reopening the modal resets selection and group-by key to defaults', async () => {
+  const user = userEvent.setup()
+  const { rerender } = render(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
+  // Deselect one sub-group
+  await user.click(screen.getByRole('checkbox', { name: 'L' }))
+  // Close and reopen
+  rerender(<PurchaseOrderExportModal open={false} po={basePo} onClose={() => {}} />)
+  rerender(<PurchaseOrderExportModal open po={basePo} onClose={() => {}} />)
+  // All checkboxes should be checked again
+  screen.getAllByRole('checkbox').forEach(cb => expect(cb).toBeChecked())
+  // Group-by should be back to default (Size = second key)
+  expect(screen.getByRole('combobox', { name: /group by dimension/i })).toHaveValue('Size')
 })
