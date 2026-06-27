@@ -1,5 +1,5 @@
 import client from './client'
-import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult } from '../types/purchasing'
+import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolItemsResponse, SourcingPoolPreviewRow, SourcingPoolPreviewResult, SourcingPoolImportResult } from '../types/purchasing'
 import type { PaginatedResponse } from '../types/inventory'
 
 export const getPurchaseOrders = (params?: Record<string, string | number>) =>
@@ -41,3 +41,35 @@ export const getReplenishment = (params?: { warehouse_id?: string }) =>
 
 export const getPurchaseOrderSummary = (params?: Record<string, string>) =>
   client.get<PurchaseOrderSummary>('/purchase-order/summary/', { params })
+
+export const getSourcingPoolItems = (supplierId: string, search?: string) =>
+  client.get<SourcingPoolItemsResponse>('/sourcing-pool/items/', {
+    params: {
+      supplier_id: supplierId,
+      page_size: 200,
+      ...(search ? { search } : {}),
+    },
+  })
+
+export const downloadSourcingPoolTemplate = () =>
+  client.get('/sourcing-pool/template/', { responseType: 'blob' })
+
+export const previewSourcingPoolUpload = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return client.post<SourcingPoolPreviewResult>('/sourcing-pool/preview/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export const importSourcingPoolRows = (supplierId: string, rows: SourcingPoolPreviewRow[]) =>
+  client.post<SourcingPoolImportResult>('/sourcing-pool/import/', {
+    supplier_id: supplierId,
+    rows,
+  })
+
+export const addDraftLine = (
+  poId: string,
+  data: { sourcing_item_id: string; ordered_qty: number; unit_price_foreign?: number },
+) =>
+  client.post<{ detail_id: string }>(`/purchase-order/${poId}/draft-lines/`, data)

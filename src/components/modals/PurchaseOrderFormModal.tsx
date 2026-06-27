@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Trash2, ExternalLink } from 'lucide-react'
+import { Plus, Trash2, ExternalLink, Upload } from 'lucide-react'
 import { SupplierFormModal } from './SupplierFormModal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { FormField } from '../ui/form'
@@ -12,12 +13,16 @@ import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
 import { useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
-import type { ReplenishmentItem } from '../../types/purchasing'
+import type { ReplenishmentItem, DraftPoolLine, SourcingPoolPreviewRow } from '../../types/purchasing'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
+import { SourcingPoolImportModal } from '../../features/purchasing/components/SourcingPoolImportModal'
+import { PoolBrowser } from '../../features/purchasing/components/PoolBrowser'
+import { useSourcingPoolItems, useAddDraftLine } from '../../features/purchasing/hooks/useSourcingPool'
+import { Badge } from '../ui/badge'
 import { toast } from '../../lib/toast'
 
 const itemSchema = z.object({
-  product_variant_id: z.string().min(1, 'Variant required'),
+  product_variant_id: z.string(),
   product_id: z.string().optional(),
   product_name: z.string().optional(),
   product_supplier_link: z.string().nullable().optional(),
@@ -31,8 +36,8 @@ const schema = z.object({
   supplier_id: z.string().optional(),
   warehouse_id: z.string().min(1, 'Warehouse is required'),
   currency: z.string().optional(),
-  exchange_rate: z.number().positive('Must be > 0').optional(),
-  order_details: z.array(itemSchema).min(1, 'At least one item required'),
+  exchange_rate: z.number().positive('Must be > 0').optional().nullable().catch(undefined),
+  order_details: z.array(itemSchema),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -45,11 +50,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
   const navigate = useNavigate()
   const { data: warehousesData } = useWarehouses()
   const { data: suppliersData } = useSuppliers({ active_only: 'true' })
-  const createMutation = useCreatePurchaseOrder((id) => {
-    toast.success('Purchase order created')
-    onClose()
-    navigate(`/purchasing/orders/${id}`)
-  })
+  const createMutation = useCreatePurchaseOrder()
 
   const { register, handleSubmit, reset, setValue, watch, getValues, control, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -66,6 +67,23 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
     lastCurrency: string | null
     lastDiscountedUnitPriceForeign: string | null
   }>>({})
+  const [draftLines, setDraftLines] = useState<DraftPoolLine[]>([])
+  const [newItemKeys, setNewItemKeys] = useState<Set<string>>(new Set())
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [lineError, setLineError] = useState<string | null>(null)
+
+  const addDraftLineMutation = useAddDraftLine()
+
+  const selectedSupplierId = watch('supplier_id')
+  const activeSupplierId =
+    selectedSupplierId && selectedSupplierId !== 'none' && selectedSupplierId !== ''
+      ? selectedSupplierId
+      : undefined
+
+  const { data: poolData } = useSourcingPoolItems(activeSupplierId)
+  const poolItems = poolData?.items ?? []
+  const hasPoolItems = poolItems.length > 0
+
   const { data: replenishData } = useReplenishment()
   const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
     const m = new Map<string, ReplenishmentItem>()
@@ -73,12 +91,49 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
     return m
   }, [replenishData])
 
-  const handleClose = () => { reset(); setHasDiscount(false); setVariantLabels({}); setLastPriceData({}); onClose() }
+  const handleClose = () => { reset(); setHasDiscount(false); setVariantLabels({}); setLastPriceData({}); setDraftLines([]); setNewItemKeys(new Set()); setShowImportModal(false); setLineError(null); onClose() }
+
+  const handleAddPoolLines = (newLines: DraftPoolLine[]) => {
+    const mergedNames: string[] = []
+    const updated = [...draftLines]
+    for (const line of newLines) {
+      const existingIdx = updated.findIndex((dl) => dl.sourcing_item_id === line.sourcing_item_id)
+      if (existingIdx !== -1) {
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          ordered_qty: updated[existingIdx].ordered_qty + line.ordered_qty,
+        }
+        mergedNames.push(line.variant_name)
+      } else {
+        updated.push(line)
+      }
+    }
+    setDraftLines(updated)
+    for (const name of mergedNames) {
+      toast.info(`Qty merged — "${name}" already in this order`)
+    }
+  }
+
+  useEffect(() => {
+    setNewItemKeys(new Set())
+    setDraftLines([])
+  }, [activeSupplierId])
+
+  const handleImportSuccess = (importedRows: SourcingPoolPreviewRow[]) => {
+    setNewItemKeys(new Set(importedRows.map((r) => `${r.product_name}|${r.variant_name}`)))
+  }
 
   const onSubmit = async (values: FormValues) => {
+    const nonEmptyDetails = values.order_details.filter(d => d.product_variant_id !== '')
+    if (nonEmptyDetails.length === 0 && draftLines.length === 0) {
+      setLineError('At least one item (regular variant or from sourcing pool) is required')
+      return
+    }
+    setLineError(null)
+
     const payload: Record<string, unknown> = {
       ...values,
-      order_details: values.order_details.map(({ product_variant_id, ordered_qty, unit_price_foreign, discounted_unit_price_foreign }) => {
+      order_details: nonEmptyDetails.map(({ product_variant_id, ordered_qty, unit_price_foreign, discounted_unit_price_foreign }) => {
         let finalPrice = unit_price_foreign
         let finalDiscountedPrice = discounted_unit_price_foreign
 
@@ -109,8 +164,35 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
     if (!payload.supplier_id) delete payload.supplier_id
     if (!payload.currency) delete payload.currency
     if (!payload.exchange_rate) delete payload.exchange_rate
+
     try {
-      await createMutation.mutateAsync(payload)
+      const result = await createMutation.mutateAsync(payload)
+      const poId = result.id
+
+      const failedVariants: string[] = []
+      for (const dl of draftLines) {
+        try {
+          await addDraftLineMutation.mutateAsync({
+            poId,
+            sourcing_item_id: dl.sourcing_item_id,
+            ordered_qty: dl.ordered_qty,
+            unit_price_foreign: dl.unit_price_foreign > 0 ? dl.unit_price_foreign : undefined,
+          })
+        } catch {
+          failedVariants.push(dl.variant_name)
+        }
+      }
+
+      if (failedVariants.length > 0) {
+        toast.warning(
+          `PO created, but these pool items could not be added: ${failedVariants.join(', ')}. Open the PO to retry.`,
+        )
+      } else {
+        toast.success('Purchase order created')
+      }
+
+      handleClose()
+      navigate(`/purchasing/orders/${poId}`)
     } catch {
       toast.error('Failed to create purchase order')
     }
@@ -265,13 +347,23 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                   />
                   Has Discount
                 </label>
+                {activeSupplierId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowImportModal(true)}
+                  >
+                    <Upload className="h-3 w-3 mr-1" /> Import from Excel
+                  </Button>
+                )}
                 <Button type="button" variant="outline" size="sm" onClick={() => append({ product_variant_id: '', product_id: '', product_name: '', product_supplier_link: null, product_photo_url: null, ordered_qty: 1, unit_price_foreign: 0, discounted_unit_price_foreign: undefined })}>
                   <Plus className="h-3 w-3 mr-1" /> Add Item
                 </Button>
               </div>
             </div>
-            {errors.order_details?.root && (
-              <p className="text-xs text-red-500">{errors.order_details.root.message}</p>
+            {(errors.order_details?.root || lineError) && (
+              <p className="text-xs text-red-500">{errors.order_details?.root?.message ?? lineError}</p>
             )}
             {fields.length > 0 && (
               <div className={`grid ${hasDiscount ? 'grid-cols-[1fr_80px_100px_100px_32px]' : 'grid-cols-[1fr_80px_100px_32px]'} gap-2 pl-2`}>
@@ -412,7 +504,7 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                               />
                             </FormField>
                           )}
-                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(i)} className="text-red-500 hover:text-red-600 self-end" aria-label="Remove item" data-testid="remove-item-btn">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -433,7 +525,85 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
                 </div>
               )
             })}
+            {draftLines.length > 0 && (
+              <div className="space-y-1 mt-1">
+                <p className="text-xs font-medium text-muted-foreground px-2">
+                  Sourcing Pool Lines ({draftLines.length})
+                </p>
+                {draftLines.map((dl, i) => (
+                  <div
+                    key={dl.sourcing_item_id}
+                    className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-end pl-2"
+                  >
+                    <div className="flex items-center gap-2 h-7">
+                      {dl.image_proxy_url ? (
+                        <img
+                          src={dl.image_proxy_url}
+                          alt=""
+                          className="w-5 h-5 rounded object-cover border shrink-0"
+                        />
+                      ) : (
+                        <div className="w-5 h-5 rounded bg-muted border border-dashed border-border shrink-0" />
+                      )}
+                      <span className="text-xs truncate text-foreground">
+                        {dl.product_name} — {dl.variant_name}
+                      </span>
+                      <Badge variant="info" className="text-[10px] px-1.5 py-0.5 shrink-0">Pool</Badge>
+                    </div>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={dl.ordered_qty}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value)
+                        setDraftLines((prev) =>
+                          prev.map((l, j) =>
+                            j === i ? { ...l, ordered_qty: isNaN(val) ? 1 : Math.max(1, val) } : l,
+                          ),
+                        )
+                      }}
+                    />
+                    <Input
+                      type="number"
+                      step="0.001"
+                      min={0}
+                      value={dl.unit_price_foreign}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value)
+                        setDraftLines((prev) =>
+                          prev.map((l, j) =>
+                            j === i ? { ...l, unit_price_foreign: isNaN(val) ? 0 : val } : l,
+                          ),
+                        )
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDraftLines((prev) => prev.filter((_, j) => j !== i))}
+                      className="text-red-500 hover:text-red-600 self-end"
+                      aria-label="Remove draft line"
+                      data-testid="remove-draft-btn"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
+          {activeSupplierId && hasPoolItems && (
+            <div className="border-t pt-3 space-y-2">
+              <p className="text-sm font-medium text-foreground">Sourcing Pool</p>
+              <PoolBrowser
+                supplierId={activeSupplierId}
+                newItemKeys={newItemKeys}
+                onAddLines={handleAddPoolLines}
+              />
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
@@ -450,6 +620,15 @@ export function PurchaseOrderFormModal({ open, onClose }: Props) {
             setShowNewSupplierModal(false)
           }}
         />
+        {activeSupplierId && (
+          <SourcingPoolImportModal
+            open={showImportModal}
+            onClose={() => setShowImportModal(false)}
+            supplierId={activeSupplierId}
+            supplierName={suppliers.find((s) => s.id === activeSupplierId)?.name ?? ''}
+            onImportSuccess={handleImportSuccess}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )

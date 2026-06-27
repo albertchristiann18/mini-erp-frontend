@@ -42,6 +42,9 @@ export interface PurchaseOrderDetail {
   commission_per_unit_idr: number | null
   cogs_per_unit_idr: number | null
   product_has_dimensions: boolean | null
+  sourcing_item_id: string | null
+  is_draft: boolean
+  draft_product_name: string
 }
 
 export interface PurchaseOrder {
@@ -139,4 +142,73 @@ export interface ReplenishmentItem {
   avg_sales_7d: number
   avg_sales_14d: number
   avg_sales_30d: number
+}
+
+export interface SourcingPoolItem {
+  id: string
+  product_name: string
+  variant_name: string
+  category_id: string | null
+  category_name: string | null
+  category_code: string | null
+  unit_price: string
+  discounted_price: string | null
+  qty_suggested: number | null
+  supplier_link: string | null
+  image_url: string | null
+  image_proxy_url: string | null
+  image_download_status: 'PENDING' | 'DONE' | 'FAILED'
+  notes: string | null
+  times_ordered: number
+  cdate: string
+  udate: string
+}
+
+export interface SourcingPoolItemsResponse {
+  pool_id: string | null
+  count?: number
+  next?: string | null
+  previous?: string | null
+  results?: SourcingPoolItem[]
+  items?: SourcingPoolItem[]
+}
+
+export interface SourcingPoolPreviewRow {
+  product_name: string
+  variant_name: string
+  unit_price: number | string
+  discounted_price?: number | string | null
+  qty_suggested?: number | null
+  category_code?: string
+  supplier_link?: string | null
+  image_url?: string | null
+  notes?: string | null
+  [key: string]: unknown
+}
+
+export interface SourcingPoolPreviewError {
+  row?: number
+  message?: string
+  errors?: string[]
+  [key: string]: unknown
+}
+
+export interface SourcingPoolPreviewResult {
+  valid: SourcingPoolPreviewRow[]
+  errors: SourcingPoolPreviewError[]
+}
+
+export interface SourcingPoolImportResult {
+  created: number
+  updated: number
+  pool_id: string
+}
+
+export interface DraftPoolLine {
+  sourcing_item_id: string
+  product_name: string
+  variant_name: string
+  ordered_qty: number
+  unit_price_foreign: number
+  image_proxy_url: string | null
 }
