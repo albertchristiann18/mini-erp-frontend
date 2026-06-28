@@ -163,6 +163,8 @@ export default function PurchaseOrderDetailPage() {
     })
 
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showSupplierPickModal, setShowSupplierPickModal] = useState(false)
+  const [supplierPickValue, setSupplierPickValue] = useState('')
   const [draftPoolLines, setDraftPoolLines] = useState<DraftPoolLine[]>([])
   const [newItemKeys, setNewItemKeys] = useState<Set<string>>(new Set())
   const addDraftLineMutation = useAddDraftLine()
@@ -1515,7 +1517,8 @@ export default function PurchaseOrderDetailPage() {
                 size="sm"
                 onClick={() => {
                   if (!activeSupplierId) {
-                    toast.info('Please select a supplier first')
+                    setSupplierPickValue('')
+                    setShowSupplierPickModal(true)
                     return
                   }
                   setShowImportModal(true)
@@ -1734,6 +1737,45 @@ export default function PurchaseOrderDetailPage() {
           }}
         />
       )}
+      <Dialog open={showSupplierPickModal} onOpenChange={(o) => !o && setShowSupplierPickModal(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Select Supplier</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground mb-3">
+              Choose a supplier to import items from their sourcing pool.
+            </p>
+            <Select value={supplierPickValue} onValueChange={setSupplierPickValue}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select supplier..." />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSupplierPickModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!supplierPickValue}
+              onClick={() => {
+                setHeaderField('supplier_id', supplierPickValue)
+                setShowSupplierPickModal(false)
+                setShowImportModal(true)
+              }}
+            >
+              Continue to Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
