@@ -1508,12 +1508,18 @@ export default function PurchaseOrderDetailPage() {
                 Has Discount
               </label>
             )}
-            {isCreating && activeSupplierId && (
+            {isCreating && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowImportModal(true)}
+                onClick={() => {
+                  if (!activeSupplierId) {
+                    toast.info('Please select a supplier first')
+                    return
+                  }
+                  setShowImportModal(true)
+                }}
               >
                 <Upload className="h-3 w-3 mr-1" /> Import from Excel
               </Button>
