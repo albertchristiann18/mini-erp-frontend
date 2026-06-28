@@ -5,6 +5,7 @@ import {
   previewSourcingPoolUpload,
   importSourcingPoolRows,
   addDraftLine,
+  finalizeDraftLine,
 } from '../../../api/purchasing'
 import type { SourcingPoolItem, SourcingPoolPreviewRow } from '../../../types/purchasing'
 
@@ -72,3 +73,28 @@ export const useAddDraftLine = () =>
     }) =>
       addDraftLine(poId, { sourcing_item_id, ordered_qty, unit_price_foreign }).then((r) => r.data),
   })
+
+export const useFinalizeDraftLine = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      poId,
+      detailId,
+      sku_suffix,
+      category_id,
+      product_name,
+    }: {
+      poId: string
+      detailId: string
+      sku_suffix: string
+      category_id?: string | null
+      product_name?: string
+    }) =>
+      finalizeDraftLine(poId, detailId, { sku_suffix, category_id, product_name }).then(
+        (r) => r.data,
+      ),
+    onSuccess: (_data, variables) => {
+      void qc.invalidateQueries({ queryKey: ['purchase-order', variables.poId] })
+    },
+  })
+}

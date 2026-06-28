@@ -7,12 +7,13 @@ import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSele
 import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
+import { FinalizeDraftLineModal } from '../../features/purchasing/components/FinalizeDraftLineModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon, ImagePlus } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon, ImagePlus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
@@ -146,6 +147,7 @@ export default function PurchaseOrderDetailPage() {
     (headerValues.supplier_id ? String(headerValues.supplier_id) : undefined) ??
     undefined
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
+  const [finalizingDetail, setFinalizingDetail] = useState<PurchaseOrderDetail | null>(null)
 
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
@@ -473,10 +475,13 @@ export default function PurchaseOrderDetailPage() {
     ? Math.round((po!.commission_fee ?? 0) / po!.total_ordered_qty)
     : 0)
 
+  const draftLines = isCreating ? [] : (po?.order_details ?? []).filter((d) => d.is_draft)
+  const hasDraftLines = draftLines.length > 0
+
   const orderItemsContent = (() => {
     const visibleDetails = isCreating
       ? []
-      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
+      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id) && !item.is_draft)
 
     type DisplayGroup = {
       groupKey: string
@@ -927,9 +932,26 @@ export default function PurchaseOrderDetailPage() {
                 </Button>
               )}
               {user?.is_staff && po!.next_status && (
-                <Button size="sm" onClick={() => setShowAdvanceModal(true)}>
-                  → {po!.next_status}
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAdvanceModal(true)}
+                    disabled={po!.next_status === 'DELIVERED' && hasDraftLines}
+                    title={
+                      po!.next_status === 'DELIVERED' && hasDraftLines
+                        ? 'Finalize all draft lines before advancing to DELIVERED'
+                        : undefined
+                    }
+                  >
+                    → {po!.next_status}
+                  </Button>
+                  {po!.next_status === 'DELIVERED' && hasDraftLines && (
+                    <p className="text-xs text-amber-600">
+                      <AlertTriangle className="inline h-3 w-3 mr-0.5" />
+                      Finalize {draftLines.length} draft {draftLines.length === 1 ? 'line' : 'lines'} to advance
+                    </p>
+                  )}
+                </div>
               )}
             </>
           )}
@@ -1483,6 +1505,80 @@ export default function PurchaseOrderDetailPage() {
           </table>
         </div>
       </div>
+
+      {!isCreating && draftLines.length > 0 && (
+        <div className="rounded-lg border bg-card">
+          <div className="px-6 py-4 border-b flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold">
+                Draft Lines ({draftLines.length})
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Finalize each line to create a Product + Variant before advancing to DELIVERED.
+              </p>
+            </div>
+            {po!.next_status === 'DELIVERED' && (
+              <div className="flex items-center gap-1.5 text-amber-600 text-xs font-medium shrink-0 mt-0.5">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Required before DELIVERED
+              </div>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/30 text-muted-foreground">
+                  <th className="w-10 px-3 py-2" />
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Product</th>
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Variant</th>
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Qty</th>
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Unit Price</th>
+                  <th className="px-3 py-2 w-24" />
+                </tr>
+              </thead>
+              <tbody>
+                {draftLines.map((item) => (
+                  <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
+                    <td className="px-3 py-2">
+                      {item.product_photo_url ? (
+                        <img
+                          src={item.product_photo_url}
+                          alt=""
+                          className="h-8 w-8 rounded object-cover border border-border"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded bg-muted" />
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-medium whitespace-nowrap">
+                      {item.draft_product_name || item.product_name}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                      {item.product_variant_name || '—'}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">{item.ordered_qty}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {item.unit_price_foreign != null
+                        ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(item.unit_price_foreign)}`
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFinalizingDetail(item)}
+                      >
+                        Finalize
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {!isCreating && po?.next_status && (
         <StatusAdvanceModal
           open={showAdvanceModal}
@@ -1523,6 +1619,14 @@ export default function PurchaseOrderDetailPage() {
           setShowNewSupplierModal(false)
         }}
       />
+      {finalizingDetail && (
+        <FinalizeDraftLineModal
+          open
+          onClose={() => setFinalizingDetail(null)}
+          poId={po!.id}
+          detail={finalizingDetail}
+        />
+      )}
     </div>
   )
 }

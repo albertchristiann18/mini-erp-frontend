@@ -73,3 +73,13 @@ export const addDraftLine = (
   data: { sourcing_item_id: string; ordered_qty: number; unit_price_foreign?: number },
 ) =>
   client.post<{ detail_id: string }>(`/purchase-order/${poId}/draft-lines/`, data)
+
+export const finalizeDraftLine = (
+  poId: string,
+  detailId: string,
+  data: { sku_suffix: string; category_id?: string | null; product_name?: string },
+) =>
+  client.post<{ detail_id: string; variant_id: string }>(
+    `/purchase-order/${poId}/details/${detailId}/finalize/`,
+    data,
+  )
