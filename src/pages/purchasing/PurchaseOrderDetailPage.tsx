@@ -8,12 +8,16 @@ import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrde
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
 import { FinalizeDraftLineModal } from '../../features/purchasing/components/FinalizeDraftLineModal'
+import { SourcingPoolImportModal } from '../../features/purchasing/components/SourcingPoolImportModal'
+import { PoolBrowser } from '../../features/purchasing/components/PoolBrowser'
+import { useAddDraftLine } from '../../features/purchasing/hooks/useSourcingPool'
+import type { DraftPoolLine } from '../../types/purchasing'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, AlertTriangle, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon, ImagePlus } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, Upload, X as XIcon, ImagePlus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
@@ -113,10 +117,7 @@ export default function PurchaseOrderDetailPage() {
   const isCreating = id === 'new'
   const { data: po, isLoading } = usePurchaseOrder(isCreating ? '' : id!)
   const { user } = useAuth()
-  const createMutation = useCreatePurchaseOrder((newId: string) => {
-    toast.success('Purchase order created')
-    navigate(`/purchasing/orders/${newId}`)
-  })
+  const createMutation = useCreatePurchaseOrder()
   const { data: warehouseData } = useWarehouses()
   const warehouses = warehouseData?.results ?? []
   const { data: suppliersData } = useSuppliers({ active_only: 'true' })
@@ -160,6 +161,11 @@ export default function PurchaseOrderDetailPage() {
       else next.add(key)
       return next
     })
+
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [draftPoolLines, setDraftPoolLines] = useState<DraftPoolLine[]>([])
+  const [newItemKeys, setNewItemKeys] = useState<Set<string>>(new Set())
+  const addDraftLineMutation = useAddDraftLine()
 
   const handleVariantPhotoUpload = async (variantId: string, productId: string, file: File) => {
     setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: true }))
@@ -212,7 +218,12 @@ export default function PurchaseOrderDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
 
-
+  useEffect(() => {
+    if (isCreating) {
+      setNewItemKeys(new Set())
+      setDraftPoolLines([])
+    }
+  }, [activeSupplierId, isCreating])
 
   if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -336,7 +347,7 @@ export default function PurchaseOrderDetailPage() {
     const errors: string[] = []
     if (!headerValues.warehouse_id) errors.push('Warehouse is required')
     const validItems = newItems.filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign !== '')
-    if (validItems.length === 0) errors.push('At least one order item with variant, quantity, and price is required')
+    if (validItems.length === 0 && draftPoolLines.length === 0) errors.push('At least one order item or sourcing pool selection is required')
     if (errors.length > 0) {
       setValidationErrors(errors)
       return
@@ -359,7 +370,22 @@ export default function PurchaseOrderDetailPage() {
         : {}),
     }))
     try {
-      await createMutation.mutateAsync(payload)
+      const result = await createMutation.mutateAsync(payload)
+      const newId = result.id
+      for (const dl of draftPoolLines) {
+        try {
+          await addDraftLineMutation.mutateAsync({
+            poId: newId,
+            sourcing_item_id: dl.sourcing_item_id,
+            ordered_qty: dl.ordered_qty,
+            unit_price_foreign: dl.unit_price_foreign,
+          })
+        } catch {
+          toast.error(`Failed to add draft line: ${dl.variant_name}`)
+        }
+      }
+      toast.success('Purchase order created')
+      navigate(`/purchasing/orders/${newId}`)
     } catch (err: unknown) {
       const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
       if (data && typeof data === 'object') {
@@ -375,6 +401,24 @@ export default function PurchaseOrderDetailPage() {
         }
       }
       toast.error('Failed to create purchase order')
+    }
+  }
+
+  const handleAddPoolLines = (newLines: DraftPoolLine[]) => {
+    const mergedNames: string[] = []
+    const updated = [...draftPoolLines]
+    for (const line of newLines) {
+      const existingIdx = updated.findIndex((dl) => dl.sourcing_item_id === line.sourcing_item_id)
+      if (existingIdx !== -1) {
+        updated[existingIdx] = { ...updated[existingIdx], ordered_qty: updated[existingIdx].ordered_qty + line.ordered_qty }
+        mergedNames.push(line.variant_name)
+      } else {
+        updated.push(line)
+      }
+    }
+    setDraftPoolLines(updated)
+    for (const name of mergedNames) {
+      toast.info(`Qty merged — "${name}" already in this order`)
     }
   }
 
@@ -1464,6 +1508,16 @@ export default function PurchaseOrderDetailPage() {
                 Has Discount
               </label>
             )}
+            {isCreating && activeSupplierId && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowImportModal(true)}
+              >
+                <Upload className="h-3 w-3 mr-1" /> Import from Excel
+              </Button>
+            )}
             {editMode && canAddDeleteItems && (
               <Button
                 type="button"
@@ -1504,7 +1558,43 @@ export default function PurchaseOrderDetailPage() {
             {orderItemsContent}
           </table>
         </div>
+      {isCreating && draftPoolLines.length > 0 && (
+        <div className="mt-2 space-y-1 px-6 pb-4">
+          <p className="text-xs font-medium text-muted-foreground px-1">Sourcing Pool Lines</p>
+          {draftPoolLines.map((dl, i) => (
+            <div key={dl.sourcing_item_id} className="grid grid-cols-[24px_1fr_80px_90px_28px] gap-2 items-center px-1">
+              {dl.image_proxy_url ? (
+                <img src={dl.image_proxy_url} alt="" className="w-6 h-6 rounded object-cover border border-border" />
+              ) : (
+                <div className="w-6 h-6 rounded bg-muted" />
+              )}
+              <span className="text-xs truncate">
+                {dl.product_name} — {dl.variant_name}
+                <Badge variant="info" className="ml-1.5 text-[10px] px-1 py-0">Pool</Badge>
+              </span>
+              <span className="text-xs text-center">{dl.ordered_qty}</span>
+              <span className="text-xs text-right">{dl.unit_price_foreign}</span>
+              <button
+                type="button"
+                aria-label="Remove draft line"
+                className="h-5 w-5 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                onClick={() => setDraftPoolLines(prev => prev.filter((_, idx) => idx !== i))}
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       </div>
+
+      {isCreating && activeSupplierId && (
+        <PoolBrowser
+          supplierId={activeSupplierId}
+          newItemKeys={newItemKeys}
+          onAddLines={handleAddPoolLines}
+        />
+      )}
 
       {!isCreating && draftLines.length > 0 && (
         <div className="rounded-lg border bg-card">
@@ -1625,6 +1715,17 @@ export default function PurchaseOrderDetailPage() {
           onClose={() => setFinalizingDetail(null)}
           poId={po!.id}
           detail={finalizingDetail}
+        />
+      )}
+      {isCreating && (
+        <SourcingPoolImportModal
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          supplierId={activeSupplierId ?? ''}
+          supplierName={suppliers.find(s => s.id === activeSupplierId)?.name ?? ''}
+          onImportSuccess={(importedRows) => {
+            setNewItemKeys(new Set(importedRows.map((r) => `${r.product_name}|${r.variant_name}`)))
+          }}
         />
       )}
     </div>
