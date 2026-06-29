@@ -8,7 +8,7 @@ interface PoolProductGroupProps {
   group: PoolGroup
   defaultExpanded: boolean
   newItemKeys: Set<string>
-  onSelectionChange: (groupName: string, selections: PoolLineSelection[]) => void
+  onSelectionChange: (groupKey: string, selections: PoolLineSelection[]) => void
 }
 
 export function PoolProductGroup({ group, defaultExpanded, newItemKeys, onSelectionChange }: PoolProductGroupProps) {
@@ -37,7 +37,7 @@ export function PoolProductGroup({ group, defaultExpanded, newItemKeys, onSelect
         image_proxy_url: item.image_proxy_url,
         variant_id: item.variant_id,
       }))
-    onSelectionChange(group.product_name, selections)
+    onSelectionChange(group.group_key, selections)
   }
 
   const newCount = group.items.filter((item) =>
@@ -65,7 +65,18 @@ export function PoolProductGroup({ group, defaultExpanded, newItemKeys, onSelect
           ) : (
             <div className="w-8 h-8 rounded bg-muted border border-dashed border-border shrink-0" />
           )}
-          <span className="text-sm font-bold text-foreground flex-1 truncate">{group.product_name}</span>
+          <span className="text-sm font-bold text-foreground flex-1 truncate min-w-0">
+            {group.is_unnamed
+              ? (group.supplier_link
+                  ? group.supplier_link.replace(/^https?:\/\//, '').slice(0, 60)
+                  : '(Unnamed)')
+              : group.product_name}
+          </span>
+          {group.is_unnamed && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 shrink-0 ml-1">
+              Unnamed
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground shrink-0">{group.items.length} variants</span>
           {newCount > 0 && (
             <Badge variant="success" className="text-[10px] px-1.5 py-0.5 shrink-0">{newCount} New</Badge>

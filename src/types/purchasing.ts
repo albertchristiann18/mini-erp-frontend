@@ -146,7 +146,8 @@ export interface ReplenishmentItem {
 
 export interface SourcingPoolItem {
   id: string
-  product_name: string
+  product_name: string | null
+  product_name_derived?: boolean
   variant_name: string
   category_id: string | null
   category_name: string | null
@@ -176,7 +177,7 @@ export interface SourcingPoolItemsResponse {
 }
 
 export interface SourcingPoolPreviewRow {
-  product_name: string
+  product_name?: string | null
   variant_name: string
   unit_price: number | string
   discounted_price?: number | string | null
@@ -208,7 +209,7 @@ export interface SourcingPoolImportResult {
 
 export interface DraftPoolLine {
   sourcing_item_id: string
-  product_name: string
+  product_name: string | null
   variant_name: string
   ordered_qty: number
   unit_price_foreign: number

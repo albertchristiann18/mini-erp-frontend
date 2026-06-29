@@ -83,14 +83,30 @@ export const useFinalizeDraftLine = () => {
       sku_suffix,
       category_id,
       product_name,
+      dim1_key,
+      dim1_value,
+      dim2_key,
+      dim2_value,
     }: {
       poId: string
       detailId: string
       sku_suffix: string
       category_id?: string | null
       product_name?: string
+      dim1_key?: string
+      dim1_value?: string
+      dim2_key?: string
+      dim2_value?: string
     }) =>
-      finalizeDraftLine(poId, detailId, { sku_suffix, category_id, product_name }).then(
+      finalizeDraftLine(poId, detailId, {
+        sku_suffix,
+        category_id,
+        product_name,
+        dim1_key,
+        dim1_value,
+        dim2_key,
+        dim2_value,
+      }).then(
         (r) => r.data,
       ),
     onSuccess: (_data, variables) => {

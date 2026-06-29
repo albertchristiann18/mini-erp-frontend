@@ -210,3 +210,43 @@ it('form_resets_when_reopened_with_different_detail', async () => {
   expect(screen.getByLabelText(/sku suffix/i)).toHaveValue('')
   expect(screen.getByLabelText(/product name/i)).toHaveValue('Widget B Blue')
 })
+
+it('unnamed_modal_shows_empty_product_name_and_requires_it', async () => {
+  const user = userEvent.setup()
+  const unnamedDetail: PurchaseOrderDetail = {
+    ...mockDetail,
+    id: 'd-unnamed',
+    draft_product_name: '(Unnamed) / Red',
+  }
+  renderModal({ detail: unnamedDetail })
+  expect(screen.getByLabelText(/product name/i)).toHaveValue('')
+  expect(screen.getByText(/Product Name/i)).toBeInTheDocument()
+  await user.type(screen.getByLabelText(/sku suffix/i), 'X')
+  await user.click(screen.getByRole('button', { name: /finalize/i }))
+  expect(screen.getByRole('alert')).toHaveTextContent('Product name is required')
+  expect(mockedUseFinalizeDraftLine().mutateAsync).not.toHaveBeenCalled()
+})
+
+it('dim_inputs_rendered_and_passed_to_mutate', async () => {
+  const user = userEvent.setup()
+  renderModal()
+  await user.type(screen.getByLabelText(/sku suffix/i), 'X')
+  await user.type(screen.getByPlaceholderText('e.g. Warna'), 'Warna')
+  await user.type(screen.getByPlaceholderText('e.g. Putih'), 'Putih')
+  await user.type(screen.getByPlaceholderText('e.g. Ukuran'), 'Ukuran')
+  await user.type(screen.getByPlaceholderText('e.g. M'), 'M')
+  await user.click(screen.getByRole('combobox'))
+  const option = await screen.findByText(/Electronics/)
+  await user.click(option)
+  await user.click(screen.getByRole('button', { name: /finalize/i }))
+  await waitFor(() => {
+    expect(mockedUseFinalizeDraftLine().mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dim1_key: 'Warna',
+        dim1_value: 'Putih',
+        dim2_key: 'Ukuran',
+        dim2_value: 'M',
+      }),
+    )
+  })
+})

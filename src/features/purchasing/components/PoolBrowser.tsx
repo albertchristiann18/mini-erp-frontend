@@ -18,15 +18,18 @@ export function PoolBrowser({ supplierId, newItemKeys, onAddLines }: PoolBrowser
   const groups = useMemo<PoolGroup[]>(() => {
     const map = new Map<string, PoolGroup>()
     for (const item of items) {
-      if (!map.has(item.product_name)) {
-        map.set(item.product_name, {
+      const groupKey = item.product_name ?? item.supplier_link ?? item.id
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
           product_name: item.product_name,
+          group_key: groupKey,
+          is_unnamed: !item.product_name,
           supplier_link: item.supplier_link,
           image_proxy_url: item.image_proxy_url,
           items: [],
         })
       }
-      const group = map.get(item.product_name)!
+      const group = map.get(groupKey)!
       if (!group.image_proxy_url && item.image_proxy_url) {
         group.image_proxy_url = item.image_proxy_url
       }
@@ -38,8 +41,8 @@ export function PoolBrowser({ supplierId, newItemKeys, onAddLines }: PoolBrowser
   const [groupSelections, setGroupSelections] = useState<Record<string, PoolLineSelection[]>>({})
   const [selectionResetKey, setSelectionResetKey] = useState(0)
 
-  const handleGroupSelectionChange = (groupName: string, selections: PoolLineSelection[]) => {
-    setGroupSelections((prev) => ({ ...prev, [groupName]: selections }))
+  const handleGroupSelectionChange = (groupKey: string, selections: PoolLineSelection[]) => {
+    setGroupSelections((prev) => ({ ...prev, [groupKey]: selections }))
   }
 
   const allSelected: PoolLineSelection[] = Object.values(groupSelections).flat()
@@ -79,7 +82,7 @@ export function PoolBrowser({ supplierId, newItemKeys, onAddLines }: PoolBrowser
       <div className="max-h-[320px] overflow-y-auto space-y-2">
         {groups.map((group, idx) => (
           <PoolProductGroup
-            key={`${group.product_name}-${selectionResetKey}`}
+            key={`${group.group_key}-${selectionResetKey}`}
             group={group}
             defaultExpanded={idx < 3}
             newItemKeys={newItemKeys}

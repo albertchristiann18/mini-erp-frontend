@@ -13,7 +13,7 @@ vi.mock('../hooks/useSourcingPool', () => ({
 
 const mockedUseSourcingPoolItems = vi.mocked(useSourcingPoolModule.useSourcingPoolItems)
 
-function makeItem(id: string, productName: string, variantName: string, overrides: Partial<SourcingPoolItem> = {}): SourcingPoolItem {
+function makeItem(id: string, productName: string | null, variantName: string, overrides: Partial<SourcingPoolItem> = {}): SourcingPoolItem {
   return {
     id,
     product_name: productName,
@@ -272,4 +272,44 @@ it('add_to_po_includes_null_variant_id_for_unmapped_item', async () => {
   expect(onAddLines).toHaveBeenCalledWith([
     expect.objectContaining({ variant_id: null }),
   ])
+})
+
+it('null_product_name_items_group_by_supplier_link', () => {
+  mockedUseSourcingPoolItems.mockReturnValue({
+    data: {
+      pool_id: 'p1',
+      items: [
+        makeItem('i1', 'Widget', 'Red'),
+        makeItem('i2', 'Widget', 'Blue'),
+        makeItem('i3', 'Gadget', 'Small'),
+        makeItem('u1', null, 'VarA', { supplier_link: 'https://taobao.com/item/1' }),
+        makeItem('u2', null, 'VarB', { supplier_link: 'https://taobao.com/item/1' }),
+      ],
+    },
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof mockedUseSourcingPoolItems>)
+  renderBrowser()
+  expect(screen.getByText('Widget')).toBeInTheDocument()
+  expect(screen.getByText('Gadget')).toBeInTheDocument()
+  expect(screen.getByText('taobao.com/item/1')).toBeInTheDocument()
+  const variantCounts = screen.getAllByText(/^\d+ variants$/)
+  expect(variantCounts).toHaveLength(3)
+})
+
+it('unnamed_group_shows_unnamed_badge_and_truncated_url', () => {
+  mockedUseSourcingPoolItems.mockReturnValue({
+    data: {
+      pool_id: 'p1',
+      items: [
+        makeItem('u1', null, 'VarA', { supplier_link: 'https://taobao.com/item/123456789' }),
+      ],
+    },
+    isLoading: false,
+    isError: false,
+  } as ReturnType<typeof mockedUseSourcingPoolItems>)
+  renderBrowser()
+  expect(screen.getByText('Unnamed')).toBeInTheDocument()
+  expect(screen.getByText('taobao.com/item/123456789')).toBeInTheDocument()
+  expect(screen.queryByText('https://taobao.com/item/123456789')).not.toBeInTheDocument()
 })

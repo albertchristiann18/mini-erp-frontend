@@ -9,6 +9,23 @@ import { useFinalizeDraftLine } from '../hooks/useSourcingPool'
 import { toast } from '../../../lib/toast'
 import type { PurchaseOrderDetail } from '../../../types/purchasing'
 
+interface DimInputProps {
+  id: string
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+}
+
+function DimInput({ id, label, value, onChange, placeholder }: DimInputProps) {
+  return (
+    <div>
+      <label htmlFor={id} className="text-xs text-muted-foreground mb-1 block">{label}</label>
+      <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="text-sm" />
+    </div>
+  )
+}
+
 interface FinalizeDraftLineModalProps {
   open: boolean
   onClose: () => void
@@ -22,13 +39,23 @@ export function FinalizeDraftLineModal({ open, onClose, poId, detail }: Finalize
   const [skuSuffix, setSkuSuffix] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [fieldError, setFieldError] = useState('')
+  const [dim1Key, setDim1Key] = useState('')
+  const [dim1Value, setDim1Value] = useState('')
+  const [dim2Key, setDim2Key] = useState('')
+  const [dim2Value, setDim2Value] = useState('')
+
+  const isUnnamed = detail.draft_product_name.startsWith('(Unnamed)')
 
   useEffect(() => {
     if (open) {
-      setProductName(detail.draft_product_name)
+      setProductName(isUnnamed ? '' : detail.draft_product_name)
       setSkuSuffix('')
       setCategoryId('')
       setFieldError('')
+      setDim1Key('')
+      setDim1Value('')
+      setDim2Key('')
+      setDim2Value('')
     }
   }, [open, detail.id])
 
@@ -36,6 +63,10 @@ export function FinalizeDraftLineModal({ open, onClose, poId, detail }: Finalize
   const categories = categoriesData?.results ?? []
 
   const handleSubmit = async () => {
+    if (isUnnamed && !productName.trim()) {
+      setFieldError('Product name is required')
+      return
+    }
     if (!skuSuffix.trim()) {
       setFieldError('SKU suffix is required')
       return
@@ -48,6 +79,10 @@ export function FinalizeDraftLineModal({ open, onClose, poId, detail }: Finalize
         sku_suffix: skuSuffix.trim(),
         category_id: categoryId || null,
         product_name: productName.trim() || undefined,
+        dim1_key: dim1Key.trim() || undefined,
+        dim1_value: dim1Value.trim() || undefined,
+        dim2_key: dim2Key.trim() || undefined,
+        dim2_value: dim2Value.trim() || undefined,
       })
       toast.success(`Finalized: ${productName || detail.draft_product_name}`)
       onClose()
@@ -92,7 +127,7 @@ export function FinalizeDraftLineModal({ open, onClose, poId, detail }: Finalize
           {/* Product Name */}
           <div>
             <label htmlFor="finalize-product-name" className="text-xs text-muted-foreground mb-1 block">
-              Product Name
+              Product Name{isUnnamed && <span className="text-red-500"> *</span>}
             </label>
             <Input
               id="finalize-product-name"
@@ -142,6 +177,17 @@ export function FinalizeDraftLineModal({ open, onClose, poId, detail }: Finalize
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Variasi (optional) */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Dimensi Variasi (opsional)</p>
+            <div className="grid grid-cols-2 gap-2">
+              <DimInput id="finalize-dim1-key" label="Variasi 1 — Nama" value={dim1Key} onChange={setDim1Key} placeholder="e.g. Warna" />
+              <DimInput id="finalize-dim1-value" label="Variasi 1 — Nilai" value={dim1Value} onChange={setDim1Value} placeholder="e.g. Putih" />
+              <DimInput id="finalize-dim2-key" label="Variasi 2 — Nama" value={dim2Key} onChange={setDim2Key} placeholder="e.g. Ukuran" />
+              <DimInput id="finalize-dim2-value" label="Variasi 2 — Nilai" value={dim2Value} onChange={setDim2Value} placeholder="e.g. M" />
+            </div>
           </div>
 
           {fieldError && (
