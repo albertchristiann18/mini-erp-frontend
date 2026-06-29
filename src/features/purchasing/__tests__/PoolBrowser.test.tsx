@@ -32,6 +32,8 @@ function makeItem(id: string, productName: string, variantName: string, override
     times_ordered: 0,
     cdate: '',
     udate: '',
+    variant_id: null,
+    variant_code: null,
     ...overrides,
   }
 }
@@ -224,4 +226,50 @@ it('after Add to PO, selection count resets to 0', async () => {
   await userEvent.click(screen.getByRole('checkbox'))
   await userEvent.click(screen.getByText(/^Add/))
   expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+})
+
+it('mapped_item_shows_mapped_badge', () => {
+  mockedUseSourcingPoolItems.mockReturnValue({
+    data: { pool_id: 'p1', items: [makeItem('i1', 'Widget', 'Red', { variant_id: 'v1', variant_code: 'W-RED' })] },
+    isLoading: false, isError: false,
+  } as ReturnType<typeof mockedUseSourcingPoolItems>)
+  renderBrowser()
+  expect(screen.getByText('Mapped')).toBeInTheDocument()
+})
+
+it('unmapped_item_does_not_show_mapped_badge', () => {
+  mockedUseSourcingPoolItems.mockReturnValue({
+    data: { pool_id: 'p1', items: [makeItem('i1', 'Widget', 'Red', { variant_id: null })] },
+    isLoading: false, isError: false,
+  } as ReturnType<typeof mockedUseSourcingPoolItems>)
+  renderBrowser()
+  expect(screen.queryByText('Mapped')).not.toBeInTheDocument()
+})
+
+it('add_to_po_includes_variant_id_for_mapped_item', async () => {
+  const onAddLines = vi.fn()
+  mockedUseSourcingPoolItems.mockReturnValue({
+    data: { pool_id: 'p1', items: [makeItem('i1', 'Widget', 'Red', { variant_id: 'v1', variant_code: 'W-RED' })] },
+    isLoading: false, isError: false,
+  } as ReturnType<typeof mockedUseSourcingPoolItems>)
+  renderBrowser({ onAddLines })
+  await userEvent.click(screen.getByRole('checkbox'))
+  await userEvent.click(screen.getByText(/^Add/))
+  expect(onAddLines).toHaveBeenCalledWith([
+    expect.objectContaining({ variant_id: 'v1', sourcing_item_id: 'i1' }),
+  ])
+})
+
+it('add_to_po_includes_null_variant_id_for_unmapped_item', async () => {
+  const onAddLines = vi.fn()
+  mockedUseSourcingPoolItems.mockReturnValue({
+    data: { pool_id: 'p1', items: [makeItem('i1', 'Widget', 'Red', { variant_id: null })] },
+    isLoading: false, isError: false,
+  } as ReturnType<typeof mockedUseSourcingPoolItems>)
+  renderBrowser({ onAddLines })
+  await userEvent.click(screen.getByRole('checkbox'))
+  await userEvent.click(screen.getByText(/^Add/))
+  expect(onAddLines).toHaveBeenCalledWith([
+    expect.objectContaining({ variant_id: null }),
+  ])
 })

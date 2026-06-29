@@ -363,18 +363,27 @@ export default function PurchaseOrderDetailPage() {
       const val = headerValues[field]
       if (val != null && val !== '') payload[field] = numericFields.includes(field) ? Number(val) : val
     }
-    payload.order_details = validItems.map(n => ({
-      product_variant_id: n.product_variant_id,
-      ordered_qty: Number(n.ordered_qty),
-      unit_price_foreign: Number(n.unit_price_foreign),
-      ...(hasDiscount && n.discounted_unit_price_foreign
-        ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
-        : {}),
-    }))
+    const mappedPoolLines = draftPoolLines.filter((dl) => dl.variant_id != null)
+    const unmappedPoolLines = draftPoolLines.filter((dl) => dl.variant_id == null)
+    payload.order_details = [
+      ...validItems.map(n => ({
+        product_variant_id: n.product_variant_id,
+        ordered_qty: Number(n.ordered_qty),
+        unit_price_foreign: Number(n.unit_price_foreign),
+        ...(hasDiscount && n.discounted_unit_price_foreign
+          ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
+          : {}),
+      })),
+      ...mappedPoolLines.map((dl) => ({
+        product_variant_id: dl.variant_id!,
+        ordered_qty: dl.ordered_qty,
+        unit_price_foreign: dl.unit_price_foreign,
+      })),
+    ]
     try {
       const result = await createMutation.mutateAsync(payload)
       const newId = result.id
-      for (const dl of draftPoolLines) {
+      for (const dl of unmappedPoolLines) {
         try {
           await addDraftLineMutation.mutateAsync({
             poId: newId,
@@ -1020,7 +1029,7 @@ export default function PurchaseOrderDetailPage() {
                     value={String(headerValues.warehouse_id ?? '')}
                     onValueChange={val => setHeaderField('warehouse_id', val)}
                   >
-                    <SelectTrigger className="h-7 text-xs">
+                    <SelectTrigger className="h-7 text-xs" data-testid="warehouse-select-trigger">
                       <SelectValue placeholder="Select warehouse..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -1040,7 +1049,7 @@ export default function PurchaseOrderDetailPage() {
                     value={String(headerValues.supplier_id ?? po?.supplier_id ?? '')}
                     onValueChange={val => setHeaderField('supplier_id', val === 'none' ? '' : val)}
                   >
-                    <SelectTrigger className="h-7 text-xs">
+                    <SelectTrigger className="h-7 text-xs" data-testid="supplier-select-trigger">
                       <SelectValue placeholder="No supplier" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1579,7 +1588,11 @@ export default function PurchaseOrderDetailPage() {
               )}
               <span className="text-xs truncate">
                 {dl.product_name} — {dl.variant_name}
-                <Badge variant="info" className="ml-1.5 text-[10px] px-1 py-0">Pool</Badge>
+                {dl.variant_id != null ? (
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">Mapped</Badge>
+                ) : (
+                  <Badge variant="info" className="ml-1.5 text-[10px] px-1 py-0">Pool</Badge>
+                )}
               </span>
               <span className="text-xs text-center">{dl.ordered_qty}</span>
               <span className="text-xs text-right">{dl.unit_price_foreign}</span>

@@ -53,6 +53,7 @@ export function PoolBrowser({ supplierId, newItemKeys, onAddLines }: PoolBrowser
         ordered_qty: s.ordered_qty,
         unit_price_foreign: s.unit_price_foreign,
         image_proxy_url: s.image_proxy_url,
+        variant_id: s.variant_id,
       })),
     )
     setGroupSelections({})

@@ -162,6 +162,8 @@ export interface SourcingPoolItem {
   times_ordered: number
   cdate: string
   udate: string
+  variant_id: string | null
+  variant_code: string | null
 }
 
 export interface SourcingPoolItemsResponse {
@@ -211,4 +213,5 @@ export interface DraftPoolLine {
   ordered_qty: number
   unit_price_foreign: number
   image_proxy_url: string | null
+  variant_id: string | null
 }

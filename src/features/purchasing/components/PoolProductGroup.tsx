@@ -35,11 +35,10 @@ export function PoolProductGroup({ group, defaultExpanded, newItemKeys, onSelect
         ordered_qty: nextQtys[item.id] ?? item.qty_suggested ?? 1,
         unit_price_foreign: nextPrices[item.id] ?? parseFloat(item.unit_price) ?? 0,
         image_proxy_url: item.image_proxy_url,
+        variant_id: item.variant_id,
       }))
     onSelectionChange(group.product_name, selections)
   }
-
-
 
   const newCount = group.items.filter((item) =>
     newItemKeys.has(`${item.product_name}|${item.variant_name}`)
@@ -105,6 +104,9 @@ export function PoolProductGroup({ group, defaultExpanded, newItemKeys, onSelect
                   <span className="text-xs truncate">{item.variant_name}</span>
                   {isNew && (
                     <Badge variant="success" className="text-[10px] px-1 py-0.5 shrink-0">New</Badge>
+                  )}
+                  {item.variant_id != null && (
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0.5 shrink-0">Mapped</Badge>
                   )}
                 </label>
                 <Input

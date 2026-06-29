@@ -14,4 +14,5 @@ export interface PoolLineSelection {
   ordered_qty: number
   unit_price_foreign: number
   image_proxy_url: string | null
+  variant_id: string | null
 }

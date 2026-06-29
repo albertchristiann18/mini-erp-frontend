@@ -70,9 +70,30 @@ vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }))
 
+let mockPoolBrowserLines: import('../../../types/purchasing').DraftPoolLine[] = []
+
+vi.mock('../../../features/purchasing/components/PoolBrowser', () => ({
+  PoolBrowser: ({ onAddLines }: { supplierId: string; newItemKeys: Set<string>; onAddLines: (lines: import('../../../types/purchasing').DraftPoolLine[]) => void }) => (
+    <button data-testid="mock-add-pool-lines" onClick={() => onAddLines(mockPoolBrowserLines)}>
+      Add Pool Lines
+    </button>
+  ),
+}))
+
+vi.mock('../../../features/purchasing/components/SourcingPoolImportModal', () => ({
+  SourcingPoolImportModal: () => null,
+}))
+
+vi.mock('../../../features/purchasing/hooks/useSourcingPool', () => ({
+  useAddDraftLine: vi.fn(),
+}))
+
 import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../../hooks/usePurchasing'
 import { useParams } from 'react-router-dom'
 import { toast } from '../../../lib/toast'
+import { useCreatePurchaseOrder } from '../../../hooks/usePurchasing'
+import { useWarehouses, useSuppliers } from '../../../hooks/useInventory'
+import { useAddDraftLine } from '../../../features/purchasing/hooks/useSourcingPool'
 
 const basePo = {
   id: 'po-1',
@@ -142,8 +163,35 @@ function renderPage() {
   )
 }
 
+function renderCreatePage() {
+  vi.mocked(useParams).mockReturnValue({ id: 'new' })
+  vi.mocked(usePurchaseOrder).mockReturnValue({ data: undefined, isLoading: false } as never)
+  vi.mocked(useWarehouses).mockReturnValue({
+    data: { results: [{ id: 'wh-1', name: 'Warehouse 1' }] },
+  } as never)
+  vi.mocked(useSuppliers).mockReturnValue({
+    data: { results: [{ id: 'sup-1', name: 'Supplier A' }] },
+  } as never)
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter>
+        <PurchaseOrderDetailPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+async function selectWarehouseAndSupplier() {
+  await userEvent.click(screen.getByTestId('warehouse-select-trigger'))
+  await userEvent.click(await screen.findByText('Warehouse 1'))
+  await userEvent.click(screen.getByTestId('supplier-select-trigger'))
+  await userEvent.click(await screen.findByText('Supplier A'))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  mockPoolBrowserLines = []
 })
 
 it('PO detail variant row shows photo upload when no photo', async () => {
@@ -1171,4 +1219,113 @@ it('test_currency_change_warning_when_existing_prices', async () => {
   await waitFor(() => {
     expect(vi.mocked(toast.warning)).toHaveBeenCalledWith('Currency changed — existing prices may be in the old currency')
   })
+})
+
+it('mapped_pool_lines_go_into_order_details_not_draft_mutation', async () => {
+  mockPoolBrowserLines = [{
+    sourcing_item_id: 'si-1',
+    product_name: 'Widget',
+    variant_name: 'Red',
+    ordered_qty: 5,
+    unit_price_foreign: 10,
+    image_proxy_url: null,
+    variant_id: 'v-mapped-1',
+  }]
+  const mockCreate = vi.fn().mockResolvedValue({ id: 'new-po-id' })
+  const mockAddDraft = vi.fn().mockResolvedValue({})
+  vi.mocked(useCreatePurchaseOrder).mockReturnValue({ mutateAsync: mockCreate, isPending: false } as never)
+  vi.mocked(useAddDraftLine).mockReturnValue({ mutateAsync: mockAddDraft, isPending: false } as never)
+
+  renderCreatePage()
+  await selectWarehouseAndSupplier()
+
+  await userEvent.click(screen.getByTestId('mock-add-pool-lines'))
+  await userEvent.click(screen.getByRole('button', { name: /create po/i }))
+
+  await waitFor(() => {
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        order_details: expect.arrayContaining([
+          expect.objectContaining({ product_variant_id: 'v-mapped-1', ordered_qty: 5 }),
+        ]),
+      }),
+    )
+  })
+  expect(mockAddDraft).not.toHaveBeenCalled()
+})
+
+it('unmapped_pool_lines_go_through_draft_mutation_not_order_details', async () => {
+  mockPoolBrowserLines = [{
+    sourcing_item_id: 'si-2',
+    product_name: 'Widget',
+    variant_name: 'Blue',
+    ordered_qty: 3,
+    unit_price_foreign: 12,
+    image_proxy_url: null,
+    variant_id: null,
+  }]
+  const mockCreate = vi.fn().mockResolvedValue({ id: 'new-po-id' })
+  const mockAddDraft = vi.fn().mockResolvedValue({})
+  vi.mocked(useCreatePurchaseOrder).mockReturnValue({ mutateAsync: mockCreate, isPending: false } as never)
+  vi.mocked(useAddDraftLine).mockReturnValue({ mutateAsync: mockAddDraft, isPending: false } as never)
+
+  renderCreatePage()
+  await selectWarehouseAndSupplier()
+  await userEvent.click(screen.getByTestId('mock-add-pool-lines'))
+  await userEvent.click(screen.getByRole('button', { name: /create po/i }))
+
+  await waitFor(() => {
+    expect(mockAddDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ poId: 'new-po-id', sourcing_item_id: 'si-2', ordered_qty: 3 }),
+    )
+  })
+  const createCall = mockCreate.mock.calls[0][0] as { order_details: unknown[] }
+  expect(createCall.order_details).toHaveLength(0)
+})
+
+it('mixed_mapped_and_unmapped_lines_split_correctly', async () => {
+  mockPoolBrowserLines = [
+    {
+      sourcing_item_id: 'si-3',
+      product_name: 'Widget',
+      variant_name: 'Red',
+      ordered_qty: 5,
+      unit_price_foreign: 10,
+      image_proxy_url: null,
+      variant_id: 'v-mapped-2',
+    },
+    {
+      sourcing_item_id: 'si-4',
+      product_name: 'Widget',
+      variant_name: 'Green',
+      ordered_qty: 2,
+      unit_price_foreign: 8,
+      image_proxy_url: null,
+      variant_id: null,
+    },
+  ]
+  const mockCreate = vi.fn().mockResolvedValue({ id: 'new-po-id' })
+  const mockAddDraft = vi.fn().mockResolvedValue({})
+  vi.mocked(useCreatePurchaseOrder).mockReturnValue({ mutateAsync: mockCreate, isPending: false } as never)
+  vi.mocked(useAddDraftLine).mockReturnValue({ mutateAsync: mockAddDraft, isPending: false } as never)
+
+  renderCreatePage()
+  await selectWarehouseAndSupplier()
+  await userEvent.click(screen.getByTestId('mock-add-pool-lines'))
+  await userEvent.click(screen.getByRole('button', { name: /create po/i }))
+
+  await waitFor(() => {
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        order_details: expect.arrayContaining([
+          expect.objectContaining({ product_variant_id: 'v-mapped-2' }),
+        ]),
+      }),
+    )
+    expect(mockAddDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ poId: 'new-po-id', sourcing_item_id: 'si-4' }),
+    )
+  })
+  const createCall = mockCreate.mock.calls[0][0] as { order_details: unknown[] }
+  expect(createCall.order_details).toHaveLength(1)
 })

@@ -56,8 +56,8 @@ it('returns items array from paginated results shape when pool exists', async ()
       next: null,
       previous: null,
       results: [
-        { id: 'item1', product_name: 'P1', variant_name: 'V1', unit_price: '10', category_id: null, category_name: null, category_code: null, discounted_price: null, qty_suggested: null, supplier_link: null, image_url: null, image_proxy_url: null, image_download_status: 'DONE', notes: null, times_ordered: 0, cdate: '', udate: '' } as SourcingPoolItem,
-        { id: 'item2', product_name: 'P2', variant_name: 'V2', unit_price: '20', category_id: null, category_name: null, category_code: null, discounted_price: null, qty_suggested: null, supplier_link: null, image_url: null, image_proxy_url: null, image_download_status: 'DONE', notes: null, times_ordered: 0, cdate: '', udate: '' } as SourcingPoolItem,
+        { id: 'item1', product_name: 'P1', variant_name: 'V1', unit_price: '10', category_id: null, category_name: null, category_code: null, discounted_price: null, qty_suggested: null, supplier_link: null, image_url: null, image_proxy_url: null, image_download_status: 'DONE' as const, notes: null, times_ordered: 0, cdate: '', udate: '', variant_id: null, variant_code: null } as SourcingPoolItem,
+        { id: 'item2', product_name: 'P2', variant_name: 'V2', unit_price: '20', category_id: null, category_name: null, category_code: null, discounted_price: null, qty_suggested: null, supplier_link: null, image_url: null, image_proxy_url: null, image_download_status: 'DONE' as const, notes: null, times_ordered: 0, cdate: '', udate: '', variant_id: null, variant_code: null } as SourcingPoolItem,
       ],
     },
   } as unknown as AxiosResponse<SourcingPoolItemsResponse>)
