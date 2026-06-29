@@ -45,6 +45,7 @@ export interface PurchaseOrderDetail {
   sourcing_item_id: string | null
   is_draft: boolean
   draft_product_name: string
+  product_dim1_key: string | null
 }
 
 export interface PurchaseOrder {

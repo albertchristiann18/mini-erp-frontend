@@ -26,10 +26,20 @@ export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [po.id])
 
-  const initialGroupByKey = useMemo(
-    () => (dimensionKeys.length >= 2 ? dimensionKeys[1] : dimensionKeys[0] ?? null),
-    [dimensionKeys],
-  )
+  const initialGroupByKey = useMemo(() => {
+    const details = po.order_details ?? []
+    const dim1Keys = details
+      .map(d => d.product_dim1_key)
+      .filter((k): k is string => k != null && k !== '')
+    const unique = [...new Set(dim1Keys)]
+    if (unique.length === 1) {
+      // All details agree on the same dim1_key — prefer it
+      return unique[0]
+    }
+    // Mixed or all-null dim1_keys — fall back to positional heuristic
+    return dimensionKeys.length >= 2 ? dimensionKeys[1] : (dimensionKeys[0] ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [po.id, dimensionKeys])
 
   const [groupByKey, setGroupByKey] = useState<string | null>(initialGroupByKey)
 
@@ -50,31 +60,29 @@ export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
 
   useEffect(() => {
     if (!open) return
-    const uniqueProducts = [
-      ...new Map(
-        allSubGroups
-          .filter(sg => sg.product_photo_url && sg.product_id)
-          .map(sg => [sg.product_id, sg]),
-      ).values(),
-    ]
-    if (uniqueProducts.length === 0) return
+    const toFetch = allSubGroups.filter(sg => sg.product_id)
+    if (toFetch.length === 0) return
 
     let cancelled = false
     Promise.all(
-      uniqueProducts.map(async sg => {
-        const base64 = await fetchPhotoViaProxy(sg.product_id)
-        return [sg.product_id, base64] as const
+      toFetch.map(async sg => {
+        const base64 = await fetchPhotoViaProxy(
+          sg.product_id,
+          groupByKey ?? undefined,
+          sg.first_dim_value || undefined,
+        )
+        return [sg.key, base64] as const
       }),
     ).then(entries => {
       if (cancelled) return
       const map: Record<string, string> = {}
-      for (const [id, base64] of entries) {
-        if (base64) map[id] = base64
+      for (const [key, base64] of entries) {
+        if (base64) map[key] = base64
       }
       setImageMap(map)
     })
     return () => { cancelled = true }
-  }, [open, po.id, allSubGroups])
+  }, [open, po.id, allSubGroups, groupByKey])
 
   useEffect(() => {
     if (open) {

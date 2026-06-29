@@ -131,7 +131,6 @@ function PODocument({ po, subGroups, grandTotalQty, grandTotalForeign, currencyS
         {productOrder.map((productId) => {
           const meta = productMeta[productId]
           const sgs = subGroupsByProduct[productId]
-          const photoSrc = imageMap[productId] ?? null
 
           return (
             <View key={productId}>
@@ -145,6 +144,7 @@ function PODocument({ po, subGroups, grandTotalQty, grandTotalForeign, currencyS
               </View>
 
               {sgs.map((sg) => {
+                const photoSrc = imageMap[sg.key] ?? null
                 const subtotalQty = sg.items.reduce((s, i) => s + i.ordered_qty, 0)
                 const subtotalAmt = sg.items.reduce(
                   (s, i) => s + Number(i.discounted_total_price_foreign ?? i.total_price_foreign ?? 0),

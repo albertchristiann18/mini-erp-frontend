@@ -93,6 +93,7 @@ const basePo: PurchaseOrder = {
       sourcing_item_id: null,
       is_draft: false,
       draft_product_name: '',
+      product_dim1_key: null,
     },
     {
       id: 'd2', variant_id: 'v2', product_variant_name: 'M / White Cherry',
@@ -114,6 +115,7 @@ const basePo: PurchaseOrder = {
       sourcing_item_id: null,
       is_draft: false,
       draft_product_name: '',
+      product_dim1_key: null,
     },
     {
       id: 'd3', variant_id: 'v3', product_variant_name: 'S / Red',
@@ -135,6 +137,7 @@ const basePo: PurchaseOrder = {
       sourcing_item_id: null,
       is_draft: false,
       draft_product_name: '',
+      product_dim1_key: null,
     },
   ],
 }
@@ -220,7 +223,7 @@ it('Group by select shows Product only and all dimension keys from PO variant va
   expect(screen.getByRole('option', { name: 'Product only' })).toBeInTheDocument()
   expect(screen.getByRole('option', { name: 'Color' })).toBeInTheDocument()
   expect(screen.getByRole('option', { name: 'Size' })).toBeInTheDocument()
-  // default is second key ('Size')
+  // product_dim1_key is null on all details → falls back to second dimension key 'Size'
   expect(select).toHaveValue('Size')
 })
 
@@ -294,4 +297,77 @@ it('reopening the modal resets selection and group-by key to defaults', async ()
   screen.getAllByRole('checkbox').forEach(cb => expect(cb).toBeChecked())
   // Group-by should be back to default (Size = second key)
   expect(screen.getByRole('combobox', { name: /group by dimension/i })).toHaveValue('Size')
+})
+
+it('Group by selector defaults to product_dim1_key when all details share the same dim1_key', () => {
+  const dim1Po: PurchaseOrder = {
+    ...basePo,
+    order_details: [
+      {
+        ...basePo.order_details![0],
+        variant_values: { Warna: 'Putih', Ukuran: 'S' },
+        product_dim1_key: 'Warna',
+      },
+      {
+        ...basePo.order_details![1],
+        variant_values: { Warna: 'Merah', Ukuran: 'M' },
+        product_dim1_key: 'Warna',
+      },
+    ],
+  }
+  render(<PurchaseOrderExportModal open po={dim1Po} onClose={() => {}} />)
+  const select = screen.getByRole('combobox', { name: /group by dimension/i })
+  // Without dim1_key logic, heuristic would pick 'Ukuran' (index 1).
+  // With dim1_key logic, all details share 'Warna' → should default to 'Warna'.
+  expect(select).toHaveValue('Warna')
+})
+
+it('image fetch calls fetchPhotoViaProxy with groupByKey and dim value for each subgroup', async () => {
+  const { fetchPhotoViaProxy: mockFetch } = await import('../purchaseOrderPDFUtils')
+  const colorPo: PurchaseOrder = {
+    ...basePo,
+    order_details: [
+      {
+        ...basePo.order_details![0],
+        product_id: 'p1',
+        variant_values: { Warna: 'Putih', Ukuran: 'S' },
+        product_dim1_key: 'Warna',
+      },
+      {
+        ...basePo.order_details![1],
+        product_id: 'p1',
+        variant_values: { Warna: 'Merah', Ukuran: 'M' },
+        product_dim1_key: 'Warna',
+      },
+    ],
+  }
+  render(<PurchaseOrderExportModal open po={colorPo} onClose={() => {}} />)
+  // Wait for the effect to fire
+  await vi.waitFor(() => {
+    expect(mockFetch).toHaveBeenCalledWith('p1', 'Warna', 'Putih')
+    expect(mockFetch).toHaveBeenCalledWith('p1', 'Warna', 'Merah')
+  })
+})
+
+it('Group by selector falls back to second dimension key when details have mixed dim1_keys', () => {
+  const mixedPo: PurchaseOrder = {
+    ...basePo,
+    order_details: [
+      {
+        ...basePo.order_details![0],
+        variant_values: { Color: 'Red', Size: 'S' },
+        product_dim1_key: 'Color',
+      },
+      {
+        ...basePo.order_details![1],
+        variant_values: { Warna: 'Putih', Ukuran: 'S' },
+        product_dim1_key: 'Warna',
+      },
+    ],
+  }
+  render(<PurchaseOrderExportModal open po={mixedPo} onClose={() => {}} />)
+  const select = screen.getByRole('combobox', { name: /group by dimension/i })
+  // Mixed dim1_keys → fallback: second dimension key in union order
+  // dimensionKeys = ['Color', 'Size', 'Warna', 'Ukuran'] → second = 'Size'
+  expect(select).toHaveValue('Size')
 })

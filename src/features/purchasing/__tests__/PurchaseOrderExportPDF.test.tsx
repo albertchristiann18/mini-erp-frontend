@@ -132,6 +132,7 @@ function makeDetail(
     sourcing_item_id: null,
     is_draft: false,
     draft_product_name: '',
+    product_dim1_key: null,
   }
 }
 
@@ -175,6 +176,7 @@ it('PO export shows supplier link when available', () => {
         sourcing_item_id: null,
         is_draft: false,
         draft_product_name: '',
+        product_dim1_key: null,
       },
     ],
   } satisfies PurchaseOrder
@@ -227,6 +229,7 @@ it('PO export shows image placeholder when no photo', () => {
         sourcing_item_id: null,
         is_draft: false,
         draft_product_name: '',
+        product_dim1_key: null,
       },
     ],
   } satisfies PurchaseOrder
@@ -327,6 +330,7 @@ it('PDF sub-group block omits the color label when first_dim_value is empty', ()
         sourcing_item_id: null,
         is_draft: false,
         draft_product_name: '',
+        product_dim1_key: null,
       },
     ],
   } satisfies PurchaseOrder
@@ -412,6 +416,7 @@ it('PDF sub-group uses discounted_total_price_foreign for total when available',
         sourcing_item_id: null,
         is_draft: false,
         draft_product_name: '',
+        product_dim1_key: null,
       },
     ],
   } satisfies PurchaseOrder
@@ -463,4 +468,56 @@ it('groupBySubGroup with a groupByKey absent from variant_values collapses all v
   expect(sgs).toHaveLength(1)
   expect(sgs[0].first_dim_value).toBe('')
   expect(sgs[0].items).toHaveLength(2)
+})
+
+it('PDF renders distinct images per subgroup when imageMap is keyed by sg.key', () => {
+  const details = [
+    makeDetail('d1', 'p1', 'Widget', 'Red/S', { Warna: 'Merah', Ukuran: 'S' }),
+    makeDetail('d2', 'p1', 'Widget', 'Blue/S', { Warna: 'Biru', Ukuran: 'S' }),
+  ]
+  const subGroups = groupBySubGroup(details, 'Warna')
+  // sg.key format: `${product_id}::${first_dim_value}`
+  const redKey = 'p1::Merah'
+  const blueKey = 'p1::Biru'
+  const imageMap: Record<string, string> = {
+    [redKey]: 'data:image/png;base64,RED',
+    [blueKey]: 'data:image/png;base64,BLUE',
+  }
+  render(
+    <PurchaseOrderExportPDF
+      po={{ ...mockPo, status: 'ORDERED', order_details: details }}
+      subGroups={subGroups}
+      imageMap={imageMap}
+    />,
+  )
+  const images = screen.getAllByTestId('pdf-image') as HTMLImageElement[]
+  const srcs = images.map(img => img.src)
+  expect(srcs).toContain('data:image/png;base64,RED')
+  expect(srcs).toContain('data:image/png;base64,BLUE')
+  // Both images must be distinct — not the same src repeated
+  expect(srcs[0]).not.toBe(srcs[1])
+})
+
+it('fetchPhotoViaProxy passes dim_key and dim_value query params when provided', async () => {
+  const clientMock = (await import('../../../api/client')).default
+  const getMock = vi.mocked(clientMock.get)
+  getMock.mockResolvedValueOnce({ data: new Blob(['x'], { type: 'image/png' }) })
+  const { fetchPhotoViaProxy: realFetch } = await vi.importActual<typeof import('../purchaseOrderPDFUtils')>('../purchaseOrderPDFUtils')
+  await realFetch('p1', 'Warna', 'Putih')
+  expect(getMock).toHaveBeenCalledWith(
+    '/product/p1/photo-proxy/?dim_key=Warna&dim_value=Putih',
+    expect.objectContaining({ responseType: 'blob' }),
+  )
+})
+
+it('fetchPhotoViaProxy omits query params when dimKey is not provided', async () => {
+  const clientMock = (await import('../../../api/client')).default
+  const getMock = vi.mocked(clientMock.get)
+  getMock.mockResolvedValueOnce({ data: new Blob(['x'], { type: 'image/png' }) })
+  const { fetchPhotoViaProxy: realFetch } = await vi.importActual<typeof import('../purchaseOrderPDFUtils')>('../purchaseOrderPDFUtils')
+  await realFetch('p1')
+  expect(getMock).toHaveBeenCalledWith(
+    '/product/p1/photo-proxy/',
+    expect.objectContaining({ responseType: 'blob' }),
+  )
 })

@@ -11,9 +11,17 @@ export interface SubGroup {
   items: PurchaseOrderDetail[]
 }
 
-export async function fetchPhotoViaProxy(productId: string): Promise<string | null> {
+export async function fetchPhotoViaProxy(
+  productId: string,
+  dimKey?: string,
+  dimValue?: string,
+): Promise<string | null> {
   try {
-    const response = await client.get<Blob>(`/product/${productId}/photo-proxy/`, {
+    const params = new URLSearchParams()
+    if (dimKey) params.set('dim_key', dimKey)
+    if (dimValue) params.set('dim_value', dimValue)
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const response = await client.get<Blob>(`/product/${productId}/photo-proxy/${query}`, {
       responseType: 'blob',
     })
     const blob = response.data
