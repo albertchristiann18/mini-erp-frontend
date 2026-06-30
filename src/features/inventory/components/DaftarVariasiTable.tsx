@@ -271,7 +271,9 @@ export function DaftarVariasiTable({
                     </Cell>
                     <Cell>
                       {row.hasStock ? (
-                        <Badge variant="secondary" className="text-xs">Ada stok</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {row.total_available_qty === 0 ? 'Ada riwayat' : 'Ada stok'}
+                        </Badge>
                       ) : (
                         <button
                           type="button"

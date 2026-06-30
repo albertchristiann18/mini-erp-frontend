@@ -171,6 +171,7 @@ export default function ProductEditPage() {
   const [pendingDimImageDeletions, setPendingDimImageDeletions] = useState<
     Array<{ dimKey: string; dimValue: string }>
   >([])
+  const [removeDimConfirm, setRemoveDimConfirm] = useState<1 | 2 | null>(null)
 const [newSupplierSelectedId, setNewSupplierSelectedId] = useState('')
 const [newSupplierLink, setNewSupplierLink] = useState('')
 const [supplierSearch, setSupplierSearch] = useState('')
@@ -336,21 +337,26 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
     else setShowDim2(true)
   }
 
-  const handleRemoveDim1 = () => {
-    if (dim1Key) setRows(prev => prev.map(r => dim1Key && r.variantValues[dim1Key] ? { ...r, removed: true } : r))
-    setShowDim1(false)
-    setShowDim2(false)
-    setDim1Key('')
-    setDim1Options([])
-    setDim2Key('')
-    setDim2Options([])
-  }
+  const handleRemoveDim1 = () => setRemoveDimConfirm(1)
 
-  const handleRemoveDim2 = () => {
-    if (dim2Key) setRows(prev => prev.map(r => dim2Key && r.variantValues[dim2Key] ? { ...r, removed: true } : r))
-    setShowDim2(false)
-    setDim2Key('')
-    setDim2Options([])
+  const handleRemoveDim2 = () => setRemoveDimConfirm(2)
+
+  const confirmRemoveDim = () => {
+    if (removeDimConfirm === 1) {
+      if (dim1Key) setRows(prev => prev.map(r => dim1Key && r.variantValues[dim1Key] ? { ...r, removed: true } : r))
+      setShowDim1(false)
+      setShowDim2(false)
+      setDim1Key('')
+      setDim1Options([])
+      setDim2Key('')
+      setDim2Options([])
+    } else if (removeDimConfirm === 2) {
+      if (dim2Key) setRows(prev => prev.map(r => dim2Key && r.variantValues[dim2Key] ? { ...r, removed: true } : r))
+      setShowDim2(false)
+      setDim2Key('')
+      setDim2Options([])
+    }
+    setRemoveDimConfirm(null)
   }
 
   const handleSwapConfirmed = () => {
@@ -402,10 +408,19 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       toast.error('Variasi 1 dan Variasi 2 tidak boleh memiliki nama yang sama')
       return
     }
-    setIsSaving(true)
-    try {
-      let productId = id ?? ''
 
+    const dimStructureChanged = isEditing && product && (
+      (product.dim1_key ?? '') !== dim1Key ||
+      (product.dim2_key ?? '') !== dim2Key ||
+      JSON.stringify(product.dim1_options ?? []) !== JSON.stringify(dim1Options) ||
+      JSON.stringify(product.dim2_options ?? []) !== JSON.stringify(dim2Options)
+    )
+
+    setIsSaving(true)
+    let productId = id ?? ''
+
+    // Step 1: Save product info
+    try {
       if (isEditing) {
         await updateMutation.mutateAsync({
           id: productId,
@@ -443,8 +458,14 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
         })
         productId = created.id
       }
+    } catch {
+      toast.error(isEditing ? 'Failed to save product' : 'Failed to create product')
+      setIsSaving(false)
+      return
+    }
 
-      // Flush pending dim image deletions (queued during swap) before saving variants
+    // Step 2: Save variants (separate error message so user knows info was saved)
+    try {
       if (pendingDimImageDeletions.length > 0 && id) {
         await Promise.allSettled(
           pendingDimImageDeletions.map(({ dimKey, dimValue }) =>
@@ -477,18 +498,18 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
         await saveMutation.mutateAsync(variantsPayload)
       }
 
-      // Upload pending photos for active rows that have a pending file
-      const activeRowsWithPhotos = rows
-        .filter(r => !r.removed && r.id && r.pendingPhoto)
-      const variantPhotoPromises = activeRowsWithPhotos.map(r =>
-        uploadVariantPhoto(productId, r.id!, r.pendingPhoto!).catch(() => {}),
+      const activeRowsWithPhotos = rows.filter(r => !r.removed && r.id && r.pendingPhoto)
+      await Promise.allSettled(
+        activeRowsWithPhotos.map(r => uploadVariantPhoto(productId, r.id!, r.pendingPhoto!).catch(() => {}))
       )
-      await Promise.allSettled(variantPhotoPromises)
 
+      if (dimStructureChanged) {
+        toast.warning('Struktur variasi berubah — listing Shopee mungkin perlu disinkronkan ulang')
+      }
       toast.success(isEditing ? 'Product saved' : 'Product created')
       navigate(`/inventory/products/${productId}`)
     } catch {
-      toast.error(isEditing ? 'Failed to save product' : 'Failed to create product')
+      toast.error('Info produk tersimpan. Gagal menyimpan varian — coba lagi.')
     } finally {
       setIsSaving(false)
     }
@@ -916,6 +937,24 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
           </Button>
         </div>
       </form>
+
+      <Dialog open={removeDimConfirm !== null} onOpenChange={(open) => { if (!open) setRemoveDimConfirm(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Hapus Variasi {removeDimConfirm}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {removeDimConfirm === 1
+              ? `Semua baris varian untuk "${dim1Key}" akan dihapus. Tindakan ini tidak dapat dibatalkan sebelum disimpan.`
+              : `Semua baris varian untuk "${dim2Key}" akan dihapus. Tindakan ini tidak dapat dibatalkan sebelum disimpan.`
+            }
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDimConfirm(null)}>Batal</Button>
+            <Button variant="destructive" onClick={confirmRemoveDim}>Hapus</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
