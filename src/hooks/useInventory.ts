@@ -6,7 +6,7 @@ import {
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getProductSuppliers, createProductSupplier, deleteProductSupplier,
-  saveVariants, deleteCategory, uploadVariantPhoto, deleteVariantPhoto,
+  saveVariants, deleteCategory,   uploadVariantPhoto, deleteVariantPhoto, uploadDimensionImage, deleteDimensionImage,
   getCompanyMarketplaces, createCompanyMarketplace, updateCompanyMarketplace, deleteCompanyMarketplace,
   getBusinessEntities, createBusinessEntity,
   updateBusinessEntity, deleteBusinessEntity, getProductBusinessEntities,
@@ -394,6 +394,24 @@ export const useDeleteVariantPhoto = (productId: string) => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (variantId: string) => deleteVariantPhoto(productId, variantId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
+  })
+}
+
+export const useUploadDimensionImage = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dimKey, dimValue, photo }: { dimKey: string; dimValue: string; photo: File }) =>
+      uploadDimensionImage(productId, dimKey, dimValue, photo).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
+  })
+}
+
+export const useDeleteDimensionImage = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dimKey, dimValue }: { dimKey: string; dimValue: string }) =>
+      deleteDimensionImage(productId, dimKey, dimValue),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
   })
 }

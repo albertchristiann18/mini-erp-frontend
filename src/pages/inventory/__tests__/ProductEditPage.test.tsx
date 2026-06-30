@@ -21,6 +21,8 @@ vi.mock('../../../hooks/useInventory', () => ({
   useBusinessEntities: vi.fn(() => ({ data: undefined, isLoading: false })),
   useUploadVariantPhoto: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useDeleteVariantPhoto: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useUploadDimensionImage: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useDeleteDimensionImage: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -68,6 +70,11 @@ const baseProduct = {
   photos: [],
   variants: [],
   variant_options: [],
+  dim1_key: '',
+  dim2_key: '',
+  dim1_options: [],
+  dim2_options: [],
+  dimension_images: [],
   cdate: '',
   udate: '',
 }
@@ -146,72 +153,31 @@ it('description character counter updates on typing', async () => {
   expect(textarea).toHaveValue('Hello World This is a test description')
 })
 
-it('adding a dimension and adding a value creates a variant row', async () => {
+it('clicking Tambah Variasi reveals Variasi 1 name input', async () => {
   vi.mocked(useParams).mockReturnValue({})
   vi.mocked(useProduct).mockReturnValue(hookResult(undefined))
   vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
   vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
   vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
   vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
-
   renderPage()
-
-  await userEvent.click(screen.getByRole('button', { name: /add attribute/i }))
-  const dimInput = screen.getByPlaceholderText(/attribute name/i)
-  await userEvent.type(dimInput, 'Color')
-  await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
-
-  await userEvent.click(screen.getByRole('button', { name: /add color/i }))
-  const valueInput = screen.getByPlaceholderText(/add color/i)
-  await userEvent.type(valueInput, 'Red')
-  await userEvent.keyboard('{Enter}')
-
-  const redElements = screen.getAllByText('Red')
-  expect(redElements.length).toBeGreaterThanOrEqual(1)
-  expect(screen.getByText('Variant Matrix (1)')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: /tambah variasi/i }))
+  expect(screen.getByPlaceholderText(/e\.g\. warna/i)).toBeInTheDocument()
 })
 
-it('clicking × on a row with no stock marks it removed', async () => {
-  vi.mocked(useParams).mockReturnValue({})
-  vi.mocked(useProduct).mockReturnValue(hookResult(undefined))
-  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
-  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
-
-  renderPage()
-
-  await userEvent.click(screen.getByRole('button', { name: /add attribute/i }))
-  const dimInput = screen.getByPlaceholderText(/attribute name/i)
-  await userEvent.type(dimInput, 'Color')
-  await userEvent.click(screen.getByRole('button', { name: /^add$/i }))
-
-  await userEvent.click(screen.getByRole('button', { name: /add color/i }))
-  const valueInput = screen.getByPlaceholderText(/add color/i)
-  await userEvent.type(valueInput, 'Red')
-  await userEvent.keyboard('{Enter}')
-
-  expect(screen.getByText('Variant Matrix (1)')).toBeInTheDocument()
-
-  const variantSection = screen.getByText(/^Variant Matrix \(\d+\)$/)
-    .closest('div.rounded-lg')!
-  const deleteButtons = variantSection.querySelectorAll('button')
-  const removeBtn = Array.from(deleteButtons).find(b =>
-    b.textContent === 'Delete',
-  )
-  await userEvent.click(removeBtn!)
-
-  expect(screen.getByText(/No variants yet/)).toBeInTheDocument()
-})
-
-it('clicking × on a row with stock shows error toast and keeps row', async () => {
+it('removing a chip with stock shows error toast and keeps the row', async () => {
   const productWithStock = {
     ...baseProduct,
-    variant_options: [{ id: 'color', name: 'Color', order: 1, values: [{ id: 'red', label: 'Red' }] }],
+    id: '123',
+    dim1_key: 'Warna',
+    dim1_options: ['Merah'],
     variants: [{
-      id: 'var-1', name: 'Red', sku_variant_code: 'SKU-RED', base_price: 10000,
-      variant_values: { 'color': 'red' }, is_active: true,
+      id: 'var-1', name: 'Merah', sku_variant_code: 'SKU-RED', base_price: 10000,
+      variant_values: { 'Warna': 'Merah' }, is_active: true,
       total_incoming_qty: 5, total_available_qty: 5,
+      product: 'prod-1', product_name: 'Test', company: 'c1',
+      sku: 'TST', cdate: '', udate: '',
+      product_supplier_link: null, product_photo_url: null, photo_url: null,
     }],
   }
   vi.mocked(useParams).mockReturnValue({ id: '123' })
@@ -220,19 +186,13 @@ it('clicking × on a row with stock shows error toast and keeps row', async () =
   vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
   vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
   vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
-
   renderPage()
-
   await waitFor(() => expect(screen.getByDisplayValue('SKU-RED')).toBeInTheDocument())
-
-  const variantSection = screen.getByText(/^Variant Matrix \(\d+\)$/).closest('div.rounded-lg')!
-  const deleteButtons = variantSection.querySelectorAll('button')
-  const removeBtn = Array.from(deleteButtons).find(b =>
-    b.textContent === 'Delete',
-  )
-  await userEvent.click(removeBtn!)
-
-  expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('stock'))
+  expect(screen.getByText('Daftar Variasi (1)')).toBeInTheDocument()
+  const removeBtn = screen.getByTestId('remove-chip-Merah')
+  await userEvent.click(removeBtn)
+  expect(toast.error).toHaveBeenCalledWith('Tidak dapat menghapus opsi: ada varian dengan stok')
+  expect(screen.getByText('Daftar Variasi (1)')).toBeInTheDocument()
 })
 
 it('submit calls createMutation then saveVariants on create flow', async () => {
@@ -319,56 +279,6 @@ it('renders Suppliers card in edit mode (:id param present)', () => {
   expect(screen.getByText('Suppliers')).toBeInTheDocument()
 })
 
-it('dimension rows have grip handle when 2 dimensions exist', () => {
-  const productWithDims = {
-    ...baseProduct,
-    variant_options: { Color: ['Red', 'Blue'], Size: ['S', 'M'] },
-    variants: [
-      {
-        id: 'var-1', name: 'Red-S', sku_variant_code: 'SKU-RS', base_price: 10000,
-        variant_values: { Color: 'Red', Size: 'S' }, is_active: true,
-        total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
-      },
-    ],
-  }
-  vi.mocked(useParams).mockReturnValue({ id: '123' })
-  vi.mocked(useProduct).mockReturnValue(hookResult(productWithDims))
-  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
-  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
-  vi.mocked(useProductSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
-  vi.mocked(useCreateProductSupplier).mockReturnValue(mutationMock())
-  vi.mocked(useDeleteProductSupplier).mockReturnValue(mutationMock())
-  vi.mocked(useSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
-
-  renderPage()
-  const grips = screen.getAllByTitle('Drag to reorder')
-  expect(grips).toHaveLength(2)
-})
-
-it('variant matrix shows photo column', () => {
-  const productWithVariant = {
-    ...baseProduct,
-    variant_options: { Color: ['Red'] },
-    variants: [{
-      id: 'var-1', name: 'Red', sku_variant_code: 'SKU-RED', base_price: 10000,
-      variant_values: { Color: 'red' }, is_active: true,
-      total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
-    }],
-  }
-  vi.mocked(useParams).mockReturnValue({ id: '123' })
-  vi.mocked(useProduct).mockReturnValue(hookResult(productWithVariant))
-  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
-  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
-
-  renderPage()
-
-  expect(screen.getByText('Photo')).toBeInTheDocument()
-})
-
 it('initializeRows heals mismatched variant_values keys positionally', () => {
   const baseVariant = {
     product: 'prod-1', product_name: 'Test', company: 'c1',
@@ -427,56 +337,6 @@ it('initializeRows leaves matching keys unchanged', () => {
   expect(rows[0].variantValues).toEqual({ Color: 'Red' })
 })
 
-it('renaming a dimension updates variantValues keys in all rows', async () => {
-  const productWithDims = {
-    ...baseProduct,
-    variant_options: { Size: ['S', 'M'] },
-    variants: [
-      {
-        id: 'var-1', name: 'Small', sku_variant_code: 'SKU-S', base_price: 10000,
-        variant_values: { Size: 'S' }, is_active: true,
-        total_incoming_qty: 0, total_available_qty: 0, photo_url: null,
-        product: 'prod-1', product_name: 'Test', company: 'c1',
-        sku: 'SKU', cdate: '', udate: '',
-        product_supplier_link: null, product_photo_url: null,
-      },
-    ],
-  }
-  vi.mocked(useParams).mockReturnValue({ id: '123' })
-  vi.mocked(useProduct).mockReturnValue(hookResult(productWithDims))
-  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
-  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
-  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
-  vi.mocked(useProductSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
-  vi.mocked(useCreateProductSupplier).mockReturnValue(mutationMock())
-  vi.mocked(useDeleteProductSupplier).mockReturnValue(mutationMock())
-  vi.mocked(useSuppliers).mockReturnValue(hookResult({ results: [], count: 0, next: null, previous: null }))
-
-  renderPage()
-
-  await waitFor(() => expect(screen.getByDisplayValue('SKU-S')).toBeInTheDocument())
-
-  // Click the rename button (title="Rename attribute")
-  const renameBtn = screen.getByTitle('Rename attribute')
-  await userEvent.click(renameBtn)
-
-  // Type new name
-  const renameInput = screen.getByDisplayValue('Size')
-  await userEvent.clear(renameInput)
-  await userEvent.type(renameInput, 'VariantSize')
-
-  // Confirm rename
-  const saveBtn = screen.getByRole('button', { name: /^save$/i })
-  await userEvent.click(saveBtn)
-
-  // Verify the new dimension name appears as the attribute label
-  await waitFor(() => {
-    const variantSizeElements = screen.getAllByText('VariantSize')
-    expect(variantSizeElements.length).toBeGreaterThanOrEqual(1)
-  })
-})
-
 it('variant photo cell shows ImagePlus placeholder when no photo', () => {
   const productWithVariant = {
     ...baseProduct,
@@ -497,4 +357,37 @@ it('variant photo cell shows ImagePlus placeholder when no photo', () => {
   renderPage()
 
   expect(screen.getByDisplayValue('SKU-RED')).toBeInTheDocument()
+})
+
+it('onSubmit sends dim1_key and dim1_options in product PATCH', async () => {
+  const updateMock = vi.fn().mockResolvedValue({ id: '123' })
+  const productWithDims = {
+    ...baseProduct,
+    id: '123',
+    dim1_key: 'Warna',
+    dim1_options: ['White', 'Pink'],
+    variants: [{
+      id: 'var-1', name: 'White', sku_variant_code: 'TST-WH', base_price: 10000,
+      variant_values: { 'Warna': 'White' }, is_active: true,
+      total_incoming_qty: 0, total_available_qty: 0,
+      product: '123', product_name: 'Test Product', company: 'c1',
+      sku: 'TST', cdate: '', udate: '',
+      product_supplier_link: null, product_photo_url: null, photo_url: null,
+    }],
+  }
+  vi.mocked(useParams).mockReturnValue({ id: '123' })
+  vi.mocked(useProduct).mockReturnValue(hookResult(productWithDims))
+  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
+  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock({ mutateAsync: updateMock }))
+  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+  renderPage()
+  await waitFor(() => expect(screen.getByDisplayValue('TST-WH')).toBeInTheDocument())
+  const form = document.querySelector('form')!
+  fireEvent.submit(form)
+  await waitFor(() => {
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ dim1_key: 'Warna', dim1_options: ['White', 'Pink'] }),
+    }))
+  })
 })

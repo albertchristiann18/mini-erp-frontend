@@ -29,6 +29,12 @@ export interface ProductPhoto {
   is_primary: boolean
 }
 
+export interface DimensionImage {
+  dim_key: string
+  dim_value: string
+  photo_url: string | null
+}
+
 export interface Product {
   id: string
   company: string
@@ -50,6 +56,11 @@ export interface Product {
   photos?: ProductPhoto[]
   variants?: ProductVariant[]
   variant_options?: Record<string, string[]>
+  dim1_key?: string
+  dim2_key?: string
+  dim1_options?: string[]
+  dim2_options?: string[]
+  dimension_images?: DimensionImage[]
   cdate: string
   udate: string
 }

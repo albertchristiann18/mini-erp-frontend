@@ -49,6 +49,7 @@ const mockDetail: PurchaseOrderDetail = {
   cogs_per_unit_idr: null,
   product_has_dimensions: null,
   sourcing_item_id: null,
+  product_dim1_key: null,
 }
 
 const mockedUseFinalizeDraftLine = vi.mocked(useSourcingPoolModule.useFinalizeDraftLine)
