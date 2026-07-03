@@ -938,7 +938,7 @@ it('test_dimension_warning_banner_shows_when_missing_dimensions', async () => {
   await waitFor(() => expect(screen.getByText(/have no product dimensions/)).toBeInTheDocument())
 })
 
-it('test_freight_strip_shows_in_delivered_po', async () => {
+it('shows_cogs_per_unit_inline_in_delivered_po', async () => {
   const baseDetail = {
     id: 'detail-1',
     variant_id: 'var-1',
@@ -985,8 +985,10 @@ it('test_freight_strip_shows_in_delivered_po', async () => {
   vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(deliveredPo))
   renderPage()
 
-  await waitFor(() => expect(screen.getByText(/COGS\/unit/)).toBeInTheDocument())
-  expect(screen.getByText(/Shipping\/unit/)).toBeInTheDocument()
+  // COGS/u now shown inline in the item row instead of a sub-row
+  await waitFor(() => {
+    expect(screen.getAllByText(/72\.000/).length).toBeGreaterThanOrEqual(1)
+  })
 })
 
 it('test_currency_change_autofills_zero_price_items', async () => {
@@ -1328,4 +1330,109 @@ it('mixed_mapped_and_unmapped_lines_split_correctly', async () => {
   })
   const createCall = mockCreate.mock.calls[0][0] as { order_details: unknown[] }
   expect(createCall.order_details).toHaveLength(1)
+})
+
+it('collapse_all_button_hides_item_rows_and_expand_all_restores_them', async () => {
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+  const detail = {
+    id: 'detail-c1',
+    variant_id: 'var-c1',
+    product_variant_name: 'Blue Variant',
+    sku_variant_code: 'BLU-001',
+    product_id: 'prod-c1',
+    product_name: 'Collapsible Product',
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: 5,
+    received_qty: null,
+    unit_price_foreign: '10.00',
+    unit_price_base: 15000,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: '50.00',
+    total_price_base: 75000,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: '',
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 0,
+    incoming_qty: 0,
+    variant_values: {},
+    last_unit_price_foreign: null,
+    last_currency: null,
+    cogs_per_unit_idr: null,
+    is_draft: false,
+    shipping_per_unit_idr: null,
+    delivery_per_unit_idr: null,
+    commission_per_unit_idr: null,
+  }
+  const po = { ...basePo, status: 'DELIVERED', order_details: [detail] }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('Blue Variant')).toBeInTheDocument()
+  })
+
+  const collapseBtn = await screen.findByRole('button', { name: /collapse all/i })
+  await userEvent.click(collapseBtn)
+
+  await waitFor(() => {
+    expect(screen.queryByText('Blue Variant')).not.toBeInTheDocument()
+  })
+
+  const expandBtn = screen.getByRole('button', { name: /expand all/i })
+  await userEvent.click(expandBtn)
+
+  await waitFor(() => {
+    expect(screen.getByText('Blue Variant')).toBeInTheDocument()
+  })
+})
+
+it('group_header_shows_unit_price_and_cogs_per_unit', async () => {
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+  const detail = {
+    id: 'detail-g1',
+    variant_id: 'var-g1',
+    product_variant_name: 'Red Variant',
+    sku_variant_code: 'RED-001',
+    product_id: 'prod-g1',
+    product_name: 'Group Header Product',
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: 10,
+    received_qty: 10,
+    unit_price_foreign: '10.00',
+    unit_price_base: 15000,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: '100.00',
+    total_price_base: 150000,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: '',
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 0,
+    incoming_qty: 0,
+    variant_values: {},
+    last_unit_price_foreign: null,
+    last_currency: null,
+    is_draft: false,
+    shipping_per_unit_idr: 500,
+    delivery_per_unit_idr: 0,
+    commission_per_unit_idr: 0,
+    cogs_per_unit_idr: 15500,
+  }
+  const po = { ...basePo, status: 'DELIVERED', order_details: [detail] }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  renderPage()
+
+  await waitFor(() => {
+    const cogsMatches = screen.getAllByText(/15\.500/)
+    expect(cogsMatches.length).toBeGreaterThanOrEqual(1)
+    const priceMatches = screen.getAllByText(/10,00/)
+    expect(priceMatches.length).toBeGreaterThanOrEqual(1)
+  })
 })

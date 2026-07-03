@@ -227,6 +227,30 @@ export default function PurchaseOrderDetailPage() {
     }
   }, [activeSupplierId, isCreating])
 
+  const allGroupKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const item of (po?.order_details ?? []).filter(i => !i.is_draft && !deletedDetailIds.has(i.id))) {
+      if (groupBy === 'product') {
+        keys.add(item.product_id || 'unknown')
+      } else if (groupBy === 'flat') {
+        keys.add(item.id)
+      } else {
+        const dimValue = item.variant_values?.[groupBy] ?? 'Other'
+        keys.add(`${item.product_id}_${dimValue}`)
+      }
+    }
+    const canAddDelItems = isCreating || (po?.status ?? '') === 'DRAFT' || (po?.status ?? '') === 'ORDERED'
+    if (editMode && canAddDelItems) {
+      for (const n of newItems) {
+        keys.add(n.product_id || `new-${n._tempId}`)
+      }
+    }
+    return [...keys]
+  }, [po?.order_details, groupBy, deletedDetailIds, editMode, isCreating, po?.status, newItems])
+
+  const allCollapsed = allGroupKeys.length > 0 &&
+    allGroupKeys.every(k => collapsedGroups.has(k))
+
   if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
 
@@ -638,6 +662,23 @@ export default function PurchaseOrderDetailPage() {
       return s + base
     }, 0)
 
+    const maxUnitForeign = group.existingItems.length > 0
+      ? Math.max(...group.existingItems.map(i =>
+          hasDiscount
+            ? Number(i.discounted_unit_price_foreign ?? i.unit_price_foreign ?? 0)
+            : Number(i.unit_price_foreign ?? 0)))
+      : 0
+    const maxUnitIdr = Math.round(maxUnitForeign * poExchangeRate)
+    const maxCogsPerUnit = group.existingItems.length > 0
+      ? Math.max(...group.existingItems.map(i => {
+          if (i.cogs_per_unit_idr != null) return i.cogs_per_unit_idr
+          const unitF = hasDiscount
+            ? Number(i.discounted_unit_price_foreign ?? i.unit_price_foreign ?? 0)
+            : Number(i.unit_price_foreign ?? 0)
+          return Math.round(unitF * poExchangeRate) + freightPerUnit + commissionPerUnit
+        }))
+      : 0
+
     return (
       <tbody key={group.groupKey}>
         <tr
@@ -680,14 +721,22 @@ export default function PurchaseOrderDetailPage() {
           <td className={`px-3 py-2 whitespace-nowrap ${doiAfterColor(groupDoiAfter)}`}>
             {groupDoiAfter !== null ? `${groupDoiAfter}d` : '—'}
           </td>
-          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground font-normal">
+            {maxUnitForeign > 0
+              ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(maxUnitForeign)}`
+              : '—'}
+          </td>
           {hasDiscount && <td className="px-3 py-2" />}
-          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground font-normal">
+            {maxUnitIdr > 0 ? formatIDR(maxUnitIdr) : '—'}
+          </td>
           <td className="px-3 py-2 whitespace-nowrap">
             {sumTotalForeign > 0 ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(sumTotalForeign)}` : '—'}
           </td>
           <td className="px-3 py-2 whitespace-nowrap">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</td>
-          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap font-medium text-amber-700">
+            {maxCogsPerUnit > 0 ? formatIDR(maxCogsPerUnit) : '—'}
+          </td>
           <td className="px-3 py-2" />
           {editMode && canAddDeleteItems && <td />}
         </tr>
@@ -793,7 +842,7 @@ export default function PurchaseOrderDetailPage() {
                 <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
                 <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
                 <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
-                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{item.cogs_per_unit_idr != null ? '—' : (cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—')}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{item.cogs_per_unit_idr != null ? formatIDR(item.cogs_per_unit_idr) : (cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—')}</td>
                 <td className="px-3 py-1.5">
                   {showRemarks ? (
                     <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
@@ -810,23 +859,7 @@ export default function PurchaseOrderDetailPage() {
                   </td>
                 )}
               </tr>
-              {item.cogs_per_unit_idr != null && (
-                <tr className="bg-muted/20">
-                  <td colSpan={20} className="pl-10 pr-3 py-1 text-[10px] text-muted-foreground">
-                    <span className="font-medium text-foreground">Shipping/unit:</span>{' '}
-                    {formatIDR(item.shipping_per_unit_idr ?? 0)}
-                    {' · '}
-                    <span className="font-medium text-foreground">Delivery/unit:</span>{' '}
-                    {formatIDR(item.delivery_per_unit_idr ?? 0)}
-                    {' · '}
-                    <span className="font-medium text-foreground">Commission/unit:</span>{' '}
-                    {formatIDR(item.commission_per_unit_idr ?? 0)}
-                    {' · '}
-                    <span className="font-medium text-amber-700">COGS/unit:</span>{' '}
-                    <span className="font-bold text-amber-700">{formatIDR(item.cogs_per_unit_idr)}</span>
-                  </td>
-                </tr>
-              )}
+
             </React.Fragment>
           )
         })}
@@ -1507,6 +1540,18 @@ export default function PurchaseOrderDetailPage() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
+            {!isCreating && allGroupKeys.length > 0 && (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+                onClick={() => {
+                  if (allCollapsed) setCollapsedGroups(new Set())
+                  else setCollapsedGroups(new Set(allGroupKeys))
+                }}
+              >
+                {allCollapsed ? 'Expand all' : 'Collapse all'}
+              </button>
             )}
             {editMode && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
