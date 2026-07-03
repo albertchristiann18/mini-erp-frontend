@@ -129,7 +129,7 @@ interface DaftarVariasiTableProps {
   isEditing: boolean
   onRowChange: (globalIdx: number, field: 'sku_variant_code' | 'base_price', value: string | number) => void
   onRemoveRow: (globalIdx: number) => void
-  onBulkFillPrice: (dim1Value: string, price: number) => void
+  onBulkFillPrice: (price: number) => void
   onDimensionImageUpload: (dimKey: string, dimValue: string, file: File) => Promise<void>
   onDimensionImageDelete: (dimKey: string, dimValue: string) => Promise<void>
 }
@@ -218,6 +218,12 @@ export function DaftarVariasiTable({
           </tr>
         </thead>
         <tbody>
+          {isEditing && (
+            <TerapkanRow
+              colSpan={terapkanColSpan + (isEditing ? 1 : 0) + 1}
+              onApply={(price) => onBulkFillPrice(price)}
+            />
+          )}
           {grouped.map(({ dim1Value, rows: groupRows, isOrphaned }) => {
             if (groupRows.length === 0) return null
 
@@ -254,7 +260,7 @@ export function DaftarVariasiTable({
                       <Input
                         value={row.sku_variant_code}
                         onChange={(e) => onRowChange(globalIdx, 'sku_variant_code', e.target.value)}
-                        className="h-7 text-xs font-mono w-28"
+                        className="h-7 text-xs font-mono w-40"
                       />
                     </Cell>
                     <Cell>
@@ -286,11 +292,6 @@ export function DaftarVariasiTable({
                     </Cell>
                   </tr>
                 ))}
-                <TerapkanRow
-                  key={`terapkan-${dim1Value}`}
-                  colSpan={terapkanColSpan + (isEditing ? 1 : 0) + 1}
-                  onApply={(price) => onBulkFillPrice(dim1Value, price)}
-                />
               </React.Fragment>
             )
           })}
