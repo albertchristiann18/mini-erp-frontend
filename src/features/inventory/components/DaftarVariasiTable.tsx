@@ -163,7 +163,7 @@ export function DaftarVariasiTable({
     .map((row, globalIdx) => ({ row, globalIdx }))
     .filter(({ row }) => !row.removed)
 
-  if (!dim1Key || dim1Options.length === 0) {
+  if (!dim1Key || (dim1Options.length === 0 && activeRows.length === 0)) {
     return (
       <div className="px-4 py-8 text-center text-sm text-muted-foreground">
         Belum ada variasi. Tambah opsi Variasi 1 di atas untuk memulai.
@@ -242,7 +242,7 @@ export function DaftarVariasiTable({
                     {rowIdx === 0 && (
                       <td rowSpan={groupRows.length} className="px-3 py-2 text-sm font-medium whitespace-nowrap align-top pt-3">
                         {isOrphaned && <span className="text-amber-500 mr-1">⚠</span>}
-                        {dim1Value}
+                        {dim1Value || '—'}
                       </td>
                     )}
                     {hasDim2 && (

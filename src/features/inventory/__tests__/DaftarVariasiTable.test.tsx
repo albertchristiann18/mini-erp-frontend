@@ -53,9 +53,34 @@ describe('DaftarVariasiTable', () => {
     expect(screen.getByText(/Belum ada variasi/)).toBeInTheDocument()
   })
 
-  it('shows empty state when dim1Options is empty', () => {
-    renderTable({ dim1Options: [] })
+  it('shows empty state when dim1Options is empty and no active rows', () => {
+    renderTable({ dim1Options: [], rows: [] })
     expect(screen.getByText(/Belum ada variasi/)).toBeInTheDocument()
+  })
+
+  it('renders orphaned rows with warning when dim1Options is empty but active rows exist', () => {
+    const rows = [
+      makeRow({ variantValues: { Warna: 'Merah', Ukuran: 'S' }, sku_variant_code: 'RED-S' }),
+    ]
+    renderTable({ dim1Options: [], rows })
+    expect(screen.getByText('⚠')).toBeInTheDocument()
+    expect(screen.getByText('Merah')).toBeInTheDocument()
+  })
+
+  it('renders orphaned rows with empty string dim1Value when dimension key changed', () => {
+    const rows = [
+      makeRow({
+        variantValues: { Ukuran: '100', Berat: '1kg' },
+        sku_variant_code: 'ORPHAN-100',
+        base_price: 25000,
+        total_available_qty: 3,
+      }),
+    ]
+    renderTable({ dim1Key: 'color', dim1Options: [], rows })
+    expect(screen.queryByText(/Belum ada variasi/)).not.toBeInTheDocument()
+    expect(screen.getByText('⚠')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('ORPHAN-100')).toBeInTheDocument()
   })
 
   it('renders column header with dim1Key name', () => {
