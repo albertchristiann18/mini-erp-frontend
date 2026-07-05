@@ -191,6 +191,7 @@ async function selectWarehouseAndSupplier() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockIsStaff = false
   mockPoolBrowserLines = []
 })
 
@@ -1526,4 +1527,168 @@ it('non-COMPLETED PO with existing file still shows Replace button', async () =>
   await waitFor(() => {
     expect(screen.getByText('Replace')).toBeInTheDocument()
   })
+})
+
+const commissionDetail = {
+  id: 'detail-comm',
+  variant_id: 'var-comm',
+  product_variant_name: 'Commission Variant',
+  product_id: 'prod-comm',
+  product_name: 'Commission Product',
+  product_supplier_link: null,
+  product_photo_url: null,
+  ordered_qty: 1,
+  received_qty: null,
+  unit_price_foreign: '1000.000',
+  unit_price_base: 15000000,
+  discounted_unit_price_foreign: null,
+  discounted_unit_price_base: null,
+  total_price_foreign: '1000.000',
+  total_price_base: 15000000,
+  discounted_total_price_foreign: null,
+  discounted_total_price_base: null,
+  remarks: '',
+  avg_sales: null,
+  avg_sales_7d: null,
+  stock_on_hand: 0,
+  incoming_qty: 0,
+  variant_values: {},
+  is_draft: false,
+}
+
+it('live_commission_calculated_from_order_details_in_view_mode', async () => {
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 5,
+    exchange_rate: '15000',
+    commission_fee: 0,
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/750\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('live_commission_updates_when_commission_pct_changed_in_edit_mode', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 5,
+    exchange_rate: '15000',
+    commission_fee: 0,
+    editable_fields: { header: ['commission_fee_pct', 'exchange_rate'], order_detail: [] },
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const commissionLabel = await screen.findByText(/Commission %/i)
+  const commissionPctInput = commissionLabel.closest('div')!.querySelector('input') as HTMLInputElement
+
+  await userEvent.clear(commissionPctInput)
+  await userEvent.type(commissionPctInput, '10')
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/1\.500\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('live_commission_updates_when_exchange_rate_changed_in_edit_mode', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 5,
+    exchange_rate: '15000',
+    commission_fee: 0,
+    editable_fields: { header: ['commission_fee_pct', 'exchange_rate'], order_detail: [] },
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const exchangeRateLabel = await screen.findByText(/Exchange Rate/i)
+  const exchangeRateInput = exchangeRateLabel.closest('div')!.querySelector('input') as HTMLInputElement
+
+  await userEvent.tripleClick(exchangeRateInput)
+  await userEvent.type(exchangeRateInput, '20000')
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/1\.000\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('live_commission_falls_back_to_stored_when_pct_is_null', async () => {
+  const po = {
+    ...basePo,
+    commission_fee_pct: null,
+    commission_fee: 500_000,
+    order_details: [],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/500\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('zero_commission_pct_shows_Rp_0_not_dash', async () => {
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 0,
+    exchange_rate: '15000',
+    commission_fee: 99_999,
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/Rp\s*0/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  expect(screen.queryByText(/99\.999/)).not.toBeInTheDocument()
 })

@@ -550,8 +550,31 @@ export default function PurchaseOrderDetailPage() {
   const freightPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
     ? Math.round(effectiveShipping / po!.total_ordered_qty)
     : 0)
+  // null (not 0) when pct absent — lets display fall back to stored po.commission_fee
+  const livePct = editMode
+    ? (headerValues.commission_fee_pct != null ? Number(headerValues.commission_fee_pct) : (po?.commission_fee_pct != null ? Number(po.commission_fee_pct) : null))
+    : (po?.commission_fee_pct != null ? Number(po.commission_fee_pct) : null)
+
+  const liveCommissionFee = !isCreating && po != null && livePct != null
+    ? Math.round(
+        (po.order_details ?? []).reduce(
+          (s, i) => s + Number(
+            hasDiscount
+              ? (i.discounted_total_price_foreign ?? i.total_price_foreign ?? 0)
+              : (i.total_price_foreign ?? i.discounted_total_price_foreign ?? 0)
+          ),
+          0
+        ) *
+        (livePct / 100) *
+        (editMode
+          ? (Number(headerValues.exchange_rate) || Number(po.exchange_rate) || 0)
+          : Number(po.exchange_rate || 0)
+        )
+      )
+    : null
+
   const commissionPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
-    ? Math.round((po!.commission_fee ?? 0) / po!.total_ordered_qty)
+    ? Math.round((liveCommissionFee ?? po!.commission_fee ?? 0) / po!.total_ordered_qty)
     : 0)
 
   const draftLines = isCreating ? [] : (po?.order_details ?? []).filter((d) => d.is_draft)
@@ -1218,7 +1241,12 @@ export default function PurchaseOrderDetailPage() {
               />
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Commission (IDR)</p>
-                <p className="text-sm font-semibold">{po?.commission_fee != null ? formatIDR(po?.commission_fee) : '—'}</p>
+                <p className="text-sm font-semibold">
+                  {(() => {
+                    const val = liveCommissionFee ?? po?.commission_fee
+                    return val != null ? formatIDR(val) : '—'
+                  })()}
+                </p>
               </div>
               <EditableInfoItem
                 field="weight"
@@ -1415,7 +1443,7 @@ export default function PurchaseOrderDetailPage() {
                         value={`${currencySymbol} ${formatForeignAmount(totalForeignAmount)}`}
                       />
                     )}
-                    <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
+                    <SummaryRow label="Commission" value={(() => { const val = liveCommissionFee ?? po!.commission_fee; return val != null ? formatIDR(val) : '—' })()} />
                     <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
                     <SummaryRow label="Freight" value={(po!.shipping_fee ?? 0) > 0 ? formatIDR(po!.shipping_fee!) : '—'} />
                     <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
@@ -1567,7 +1595,7 @@ export default function PurchaseOrderDetailPage() {
                 Has Discount
               </label>
             )}
-            {isCreating && (
+            {editMode && canAddDeleteItems && (
               <Button
                 type="button"
                 variant="outline"
