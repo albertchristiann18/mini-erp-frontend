@@ -1293,7 +1293,10 @@ export default function PurchaseOrderDetailPage() {
             <h2 className="text-sm font-semibold mb-3">Attachments</h2>
             <div className="grid grid-cols-4 gap-3">
               {attachments.map(({ label, field, url }) => {
-                const isFileEditable = (editMode && po?.editable_fields?.header?.includes(field)) ?? false
+                const isFileEditable =
+                  (editMode &&
+                    (po?.editable_fields?.header?.includes(field) ?? false) &&
+                    !(po?.status === 'COMPLETED' && !!url)) ?? false
                 const fileSelected = !!headerValues[field]
                 return (
                   <div key={label} className="flex flex-col items-center gap-2 rounded-lg border p-3 text-center">

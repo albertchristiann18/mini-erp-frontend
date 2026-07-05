@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useProduct, useSaveVariants, useProductSuppliers, useProductBusinessEntities, useAttachBusinessEntity, useDetachBusinessEntity, useBusinessEntities } from '../../hooks/useInventory'
+import { useProduct, useSaveVariants, useProductSuppliers, useProductBusinessEntities, useAttachBusinessEntity, useDetachBusinessEntity, useBusinessEntities, useUpdateProductSupplier } from '../../hooks/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -36,10 +36,13 @@ export default function ProductDetailPage() {
   const { data: productSuppliersData } = useProductSuppliers(id!)
   const [showAttachModal, setShowAttachModal] = useState(false)
   const [attachingId, setAttachingId] = useState('')
+  const [editingSupplierLinkId, setEditingSupplierLinkId] = useState<string | null>(null)
+  const [editingSupplierLink, setEditingSupplierLink] = useState('')
   const { data: productBEData } = useProductBusinessEntities(id!)
   const attachMutation = useAttachBusinessEntity(id!)
   const detachMutation = useDetachBusinessEntity(id!)
   const { data: allBEData } = useBusinessEntities({ page_size: 100, is_active: 'true' })
+  const updateSupplierLinkMutation = useUpdateProductSupplier(id!)
 
   const variants = product?.variants ?? []
   const photos = product?.photos ?? []
@@ -49,7 +52,7 @@ export default function ProductDetailPage() {
         id: name,
         name,
         order: idx + 1,
-        values: (values ?? []).map(v => ({ id: v, label: v })),
+        values: Array.isArray(values) ? values.map(v => ({ id: v, label: v })) : [],
       }))
     : []
 
@@ -110,6 +113,20 @@ export default function ProductDetailPage() {
   const marketplaceIds = [...new Set(
     variants.flatMap(v => (v.marketplace_listings ?? []).map(l => l.marketplace_id))
   )]
+
+  const handleSaveSupplierLink = async () => {
+    if (!editingSupplierLinkId) return
+    try {
+      await updateSupplierLinkMutation.mutateAsync({
+        id: editingSupplierLinkId,
+        supplier_link: editingSupplierLink.trim() || null,
+      })
+      toast.success('Supplier link updated')
+      setEditingSupplierLinkId(null)
+    } catch {
+      toast.error('Failed to update supplier link')
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -290,18 +307,33 @@ export default function ProductDetailPage() {
               {(productSuppliersData?.results ?? []).map(ps => (
                 <div key={ps.id} className="flex items-center justify-between text-sm">
                   <span className="font-medium">{ps.supplier_name}</span>
-                  {ps.supplier_link ? (
-                    <a
-                      href={ps.supplier_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline text-xs truncate max-w-[260px]"
-                    >
-                      {ps.supplier_link}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">No link</span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {ps.supplier_link ? (
+                      <a
+                        href={ps.supplier_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline text-xs truncate max-w-[200px]"
+                      >
+                        {ps.supplier_link}
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">No link</span>
+                    )}
+                    {user?.is_staff && (
+                      <button
+                        type="button"
+                        data-testid={`edit-supplier-link-${ps.id}`}
+                        onClick={() => {
+                          setEditingSupplierLinkId(ps.id)
+                          setEditingSupplierLink(ps.supplier_link ?? '')
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -347,6 +379,34 @@ export default function ProductDetailPage() {
           )}
         </div>
       </div>
+
+      <Dialog
+        open={!!editingSupplierLinkId}
+        onOpenChange={(open) => { if (!open) setEditingSupplierLinkId(null) }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Supplier Link</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={editingSupplierLink}
+              onChange={(e) => setEditingSupplierLink(e.target.value)}
+              placeholder="https://..."
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveSupplierLink() }}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Leave blank to clear the link.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingSupplierLinkId(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSupplierLink} disabled={updateSupplierLinkMutation.isPending}>
+              {updateSupplierLinkMutation.isPending ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAttachModal} onOpenChange={setShowAttachModal}>
         <DialogContent>

@@ -1436,3 +1436,94 @@ it('group_header_shows_unit_price_and_cogs_per_unit', async () => {
     expect(priceMatches.length).toBeGreaterThanOrEqual(1)
   })
 })
+
+it('COMPLETED PO with empty file field shows Upload button', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    status: 'COMPLETED',
+    editable_fields: {
+      header: ['note', 'has_discount', 'purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'],
+      order_detail: [],
+    },
+    purchase_order_invoice_file: null,
+    delivery_order_file: 'https://example.com/do.pdf',
+    delivery_order_invoice_file: 'https://example.com/doi.pdf',
+    packing_list_file: 'https://example.com/pl.pdf',
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await waitFor(() => {
+    expect(screen.getByText('Upload')).toBeInTheDocument()
+  })
+})
+
+it('COMPLETED PO with all files present shows no Upload or Replace', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    status: 'COMPLETED',
+    editable_fields: {
+      header: ['note', 'has_discount', 'purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'],
+      order_detail: [],
+    },
+    purchase_order_invoice_file: 'https://example.com/invoice.pdf',
+    delivery_order_file: 'https://example.com/do.pdf',
+    delivery_order_invoice_file: 'https://example.com/doi.pdf',
+    packing_list_file: 'https://example.com/pl.pdf',
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await waitFor(() => {
+    expect(screen.queryByText('Upload')).not.toBeInTheDocument()
+    expect(screen.queryByText('Replace')).not.toBeInTheDocument()
+  })
+})
+
+it('non-COMPLETED PO with existing file still shows Replace button', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    status: 'DELIVERED',
+    editable_fields: {
+      header: ['note', 'has_discount', 'purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'],
+      order_detail: [],
+    },
+    purchase_order_invoice_file: 'https://example.com/invoice.pdf',
+    delivery_order_file: null,
+    delivery_order_invoice_file: null,
+    packing_list_file: null,
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await waitFor(() => {
+    expect(screen.getByText('Replace')).toBeInTheDocument()
+  })
+})

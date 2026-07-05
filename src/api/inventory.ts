@@ -156,6 +156,9 @@ export const createProductSupplier = (data: { product_id: string; supplier_id: s
 export const deleteProductSupplier = (id: string) =>
   client.delete(`/product-suppliers/${id}/`)
 
+export const updateProductSupplier = (id: string, data: { supplier_link: string | null }) =>
+  client.patch<ProductSupplier>(`/product-suppliers/${id}/`, data)
+
 export const getCompanyMarketplaces = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<CompanyMarketplace>>('/company-marketplaces/', { params })
 
