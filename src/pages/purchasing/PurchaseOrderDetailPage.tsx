@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
 import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
@@ -163,11 +164,13 @@ export default function PurchaseOrderDetailPage() {
     })
 
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showPoolBrowserAfterImport, setShowPoolBrowserAfterImport] = useState(false)
   const [showSupplierPickModal, setShowSupplierPickModal] = useState(false)
   const [supplierPickValue, setSupplierPickValue] = useState('')
   const [draftPoolLines, setDraftPoolLines] = useState<DraftPoolLine[]>([])
   const [newItemKeys, setNewItemKeys] = useState<Set<string>>(new Set())
   const addDraftLineMutation = useAddDraftLine()
+  const queryClient = useQueryClient()
 
   const handleVariantPhotoUpload = async (variantId: string, productId: string, file: File) => {
     setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: true }))
@@ -1686,11 +1689,28 @@ export default function PurchaseOrderDetailPage() {
       )}
       </div>
 
-      {isCreating && activeSupplierId && (
+      {(isCreating || showPoolBrowserAfterImport) && activeSupplierId && (
         <PoolBrowser
           supplierId={activeSupplierId}
           newItemKeys={newItemKeys}
-          onAddLines={handleAddPoolLines}
+          onAddLines={isCreating ? handleAddPoolLines : async (newLines) => {
+            try {
+              for (const line of newLines) {
+                await addDraftLineMutation.mutateAsync({
+                  poId: po!.id,
+                  sourcing_item_id: line.sourcing_item_id,
+                  ordered_qty: line.ordered_qty,
+                  unit_price_foreign: line.unit_price_foreign ?? undefined,
+                })
+              }
+              void queryClient.invalidateQueries({ queryKey: ['purchase-order', po!.id] })
+              setShowPoolBrowserAfterImport(false)
+              setNewItemKeys(new Set())
+              toast.success(`Added ${newLines.length} item(s) to PO`)
+            } catch {
+              toast.error('Failed to add items — please try again')
+            }
+          }}
         />
       )}
 
@@ -1815,7 +1835,7 @@ export default function PurchaseOrderDetailPage() {
           detail={finalizingDetail}
         />
       )}
-      {isCreating && (
+      {activeSupplierId && (
         <SourcingPoolImportModal
           open={showImportModal}
           onClose={() => setShowImportModal(false)}
@@ -1823,6 +1843,9 @@ export default function PurchaseOrderDetailPage() {
           supplierName={suppliers.find(s => s.id === activeSupplierId)?.name ?? ''}
           onImportSuccess={(importedRows) => {
             setNewItemKeys(new Set(importedRows.map((r) => `${r.product_name}|${r.variant_name}`)))
+            if (!isCreating) {
+              setShowPoolBrowserAfterImport(true)
+            }
           }}
         />
       )}
