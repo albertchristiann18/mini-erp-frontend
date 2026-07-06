@@ -43,6 +43,7 @@ const ProductEditPage = lazy(() => import('./pages/inventory/ProductEditPage'))
 const CategoriesPage = lazy(() => import('./pages/inventory/CategoriesPage'))
 const MarketplacesPage = lazy(() => import('./pages/inventory/MarketplacesPage'))
 const BusinessEntitiesPage = lazy(() => import('./pages/inventory/BusinessEntitiesPage'))
+const ColorAbbreviationsPage = lazy(() => import('./pages/inventory/ColorAbbreviationsPage'))
 const SuppliersPage = lazy(() => import('./pages/purchasing/SuppliersPage'))
 const ProfilePage = lazy(() => import('./pages/profile/ProfilePage'))
 
@@ -78,6 +79,7 @@ export default function App() {
                     <Route path="categories" element={<Suspense fallback={<Loading />}><CategoriesPage /></Suspense>} />
                     <Route path="marketplaces" element={<Suspense fallback={<Loading />}><MarketplacesPage /></Suspense>} />
                     <Route path="business-entities" element={<Suspense fallback={<Loading />}><BusinessEntitiesPage /></Suspense>} />
+                    <Route path="color-abbreviations" element={<Suspense fallback={<Loading />}><ColorAbbreviationsPage /></Suspense>} />
                   </Route>
                   <Route path="purchasing">
                     <Route path="orders" element={<Suspense fallback={<Loading />}><PurchaseOrdersPage /></Suspense>} />

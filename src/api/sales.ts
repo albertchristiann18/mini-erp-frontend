@@ -22,3 +22,27 @@ export const cancelSalesOrder = (id: string) =>
 
 export const getReturns = (params?: Record<string, string | number>) =>
   client.get<PaginatedResponse<SalesReturn>>('/sales-returns/', { params })
+
+export const previewSalesOrderExcelImport = (file: File, marketplaceId: string, warehouseId: string) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('marketplace', marketplaceId)
+  form.append('warehouse', warehouseId)
+  return client.post('/sales-orders/import-preview/', form)
+}
+
+export const confirmSalesOrderExcelImport = (
+  file: File,
+  marketplaceId: string,
+  warehouseId: string,
+  skuMappings: { shopee_sku: string; variant_id: string }[],
+  skipUnmatched: boolean,
+) => {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('marketplace', marketplaceId)
+  form.append('warehouse', warehouseId)
+  form.append('sku_mappings', JSON.stringify(skuMappings))
+  form.append('skip_unmatched', String(skipUnmatched))
+  return client.post('/sales-orders/import-confirm/', form)
+}

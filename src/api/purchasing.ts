@@ -1,5 +1,5 @@
 import client from './client'
-import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolItemsResponse, SourcingPoolPreviewRow, SourcingPoolPreviewResult, SourcingPoolImportResult } from '../types/purchasing'
+import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolItemsResponse, SourcingPoolPreviewRow, SourcingPoolPreviewResult, SourcingPoolImportResult, ColorAbbreviation, AddPoolItemsRequest, AddPoolItemsResult, ResolveSkuConflictsRequest, ResolveSkuConflictsResult } from '../types/purchasing'
 import type { PaginatedResponse } from '../types/inventory'
 
 export const getPurchaseOrders = (params?: Record<string, string | number>) =>
@@ -46,6 +46,8 @@ export const getSourcingPoolItems = (supplierId: string, search?: string) =>
   client.get<SourcingPoolItemsResponse>('/sourcing-pool/items/', {
     params: {
       supplier_id: supplierId,
+      is_used: false,
+      is_active: true,
       page_size: 200,
       ...(search ? { search } : {}),
     },
@@ -68,26 +70,17 @@ export const importSourcingPoolRows = (supplierId: string, rows: SourcingPoolPre
     rows,
   })
 
-export const addDraftLine = (
-  poId: string,
-  data: { sourcing_item_id: string; ordered_qty: number; unit_price_foreign?: number },
-) =>
-  client.post<{ detail_id: string }>(`/purchase-order/${poId}/draft-lines/`, data)
+export const getColorAbbreviations = () =>
+  client.get<ColorAbbreviation[]>('/sourcing-pool/color-abbreviations/')
 
-export const finalizeDraftLine = (
-  poId: string,
-  detailId: string,
-  data: {
-    sku_suffix: string
-    category_id?: string | null
-    product_name?: string
-    dim1_key?: string
-    dim1_value?: string
-    dim2_key?: string
-    dim2_value?: string
-  },
-) =>
-  client.post<{ detail_id: string; variant_id: string }>(
-    `/purchase-order/${poId}/details/${detailId}/finalize/`,
-    data,
-  )
+export const upsertColorAbbreviation = (data: { color_name: string; abbreviation: string }) =>
+  client.post<ColorAbbreviation>('/sourcing-pool/color-abbreviations/', data)
+
+export const deleteColorAbbreviation = (color_name: string) =>
+  client.delete('/sourcing-pool/color-abbreviations/', { data: { color_name } })
+
+export const addPoolItemsToPo = (poId: string, data: AddPoolItemsRequest) =>
+  client.post<AddPoolItemsResult>(`/purchase-order/${poId}/add-pool-items/`, data)
+
+export const resolveSkuConflicts = (poId: string, data: ResolveSkuConflictsRequest) =>
+  client.post<ResolveSkuConflictsResult>(`/purchase-order/${poId}/resolve-sku-conflicts/`, data)

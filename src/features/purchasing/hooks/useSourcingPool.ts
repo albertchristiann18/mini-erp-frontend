@@ -4,10 +4,13 @@ import {
   downloadSourcingPoolTemplate,
   previewSourcingPoolUpload,
   importSourcingPoolRows,
-  addDraftLine,
-  finalizeDraftLine,
+  getColorAbbreviations,
+  upsertColorAbbreviation,
+  deleteColorAbbreviation,
+  addPoolItemsToPo,
+  resolveSkuConflicts,
 } from '../../../api/purchasing'
-import type { SourcingPoolItem, SourcingPoolPreviewRow } from '../../../types/purchasing'
+import type { SourcingPoolItem, SourcingPoolPreviewRow, AddPoolItemsRequest, ResolveSkuConflictsRequest } from '../../../types/purchasing'
 
 export const useSourcingPoolItems = (supplierId: string | undefined) => {
   return useQuery({
@@ -58,59 +61,54 @@ export const useImportSourcingPool = () => {
   })
 }
 
-export const useAddDraftLine = () =>
-  useMutation({
-    mutationFn: ({
-      poId,
-      sourcing_item_id,
-      ordered_qty,
-      unit_price_foreign,
-    }: {
-      poId: string
-      sourcing_item_id: string
-      ordered_qty: number
-      unit_price_foreign?: number
-    }) =>
-      addDraftLine(poId, { sourcing_item_id, ordered_qty, unit_price_foreign }).then((r) => r.data),
+export const useColorAbbreviations = () =>
+  useQuery({
+    queryKey: ['color-abbreviations'],
+    queryFn: () => getColorAbbreviations().then((r) => r.data),
+    staleTime: 60_000,
   })
 
-export const useFinalizeDraftLine = () => {
+export const useUpsertColorAbbreviation = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      poId,
-      detailId,
-      sku_suffix,
-      category_id,
-      product_name,
-      dim1_key,
-      dim1_value,
-      dim2_key,
-      dim2_value,
-    }: {
-      poId: string
-      detailId: string
-      sku_suffix: string
-      category_id?: string | null
-      product_name?: string
-      dim1_key?: string
-      dim1_value?: string
-      dim2_key?: string
-      dim2_value?: string
-    }) =>
-      finalizeDraftLine(poId, detailId, {
-        sku_suffix,
-        category_id,
-        product_name,
-        dim1_key,
-        dim1_value,
-        dim2_key,
-        dim2_value,
-      }).then(
-        (r) => r.data,
-      ),
-    onSuccess: (_data, variables) => {
+    mutationFn: (data: { color_name: string; abbreviation: string }) =>
+      upsertColorAbbreviation(data).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['color-abbreviations'] })
+    },
+  })
+}
+
+export const useDeleteColorAbbreviation = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (color_name: string) => deleteColorAbbreviation(color_name),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['color-abbreviations'] })
+    },
+  })
+}
+
+export const useAddPoolItemsToPo = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ poId, data }: { poId: string; data: AddPoolItemsRequest }) =>
+      addPoolItemsToPo(poId, data).then((r) => r.data),
+    onSuccess: (_result, variables) => {
       void qc.invalidateQueries({ queryKey: ['purchase-order', variables.poId] })
+      void qc.invalidateQueries({ queryKey: ['sourcing-pool-items'] })
+    },
+  })
+}
+
+export const useResolveSkuConflicts = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ poId, data }: { poId: string; data: ResolveSkuConflictsRequest }) =>
+      resolveSkuConflicts(poId, data).then((r) => r.data),
+    onSuccess: (_result, variables) => {
+      void qc.invalidateQueries({ queryKey: ['purchase-order', variables.poId] })
+      void qc.invalidateQueries({ queryKey: ['sourcing-pool-items'] })
     },
   })
 }

@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
       { label: 'Categories', to: '/inventory/categories' },
       { label: 'Marketplaces', to: '/inventory/marketplaces' },
       { label: 'Business Entities', to: '/inventory/business-entities' },
+      { label: 'Color Abbreviations', to: '/inventory/color-abbreviations' },
       { label: 'Stock', to: '/inventory/stock' },
       { label: 'Stock Closing', to: '/inventory/stock-closing' },
       { label: 'Warehouses', to: '/inventory/warehouses' },

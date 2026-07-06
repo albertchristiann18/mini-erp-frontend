@@ -20,7 +20,11 @@ vi.mock('../../../api/purchasing', () => ({
   downloadSourcingPoolTemplate: vi.fn(),
   previewSourcingPoolUpload: vi.fn(),
   importSourcingPoolRows: vi.fn(),
-  addDraftLine: vi.fn(),
+  getColorAbbreviations: vi.fn(),
+  upsertColorAbbreviation: vi.fn(),
+  deleteColorAbbreviation: vi.fn(),
+  addPoolItemsToPo: vi.fn(),
+  resolveSkuConflicts: vi.fn(),
 }))
 
 const mockedGetSourcingPoolItems = vi.mocked(getSourcingPoolItems)
