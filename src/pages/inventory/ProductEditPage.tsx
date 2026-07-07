@@ -375,8 +375,8 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
     setDim2Options(oldDim1Opts)
   }
 
-  const handleBulkFillPrice = (dim1Value: string, price: number) => {
-    setRows(prev => prev.map(r => !r.removed && r.variantValues[dim1Key] === dim1Value ? { ...r, base_price: price } : r))
+  const handleBulkFillPrice = (price: number) => {
+    setRows(prev => prev.map(r => !r.removed ? { ...r, base_price: price } : r))
   }
 
   const handleDimensionImageUpload = async (dimKey: string, dimValue: string, file: File) => {

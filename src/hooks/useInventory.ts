@@ -5,7 +5,7 @@ import {
   getStockMovements, getMasterCategories,
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
-  getProductSuppliers, createProductSupplier, deleteProductSupplier,
+  getProductSuppliers, createProductSupplier, deleteProductSupplier, updateProductSupplier,
   saveVariants, deleteCategory,   uploadVariantPhoto, deleteVariantPhoto, uploadDimensionImage, deleteDimensionImage,
   getCompanyMarketplaces, createCompanyMarketplace, updateCompanyMarketplace, deleteCompanyMarketplace,
   getBusinessEntities, createBusinessEntity,
@@ -277,6 +277,15 @@ export const useDeleteProductSupplier = (productId: string) => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => deleteProductSupplier(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-suppliers', productId] }),
+  })
+}
+
+export const useUpdateProductSupplier = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, supplier_link }: { id: string; supplier_link: string | null }) =>
+      updateProductSupplier(id, { supplier_link }).then(r => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['product-suppliers', productId] }),
   })
 }

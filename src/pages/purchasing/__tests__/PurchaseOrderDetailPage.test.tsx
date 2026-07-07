@@ -70,30 +70,13 @@ vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }))
 
-let mockPoolBrowserLines: import('../../../types/purchasing').DraftPoolLine[] = []
-
-vi.mock('../../../features/purchasing/components/PoolBrowser', () => ({
-  PoolBrowser: ({ onAddLines }: { supplierId: string; newItemKeys: Set<string>; onAddLines: (lines: import('../../../types/purchasing').DraftPoolLine[]) => void }) => (
-    <button data-testid="mock-add-pool-lines" onClick={() => onAddLines(mockPoolBrowserLines)}>
-      Add Pool Lines
-    </button>
-  ),
-}))
-
-vi.mock('../../../features/purchasing/components/SourcingPoolImportModal', () => ({
-  SourcingPoolImportModal: () => null,
-}))
-
-vi.mock('../../../features/purchasing/hooks/useSourcingPool', () => ({
-  useAddDraftLine: vi.fn(),
+vi.mock('../../../features/purchasing/components/SourcingImportWizard', () => ({
+  SourcingImportWizard: () => null,
 }))
 
 import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../../hooks/usePurchasing'
 import { useParams } from 'react-router-dom'
 import { toast } from '../../../lib/toast'
-import { useCreatePurchaseOrder } from '../../../hooks/usePurchasing'
-import { useWarehouses, useSuppliers } from '../../../hooks/useInventory'
-import { useAddDraftLine } from '../../../features/purchasing/hooks/useSourcingPool'
 
 const basePo = {
   id: 'po-1',
@@ -163,35 +146,9 @@ function renderPage() {
   )
 }
 
-function renderCreatePage() {
-  vi.mocked(useParams).mockReturnValue({ id: 'new' })
-  vi.mocked(usePurchaseOrder).mockReturnValue({ data: undefined, isLoading: false } as never)
-  vi.mocked(useWarehouses).mockReturnValue({
-    data: { results: [{ id: 'wh-1', name: 'Warehouse 1' }] },
-  } as never)
-  vi.mocked(useSuppliers).mockReturnValue({
-    data: { results: [{ id: 'sup-1', name: 'Supplier A' }] },
-  } as never)
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
-    <QueryClientProvider client={qc}>
-      <MemoryRouter>
-        <PurchaseOrderDetailPage />
-      </MemoryRouter>
-    </QueryClientProvider>,
-  )
-}
-
-async function selectWarehouseAndSupplier() {
-  await userEvent.click(screen.getByTestId('warehouse-select-trigger'))
-  await userEvent.click(await screen.findByText('Warehouse 1'))
-  await userEvent.click(screen.getByTestId('supplier-select-trigger'))
-  await userEvent.click(await screen.findByText('Supplier A'))
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
-  mockPoolBrowserLines = []
+  mockIsStaff = false
 })
 
 it('PO detail variant row shows photo upload when no photo', async () => {
@@ -938,7 +895,7 @@ it('test_dimension_warning_banner_shows_when_missing_dimensions', async () => {
   await waitFor(() => expect(screen.getByText(/have no product dimensions/)).toBeInTheDocument())
 })
 
-it('test_freight_strip_shows_in_delivered_po', async () => {
+it('shows_cogs_per_unit_inline_in_delivered_po', async () => {
   const baseDetail = {
     id: 'detail-1',
     variant_id: 'var-1',
@@ -985,8 +942,10 @@ it('test_freight_strip_shows_in_delivered_po', async () => {
   vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(deliveredPo))
   renderPage()
 
-  await waitFor(() => expect(screen.getByText(/COGS\/unit/)).toBeInTheDocument())
-  expect(screen.getByText(/Shipping\/unit/)).toBeInTheDocument()
+  // COGS/u now shown inline in the item row instead of a sub-row
+  await waitFor(() => {
+    expect(screen.getAllByText(/72\.000/).length).toBeGreaterThanOrEqual(1)
+  })
 })
 
 it('test_currency_change_autofills_zero_price_items', async () => {
@@ -1221,111 +1180,361 @@ it('test_currency_change_warning_when_existing_prices', async () => {
   })
 })
 
-it('mapped_pool_lines_go_into_order_details_not_draft_mutation', async () => {
-  mockPoolBrowserLines = [{
-    sourcing_item_id: 'si-1',
-    product_name: 'Widget',
-    variant_name: 'Red',
+
+
+it('collapse_all_button_hides_item_rows_and_expand_all_restores_them', async () => {
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+  const detail = {
+    id: 'detail-c1',
+    variant_id: 'var-c1',
+    product_variant_name: 'Blue Variant',
+    sku_variant_code: 'BLU-001',
+    product_id: 'prod-c1',
+    product_name: 'Collapsible Product',
+    product_supplier_link: null,
+    product_photo_url: null,
     ordered_qty: 5,
-    unit_price_foreign: 10,
-    image_proxy_url: null,
-    variant_id: 'v-mapped-1',
-  }]
-  const mockCreate = vi.fn().mockResolvedValue({ id: 'new-po-id' })
-  const mockAddDraft = vi.fn().mockResolvedValue({})
-  vi.mocked(useCreatePurchaseOrder).mockReturnValue({ mutateAsync: mockCreate, isPending: false } as never)
-  vi.mocked(useAddDraftLine).mockReturnValue({ mutateAsync: mockAddDraft, isPending: false } as never)
-
-  renderCreatePage()
-  await selectWarehouseAndSupplier()
-
-  await userEvent.click(screen.getByTestId('mock-add-pool-lines'))
-  await userEvent.click(screen.getByRole('button', { name: /create po/i }))
+    received_qty: null,
+    unit_price_foreign: '10.00',
+    unit_price_base: 15000,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: '50.00',
+    total_price_base: 75000,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: '',
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 0,
+    incoming_qty: 0,
+    variant_values: {},
+    last_unit_price_foreign: null,
+    last_currency: null,
+    cogs_per_unit_idr: null,
+    shipping_per_unit_idr: null,
+    delivery_per_unit_idr: null,
+    commission_per_unit_idr: null,
+  }
+  const po = { ...basePo, status: 'DELIVERED', order_details: [detail] }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  renderPage()
 
   await waitFor(() => {
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        order_details: expect.arrayContaining([
-          expect.objectContaining({ product_variant_id: 'v-mapped-1', ordered_qty: 5 }),
-        ]),
-      }),
-    )
+    expect(screen.getByText('Blue Variant')).toBeInTheDocument()
   })
-  expect(mockAddDraft).not.toHaveBeenCalled()
+
+  const collapseBtn = await screen.findByRole('button', { name: /collapse all/i })
+  await userEvent.click(collapseBtn)
+
+  await waitFor(() => {
+    expect(screen.queryByText('Blue Variant')).not.toBeInTheDocument()
+  })
+
+  const expandBtn = screen.getByRole('button', { name: /expand all/i })
+  await userEvent.click(expandBtn)
+
+  await waitFor(() => {
+    expect(screen.getByText('Blue Variant')).toBeInTheDocument()
+  })
 })
 
-it('unmapped_pool_lines_go_through_draft_mutation_not_order_details', async () => {
-  mockPoolBrowserLines = [{
-    sourcing_item_id: 'si-2',
-    product_name: 'Widget',
-    variant_name: 'Blue',
-    ordered_qty: 3,
-    unit_price_foreign: 12,
-    image_proxy_url: null,
-    variant_id: null,
-  }]
-  const mockCreate = vi.fn().mockResolvedValue({ id: 'new-po-id' })
-  const mockAddDraft = vi.fn().mockResolvedValue({})
-  vi.mocked(useCreatePurchaseOrder).mockReturnValue({ mutateAsync: mockCreate, isPending: false } as never)
-  vi.mocked(useAddDraftLine).mockReturnValue({ mutateAsync: mockAddDraft, isPending: false } as never)
-
-  renderCreatePage()
-  await selectWarehouseAndSupplier()
-  await userEvent.click(screen.getByTestId('mock-add-pool-lines'))
-  await userEvent.click(screen.getByRole('button', { name: /create po/i }))
+it('group_header_shows_unit_price_and_cogs_per_unit', async () => {
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+  const detail = {
+    id: 'detail-g1',
+    variant_id: 'var-g1',
+    product_variant_name: 'Red Variant',
+    sku_variant_code: 'RED-001',
+    product_id: 'prod-g1',
+    product_name: 'Group Header Product',
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: 10,
+    received_qty: 10,
+    unit_price_foreign: '10.00',
+    unit_price_base: 15000,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: '100.00',
+    total_price_base: 150000,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: '',
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 0,
+    incoming_qty: 0,
+    variant_values: {},
+    last_unit_price_foreign: null,
+    last_currency: null,
+    shipping_per_unit_idr: 500,
+    delivery_per_unit_idr: 0,
+    commission_per_unit_idr: 0,
+    cogs_per_unit_idr: 15500,
+  }
+  const po = { ...basePo, status: 'DELIVERED', order_details: [detail] }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  renderPage()
 
   await waitFor(() => {
-    expect(mockAddDraft).toHaveBeenCalledWith(
-      expect.objectContaining({ poId: 'new-po-id', sourcing_item_id: 'si-2', ordered_qty: 3 }),
-    )
+    const cogsMatches = screen.getAllByText(/15\.500/)
+    expect(cogsMatches.length).toBeGreaterThanOrEqual(1)
+    const priceMatches = screen.getAllByText(/10,00/)
+    expect(priceMatches.length).toBeGreaterThanOrEqual(1)
   })
-  const createCall = mockCreate.mock.calls[0][0] as { order_details: unknown[] }
-  expect(createCall.order_details).toHaveLength(0)
 })
 
-it('mixed_mapped_and_unmapped_lines_split_correctly', async () => {
-  mockPoolBrowserLines = [
-    {
-      sourcing_item_id: 'si-3',
-      product_name: 'Widget',
-      variant_name: 'Red',
-      ordered_qty: 5,
-      unit_price_foreign: 10,
-      image_proxy_url: null,
-      variant_id: 'v-mapped-2',
+it('COMPLETED PO with empty file field shows Upload button', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    status: 'COMPLETED',
+    editable_fields: {
+      header: ['note', 'has_discount', 'purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'],
+      order_detail: [],
     },
-    {
-      sourcing_item_id: 'si-4',
-      product_name: 'Widget',
-      variant_name: 'Green',
-      ordered_qty: 2,
-      unit_price_foreign: 8,
-      image_proxy_url: null,
-      variant_id: null,
-    },
-  ]
-  const mockCreate = vi.fn().mockResolvedValue({ id: 'new-po-id' })
-  const mockAddDraft = vi.fn().mockResolvedValue({})
-  vi.mocked(useCreatePurchaseOrder).mockReturnValue({ mutateAsync: mockCreate, isPending: false } as never)
-  vi.mocked(useAddDraftLine).mockReturnValue({ mutateAsync: mockAddDraft, isPending: false } as never)
+    purchase_order_invoice_file: null,
+    delivery_order_file: 'https://example.com/do.pdf',
+    delivery_order_invoice_file: 'https://example.com/doi.pdf',
+    packing_list_file: 'https://example.com/pl.pdf',
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
 
-  renderCreatePage()
-  await selectWarehouseAndSupplier()
-  await userEvent.click(screen.getByTestId('mock-add-pool-lines'))
-  await userEvent.click(screen.getByRole('button', { name: /create po/i }))
+  renderPage()
 
   await waitFor(() => {
-    expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        order_details: expect.arrayContaining([
-          expect.objectContaining({ product_variant_id: 'v-mapped-2' }),
-        ]),
-      }),
-    )
-    expect(mockAddDraft).toHaveBeenCalledWith(
-      expect.objectContaining({ poId: 'new-po-id', sourcing_item_id: 'si-4' }),
-    )
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
   })
-  const createCall = mockCreate.mock.calls[0][0] as { order_details: unknown[] }
-  expect(createCall.order_details).toHaveLength(1)
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await waitFor(() => {
+    expect(screen.getByText('Upload')).toBeInTheDocument()
+  })
+})
+
+it('COMPLETED PO with all files present shows no Upload or Replace', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    status: 'COMPLETED',
+    editable_fields: {
+      header: ['note', 'has_discount', 'purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'],
+      order_detail: [],
+    },
+    purchase_order_invoice_file: 'https://example.com/invoice.pdf',
+    delivery_order_file: 'https://example.com/do.pdf',
+    delivery_order_invoice_file: 'https://example.com/doi.pdf',
+    packing_list_file: 'https://example.com/pl.pdf',
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await waitFor(() => {
+    expect(screen.queryByText('Upload')).not.toBeInTheDocument()
+    expect(screen.queryByText('Replace')).not.toBeInTheDocument()
+  })
+})
+
+it('non-COMPLETED PO with existing file still shows Replace button', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    status: 'DELIVERED',
+    editable_fields: {
+      header: ['note', 'has_discount', 'purchase_order_invoice_file', 'delivery_order_file', 'delivery_order_invoice_file', 'packing_list_file'],
+      order_detail: [],
+    },
+    purchase_order_invoice_file: 'https://example.com/invoice.pdf',
+    delivery_order_file: null,
+    delivery_order_invoice_file: null,
+    packing_list_file: null,
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await userEvent.click(screen.getByRole('button', { name: /edit/i }))
+
+  await waitFor(() => {
+    expect(screen.getByText('Replace')).toBeInTheDocument()
+  })
+})
+
+const commissionDetail = {
+  id: 'detail-comm',
+  variant_id: 'var-comm',
+  product_variant_name: 'Commission Variant',
+  product_id: 'prod-comm',
+  product_name: 'Commission Product',
+  product_supplier_link: null,
+  product_photo_url: null,
+  ordered_qty: 1,
+  received_qty: null,
+  unit_price_foreign: '1000.000',
+  unit_price_base: 15000000,
+  discounted_unit_price_foreign: null,
+  discounted_unit_price_base: null,
+  total_price_foreign: '1000.000',
+  total_price_base: 15000000,
+  discounted_total_price_foreign: null,
+  discounted_total_price_base: null,
+  remarks: '',
+  avg_sales: null,
+  avg_sales_7d: null,
+  stock_on_hand: 0,
+  incoming_qty: 0,
+  variant_values: {},
+}
+
+it('live_commission_calculated_from_order_details_in_view_mode', async () => {
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 5,
+    exchange_rate: '15000',
+    commission_fee: 0,
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/750\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('live_commission_updates_when_commission_pct_changed_in_edit_mode', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 5,
+    exchange_rate: '15000',
+    commission_fee: 0,
+    editable_fields: { header: ['commission_fee_pct', 'exchange_rate'], order_detail: [] },
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const commissionLabel = await screen.findByText(/Commission %/i)
+  const commissionPctInput = commissionLabel.closest('div')!.querySelector('input') as HTMLInputElement
+
+  await userEvent.clear(commissionPctInput)
+  await userEvent.type(commissionPctInput, '10')
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/1\.500\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('live_commission_updates_when_exchange_rate_changed_in_edit_mode', async () => {
+  mockIsStaff = true
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 5,
+    exchange_rate: '15000',
+    commission_fee: 0,
+    editable_fields: { header: ['commission_fee_pct', 'exchange_rate'], order_detail: [] },
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  const editButton = screen.getByRole('button', { name: /edit/i })
+  await userEvent.click(editButton)
+
+  const exchangeRateLabel = await screen.findByText(/Exchange Rate/i)
+  const exchangeRateInput = exchangeRateLabel.closest('div')!.querySelector('input') as HTMLInputElement
+
+  await userEvent.tripleClick(exchangeRateInput)
+  await userEvent.type(exchangeRateInput, '20000')
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/1\.000\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('live_commission_falls_back_to_stored_when_pct_is_null', async () => {
+  const po = {
+    ...basePo,
+    commission_fee_pct: null,
+    commission_fee: 500_000,
+    order_details: [],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/500\.000/).length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+it('zero_commission_pct_shows_Rp_0_not_dash', async () => {
+  const po = {
+    ...basePo,
+    has_discount: false,
+    commission_fee_pct: 0,
+    exchange_rate: '15000',
+    commission_fee: 99_999,
+    order_details: [{ ...commissionDetail, discounted_total_price_foreign: null }],
+  }
+  vi.mocked(usePurchaseOrder).mockReturnValue(hookResult(po))
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  await waitFor(() => {
+    expect(screen.getByText('PO-001')).toBeInTheDocument()
+  })
+
+  await waitFor(() => {
+    expect(screen.getAllByText(/Rp\s*0/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  expect(screen.queryByText(/99\.999/)).not.toBeInTheDocument()
 })

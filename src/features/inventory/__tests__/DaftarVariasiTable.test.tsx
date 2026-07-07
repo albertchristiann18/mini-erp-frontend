@@ -53,9 +53,34 @@ describe('DaftarVariasiTable', () => {
     expect(screen.getByText(/Belum ada variasi/)).toBeInTheDocument()
   })
 
-  it('shows empty state when dim1Options is empty', () => {
-    renderTable({ dim1Options: [] })
+  it('shows empty state when dim1Options is empty and no active rows', () => {
+    renderTable({ dim1Options: [], rows: [] })
     expect(screen.getByText(/Belum ada variasi/)).toBeInTheDocument()
+  })
+
+  it('renders orphaned rows with warning when dim1Options is empty but active rows exist', () => {
+    const rows = [
+      makeRow({ variantValues: { Warna: 'Merah', Ukuran: 'S' }, sku_variant_code: 'RED-S' }),
+    ]
+    renderTable({ dim1Options: [], rows })
+    expect(screen.getByText('⚠')).toBeInTheDocument()
+    expect(screen.getByText('Merah')).toBeInTheDocument()
+  })
+
+  it('renders orphaned rows with empty string dim1Value when dimension key changed', () => {
+    const rows = [
+      makeRow({
+        variantValues: { Ukuran: '100', Berat: '1kg' },
+        sku_variant_code: 'ORPHAN-100',
+        base_price: 25000,
+        total_available_qty: 3,
+      }),
+    ]
+    renderTable({ dim1Key: 'color', dim1Options: [], rows })
+    expect(screen.queryByText(/Belum ada variasi/)).not.toBeInTheDocument()
+    expect(screen.getByText('⚠')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('ORPHAN-100')).toBeInTheDocument()
   })
 
   it('renders column header with dim1Key name', () => {
@@ -88,27 +113,35 @@ describe('DaftarVariasiTable', () => {
     expect(screen.getAllByText('M')).toHaveLength(1)
   })
 
-  it('renders a Terapkan ke semua row after each group', () => {
+  it('renders a single Terapkan ke semua row at the top', () => {
     renderTable()
-    expect(screen.getAllByText(/Terapkan ke semua/)).toHaveLength(2) // one per group
+    expect(screen.getAllByText(/Terapkan ke semua/)).toHaveLength(1)
   })
 
-  it('TerapkanRow calls onBulkFillPrice with correct dim1Value and price when button clicked', async () => {
+  it('TerapkanRow calls onBulkFillPrice with price only when button clicked', async () => {
     const onBulkFillPrice = vi.fn()
     renderTable({ onBulkFillPrice })
-    const priceInputs = screen.getAllByPlaceholderText('0')
-    fireEvent.change(priceInputs[0], { target: { value: '75000' } })
-    const terapkanBtns = screen.getAllByRole('button', { name: 'Terapkan' })
-    await userEvent.click(terapkanBtns[0])
-    expect(onBulkFillPrice).toHaveBeenCalledWith('Merah', 75000)
+    const priceInput = screen.getByPlaceholderText('0')
+    fireEvent.change(priceInput, { target: { value: '75000' } })
+    const terapkanBtn = screen.getByRole('button', { name: 'Terapkan' })
+    await userEvent.click(terapkanBtn)
+    expect(onBulkFillPrice).toHaveBeenCalledWith(75000)
   })
 
   it('TerapkanRow does not call onBulkFillPrice when price input is empty', async () => {
     const onBulkFillPrice = vi.fn()
     renderTable({ onBulkFillPrice })
-    const terapkanBtns = screen.getAllByRole('button', { name: 'Terapkan' })
-    await userEvent.click(terapkanBtns[0])
+    const terapkanBtn = screen.getByRole('button', { name: 'Terapkan' })
+    await userEvent.click(terapkanBtn)
     expect(onBulkFillPrice).not.toHaveBeenCalled()
+  })
+
+  it('single TerapkanRow appears even when all rows are orphaned (dim1Options empty)', () => {
+    const rows = [
+      makeRow({ variantValues: { Warna: 'Hijau', Ukuran: 'S' }, sku_variant_code: 'GRN-S' }),
+    ]
+    renderTable({ dim1Options: [], rows })
+    expect(screen.getByText(/Terapkan ke semua/)).toBeInTheDocument()
   })
 
   it('orphaned row (dim1 value not in dim1Options) shows warning icon', () => {

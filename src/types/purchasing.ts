@@ -42,9 +42,6 @@ export interface PurchaseOrderDetail {
   commission_per_unit_idr: number | null
   cogs_per_unit_idr: number | null
   product_has_dimensions: boolean | null
-  sourcing_item_id: string | null
-  is_draft: boolean
-  draft_product_name: string
   product_dim1_key: string | null
 }
 
@@ -145,36 +142,83 @@ export interface ReplenishmentItem {
   avg_sales_30d: number
 }
 
-export interface SourcingPoolItem {
-  id: string
-  product_name: string | null
-  product_name_derived?: boolean
-  variant_name: string
-  category_id: string | null
-  category_name: string | null
-  category_code: string | null
-  unit_price: string
-  discounted_price: string | null
-  qty_suggested: number | null
-  supplier_link: string | null
-  image_url: string | null
-  image_proxy_url: string | null
-  image_download_status: 'PENDING' | 'DONE' | 'FAILED'
-  notes: string | null
-  times_ordered: number
-  cdate: string
-  udate: string
-  variant_id: string | null
-  variant_code: string | null
+export interface MissingColor {
+  color_name: string
 }
 
-export interface SourcingPoolItemsResponse {
-  pool_id: string | null
-  count?: number
-  next?: string | null
-  previous?: string | null
-  results?: SourcingPoolItem[]
-  items?: SourcingPoolItem[]
+export interface MissingProductName {
+  row: number
+  supplier_link: string | null
+  dim1_key: string | null
+  dim1_value: string | null
+  dim2_key: string | null
+  dim2_value: string | null
+  unit_price: string
+}
+
+export interface DimMismatch {
+  row: number
+  variant_code: string
+  dim1_key: string | null
+  dim1_value: string | null
+  dim2_key: string | null
+  dim2_value: string | null
+}
+
+export interface ColorAbbreviation {
+  id: string
+  color_name: string
+  abbreviation: string
+}
+
+export interface SKUConflict {
+  row_key: string
+  row: SourcingPoolPreviewRow
+  variant_code: string
+  sku_code: string
+  existing_product_id: string
+  existing_product_name: string
+}
+
+export interface AddedPoolItem {
+  item_id: string
+  po_detail_id: string
+  product_name: string
+  variant_name: string
+}
+
+export interface SkippedPoolItem {
+  item_id: string
+  product_name: string
+  variant_name: string
+  reason: string
+}
+
+export interface ImportAndAddRequest {
+  supplier_id: string
+  rows: SourcingPoolPreviewRow[]
+  dim_mismatch_resolutions: Record<string, 'variant_code' | 'dims'>
+}
+
+export interface ImportAndAddResult {
+  added: AddedPoolItem[]
+  skipped: SkippedPoolItem[]
+  sku_conflicts: SKUConflict[]
+}
+
+export interface SourcingConflictResolution {
+  row: SourcingPoolPreviewRow
+  action: 'add_to_existing' | 'skip'
+  product_id?: string
+}
+
+export interface ResolveSourcingConflictsRequest {
+  resolutions: SourcingConflictResolution[]
+}
+
+export interface ResolveSourcingConflictsResult {
+  added: AddedPoolItem[]
+  skipped: SkippedPoolItem[]
 }
 
 export interface SourcingPoolPreviewRow {
@@ -187,6 +231,15 @@ export interface SourcingPoolPreviewRow {
   supplier_link?: string | null
   image_url?: string | null
   notes?: string | null
+  variant_code?: string | null
+  dim1_key?: string | null
+  dim1_value?: string | null
+  dim2_key?: string | null
+  dim2_value?: string | null
+  row: number
+  variant_id?: string | null
+  category_id?: string | null
+  category_name?: string | null
   [key: string]: unknown
 }
 
@@ -200,20 +253,9 @@ export interface SourcingPoolPreviewError {
 export interface SourcingPoolPreviewResult {
   valid: SourcingPoolPreviewRow[]
   errors: SourcingPoolPreviewError[]
+  missing_colors: MissingColor[]
+  missing_product_names: MissingProductName[]
+  dim_mismatches: DimMismatch[]
 }
 
-export interface SourcingPoolImportResult {
-  created: number
-  updated: number
-  pool_id: string
-}
 
-export interface DraftPoolLine {
-  sourcing_item_id: string
-  product_name: string | null
-  variant_name: string
-  ordered_qty: number
-  unit_price_foreign: number
-  image_proxy_url: string | null
-  variant_id: string | null
-}

@@ -1,26 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getSourcingPoolItems,
   downloadSourcingPoolTemplate,
   previewSourcingPoolUpload,
-  importSourcingPoolRows,
-  addDraftLine,
-  finalizeDraftLine,
+  getColorAbbreviations,
+  upsertColorAbbreviation,
+  deleteColorAbbreviation,
+  importAndAdd,
+  resolveSourcingConflicts,
 } from '../../../api/purchasing'
-import type { SourcingPoolItem, SourcingPoolPreviewRow } from '../../../types/purchasing'
-
-export const useSourcingPoolItems = (supplierId: string | undefined) => {
-  return useQuery({
-    queryKey: ['sourcing-pool-items', supplierId],
-    queryFn: async () => {
-      const resp = await getSourcingPoolItems(supplierId!)
-      const items: SourcingPoolItem[] = resp.data.results ?? resp.data.items ?? []
-      return { pool_id: resp.data.pool_id, items }
-    },
-    enabled: !!supplierId && supplierId !== 'none' && supplierId !== '',
-    staleTime: 30_000,
-  })
-}
+import type { ImportAndAddRequest, ResolveSourcingConflictsRequest } from '../../../types/purchasing'
 
 export const useDownloadSourcingPoolTemplate = () =>
   useMutation({
@@ -42,74 +30,51 @@ export const usePreviewSourcingPool = () =>
     mutationFn: (file: File) => previewSourcingPoolUpload(file).then((r) => r.data),
   })
 
-export const useImportSourcingPool = () => {
+export const useColorAbbreviations = () =>
+  useQuery({
+    queryKey: ['color-abbreviations'],
+    queryFn: () => getColorAbbreviations().then((r) => r.data),
+    staleTime: 60_000,
+  })
+
+export const useUpsertColorAbbreviation = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      supplierId,
-      rows,
-    }: {
-      supplierId: string
-      rows: SourcingPoolPreviewRow[]
-    }) => importSourcingPoolRows(supplierId, rows).then((r) => r.data),
-    onSuccess: (_data, variables) => {
-      void qc.invalidateQueries({ queryKey: ['sourcing-pool-items', variables.supplierId] })
+    mutationFn: (data: { color_name: string; abbreviation: string }) =>
+      upsertColorAbbreviation(data).then((r) => r.data),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['color-abbreviations'] })
     },
   })
 }
 
-export const useAddDraftLine = () =>
-  useMutation({
-    mutationFn: ({
-      poId,
-      sourcing_item_id,
-      ordered_qty,
-      unit_price_foreign,
-    }: {
-      poId: string
-      sourcing_item_id: string
-      ordered_qty: number
-      unit_price_foreign?: number
-    }) =>
-      addDraftLine(poId, { sourcing_item_id, ordered_qty, unit_price_foreign }).then((r) => r.data),
-  })
-
-export const useFinalizeDraftLine = () => {
+export const useDeleteColorAbbreviation = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      poId,
-      detailId,
-      sku_suffix,
-      category_id,
-      product_name,
-      dim1_key,
-      dim1_value,
-      dim2_key,
-      dim2_value,
-    }: {
-      poId: string
-      detailId: string
-      sku_suffix: string
-      category_id?: string | null
-      product_name?: string
-      dim1_key?: string
-      dim1_value?: string
-      dim2_key?: string
-      dim2_value?: string
-    }) =>
-      finalizeDraftLine(poId, detailId, {
-        sku_suffix,
-        category_id,
-        product_name,
-        dim1_key,
-        dim1_value,
-        dim2_key,
-        dim2_value,
-      }).then(
-        (r) => r.data,
-      ),
-    onSuccess: (_data, variables) => {
+    mutationFn: (color_name: string) => deleteColorAbbreviation(color_name),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['color-abbreviations'] })
+    },
+  })
+}
+
+export const useImportAndAdd = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ poId, data }: { poId: string; data: ImportAndAddRequest }) =>
+      importAndAdd(poId, data).then((r) => r.data),
+    onSuccess: (_result, variables) => {
+      void qc.invalidateQueries({ queryKey: ['purchase-order', variables.poId] })
+    },
+  })
+}
+
+export const useResolveSourcingConflicts = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ poId, data }: { poId: string; data: ResolveSourcingConflictsRequest }) =>
+      resolveSourcingConflicts(poId, data).then((r) => r.data),
+    onSuccess: (_result, variables) => {
       void qc.invalidateQueries({ queryKey: ['purchase-order', variables.poId] })
     },
   })

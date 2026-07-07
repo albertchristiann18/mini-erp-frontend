@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect } from 'vitest'
 import ProductDetailPage from '../ProductDetailPage'
+import { toast } from '../../../lib/toast'
 
 const mockUseProduct = vi.fn()
 const mockUseSaveVariants = vi.fn()
@@ -12,6 +13,8 @@ const mockUseAttachBusinessEntity = vi.fn()
 const mockUseDetachBusinessEntity = vi.fn()
 const mockUseBusinessEntities = vi.fn()
 const mockUseAuth = vi.fn()
+const mockUseUpdateProductSupplier = vi.fn()
+const mockMutateAsync = vi.fn()
 
 vi.mock('../../../hooks/useInventory', () => ({
   useProduct: (...args: unknown[]) => mockUseProduct(...args),
@@ -21,11 +24,14 @@ vi.mock('../../../hooks/useInventory', () => ({
   useAttachBusinessEntity: (...args: unknown[]) => mockUseAttachBusinessEntity(...args),
   useDetachBusinessEntity: (...args: unknown[]) => mockUseDetachBusinessEntity(...args),
   useBusinessEntities: (...args: unknown[]) => mockUseBusinessEntities(...args),
+  useUpdateProductSupplier: (...args: unknown[]) => mockUseUpdateProductSupplier(...args),
 }))
 
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: (...args: unknown[]) => mockUseAuth(...args),
 }))
+
+vi.mock('../../../lib/toast')
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -75,6 +81,14 @@ function renderPage() {
     </QueryClientProvider>,
   )
 }
+
+beforeEach(() => {
+  mockMutateAsync.mockResolvedValue({})
+  mockUseUpdateProductSupplier.mockReturnValue({
+    mutateAsync: mockMutateAsync,
+    isPending: false,
+  } as any)
+})
 
 it('test_product_detail_shows_suppliers_section', () => {
   mockUseAuth.mockReturnValue({ user: { is_staff: true } })
@@ -179,4 +193,83 @@ it('test_shows_empty_business_entities', () => {
   renderPage()
 
   expect(screen.getByText('No business entities attached')).toBeInTheDocument()
+})
+
+it('hides edit pencil for non-staff users', () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: false } })
+  mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
+  mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseProductSuppliers.mockReturnValue({ data: { results: mockSuppliers, count: 2, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+
+  renderPage()
+
+  expect(screen.queryByTestId('edit-supplier-link-ps1')).not.toBeInTheDocument()
+})
+
+it('sends null when saving empty supplier link', async () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true } })
+  mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
+  mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseProductSuppliers.mockReturnValue({ data: { results: mockSuppliers, count: 2, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+
+  renderPage()
+
+  fireEvent.click(screen.getByTestId('edit-supplier-link-ps1'))
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+  await vi.waitFor(() => {
+    expect(mockMutateAsync).toHaveBeenCalledWith({ id: 'ps1', supplier_link: null })
+  })
+})
+
+it('shows error toast when save fails and dialog stays open', async () => {
+  mockMutateAsync.mockRejectedValue(new Error('network error'))
+  mockUseAuth.mockReturnValue({ user: { is_staff: true } })
+  mockUseProduct.mockReturnValue({ data: baseProduct, isLoading: false })
+  mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseProductSuppliers.mockReturnValue({ data: { results: mockSuppliers, count: 2, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+
+  renderPage()
+
+  fireEvent.click(screen.getByTestId('edit-supplier-link-ps1'))
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+  await vi.waitFor(() => {
+    expect(vi.mocked(toast.error)).toHaveBeenCalledWith('Failed to update supplier link')
+  })
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+})
+
+it('renders without crashing when variant_options has non-array values', () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: true } })
+  mockUseProduct.mockReturnValue({
+    data: {
+      ...baseProduct,
+      variant_options: { size: ['S', 'M', 'L'], color: 'red' },
+    },
+    isLoading: false,
+  })
+  mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseProductSuppliers.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseProductBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: { results: [], count: 0, next: null, previous: null } })
+
+  renderPage()
+
+  expect(screen.getByText('Test Product')).toBeInTheDocument()
 })

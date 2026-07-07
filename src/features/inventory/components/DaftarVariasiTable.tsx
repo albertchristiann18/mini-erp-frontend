@@ -129,7 +129,7 @@ interface DaftarVariasiTableProps {
   isEditing: boolean
   onRowChange: (globalIdx: number, field: 'sku_variant_code' | 'base_price', value: string | number) => void
   onRemoveRow: (globalIdx: number) => void
-  onBulkFillPrice: (dim1Value: string, price: number) => void
+  onBulkFillPrice: (price: number) => void
   onDimensionImageUpload: (dimKey: string, dimValue: string, file: File) => Promise<void>
   onDimensionImageDelete: (dimKey: string, dimValue: string) => Promise<void>
 }
@@ -163,7 +163,7 @@ export function DaftarVariasiTable({
     .map((row, globalIdx) => ({ row, globalIdx }))
     .filter(({ row }) => !row.removed)
 
-  if (!dim1Key || dim1Options.length === 0) {
+  if (!dim1Key || (dim1Options.length === 0 && activeRows.length === 0)) {
     return (
       <div className="px-4 py-8 text-center text-sm text-muted-foreground">
         Belum ada variasi. Tambah opsi Variasi 1 di atas untuk memulai.
@@ -218,6 +218,12 @@ export function DaftarVariasiTable({
           </tr>
         </thead>
         <tbody>
+          {isEditing && (
+            <TerapkanRow
+              colSpan={terapkanColSpan + (isEditing ? 1 : 0) + 1}
+              onApply={(price) => onBulkFillPrice(price)}
+            />
+          )}
           {grouped.map(({ dim1Value, rows: groupRows, isOrphaned }) => {
             if (groupRows.length === 0) return null
 
@@ -242,7 +248,7 @@ export function DaftarVariasiTable({
                     {rowIdx === 0 && (
                       <td rowSpan={groupRows.length} className="px-3 py-2 text-sm font-medium whitespace-nowrap align-top pt-3">
                         {isOrphaned && <span className="text-amber-500 mr-1">⚠</span>}
-                        {dim1Value}
+                        {dim1Value || '—'}
                       </td>
                     )}
                     {hasDim2 && (
@@ -254,7 +260,7 @@ export function DaftarVariasiTable({
                       <Input
                         value={row.sku_variant_code}
                         onChange={(e) => onRowChange(globalIdx, 'sku_variant_code', e.target.value)}
-                        className="h-7 text-xs font-mono w-28"
+                        className="h-7 text-xs font-mono w-40"
                       />
                     </Cell>
                     <Cell>
@@ -286,11 +292,6 @@ export function DaftarVariasiTable({
                     </Cell>
                   </tr>
                 ))}
-                <TerapkanRow
-                  key={`terapkan-${dim1Value}`}
-                  colSpan={terapkanColSpan + (isEditing ? 1 : 0) + 1}
-                  onApply={(price) => onBulkFillPrice(dim1Value, price)}
-                />
               </React.Fragment>
             )
           })}

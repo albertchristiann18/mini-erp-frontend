@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+ 
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
 import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
@@ -7,17 +8,13 @@ import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSele
 import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
-import { FinalizeDraftLineModal } from '../../features/purchasing/components/FinalizeDraftLineModal'
-import { SourcingPoolImportModal } from '../../features/purchasing/components/SourcingPoolImportModal'
-import { PoolBrowser } from '../../features/purchasing/components/PoolBrowser'
-import { useAddDraftLine } from '../../features/purchasing/hooks/useSourcingPool'
-import type { DraftPoolLine } from '../../types/purchasing'
+import { SourcingImportWizard } from '../../features/purchasing/components/SourcingImportWizard'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, AlertTriangle, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, Upload, X as XIcon, ImagePlus } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, Upload, X as XIcon, ImagePlus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
@@ -148,7 +145,6 @@ export default function PurchaseOrderDetailPage() {
     (headerValues.supplier_id ? String(headerValues.supplier_id) : undefined) ??
     undefined
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
-  const [finalizingDetail, setFinalizingDetail] = useState<PurchaseOrderDetail | null>(null)
 
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
@@ -162,12 +158,7 @@ export default function PurchaseOrderDetailPage() {
       return next
     })
 
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [showSupplierPickModal, setShowSupplierPickModal] = useState(false)
-  const [supplierPickValue, setSupplierPickValue] = useState('')
-  const [draftPoolLines, setDraftPoolLines] = useState<DraftPoolLine[]>([])
-  const [newItemKeys, setNewItemKeys] = useState<Set<string>>(new Set())
-  const addDraftLineMutation = useAddDraftLine()
+  const [showImportWizard, setShowImportWizard] = useState(false)
 
   const handleVariantPhotoUpload = async (variantId: string, productId: string, file: File) => {
     setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: true }))
@@ -220,12 +211,31 @@ export default function PurchaseOrderDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
 
-  useEffect(() => {
-    if (isCreating) {
-      setNewItemKeys(new Set())
-      setDraftPoolLines([])
+
+
+  const allGroupKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const item of (po?.order_details ?? []).filter(i => !deletedDetailIds.has(i.id))) {
+      if (groupBy === 'product') {
+        keys.add(item.product_id || 'unknown')
+      } else if (groupBy === 'flat') {
+        keys.add(item.id)
+      } else {
+        const dimValue = item.variant_values?.[groupBy] ?? 'Other'
+        keys.add(`${item.product_id}_${dimValue}`)
+      }
     }
-  }, [activeSupplierId, isCreating])
+    const canAddDelItems = isCreating || (po?.status ?? '') === 'DRAFT' || (po?.status ?? '') === 'ORDERED'
+    if (editMode && canAddDelItems) {
+      for (const n of newItems) {
+        keys.add(n.product_id || `new-${n._tempId}`)
+      }
+    }
+    return [...keys]
+  }, [po?.order_details, groupBy, deletedDetailIds, editMode, isCreating, po?.status, newItems])
+
+  const allCollapsed = allGroupKeys.length > 0 &&
+    allGroupKeys.every(k => collapsedGroups.has(k))
 
   if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -349,7 +359,7 @@ export default function PurchaseOrderDetailPage() {
     const errors: string[] = []
     if (!headerValues.warehouse_id) errors.push('Warehouse is required')
     const validItems = newItems.filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign !== '')
-    if (validItems.length === 0 && draftPoolLines.length === 0) errors.push('At least one order item or sourcing pool selection is required')
+    if (validItems.length === 0) errors.push('At least one order item is required')
     if (errors.length > 0) {
       setValidationErrors(errors)
       return
@@ -363,8 +373,6 @@ export default function PurchaseOrderDetailPage() {
       const val = headerValues[field]
       if (val != null && val !== '') payload[field] = numericFields.includes(field) ? Number(val) : val
     }
-    const mappedPoolLines = draftPoolLines.filter((dl) => dl.variant_id != null)
-    const unmappedPoolLines = draftPoolLines.filter((dl) => dl.variant_id == null)
     payload.order_details = [
       ...validItems.map(n => ({
         product_variant_id: n.product_variant_id,
@@ -374,29 +382,11 @@ export default function PurchaseOrderDetailPage() {
           ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
           : {}),
       })),
-      ...mappedPoolLines.map((dl) => ({
-        product_variant_id: dl.variant_id!,
-        ordered_qty: dl.ordered_qty,
-        unit_price_foreign: dl.unit_price_foreign,
-      })),
     ]
     try {
       const result = await createMutation.mutateAsync(payload)
-      const newId = result.id
-      for (const dl of unmappedPoolLines) {
-        try {
-          await addDraftLineMutation.mutateAsync({
-            poId: newId,
-            sourcing_item_id: dl.sourcing_item_id,
-            ordered_qty: dl.ordered_qty,
-            unit_price_foreign: dl.unit_price_foreign,
-          })
-        } catch {
-          toast.error(`Failed to add draft line: ${dl.variant_name}`)
-        }
-      }
       toast.success('Purchase order created')
-      navigate(`/purchasing/orders/${newId}`)
+      navigate(`/purchasing/orders/${result.id}`)
     } catch (err: unknown) {
       const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
       if (data && typeof data === 'object') {
@@ -412,24 +402,6 @@ export default function PurchaseOrderDetailPage() {
         }
       }
       toast.error('Failed to create purchase order')
-    }
-  }
-
-  const handleAddPoolLines = (newLines: DraftPoolLine[]) => {
-    const mergedNames: string[] = []
-    const updated = [...draftPoolLines]
-    for (const line of newLines) {
-      const existingIdx = updated.findIndex((dl) => dl.sourcing_item_id === line.sourcing_item_id)
-      if (existingIdx !== -1) {
-        updated[existingIdx] = { ...updated[existingIdx], ordered_qty: updated[existingIdx].ordered_qty + line.ordered_qty }
-        mergedNames.push(line.variant_name)
-      } else {
-        updated.push(line)
-      }
-    }
-    setDraftPoolLines(updated)
-    for (const name of mergedNames) {
-      toast.info(`Qty merged — "${name}" already in this order`)
     }
   }
 
@@ -526,17 +498,37 @@ export default function PurchaseOrderDetailPage() {
   const freightPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
     ? Math.round(effectiveShipping / po!.total_ordered_qty)
     : 0)
-  const commissionPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
-    ? Math.round((po!.commission_fee ?? 0) / po!.total_ordered_qty)
-    : 0)
+  // null (not 0) when pct absent — lets display fall back to stored po.commission_fee
+  const livePct = editMode
+    ? (headerValues.commission_fee_pct != null ? Number(headerValues.commission_fee_pct) : (po?.commission_fee_pct != null ? Number(po.commission_fee_pct) : null))
+    : (po?.commission_fee_pct != null ? Number(po.commission_fee_pct) : null)
 
-  const draftLines = isCreating ? [] : (po?.order_details ?? []).filter((d) => d.is_draft)
-  const hasDraftLines = draftLines.length > 0
+  const liveCommissionFee = !isCreating && po != null && livePct != null
+    ? Math.round(
+        (po.order_details ?? []).reduce(
+          (s, i) => s + Number(
+            hasDiscount
+              ? (i.discounted_total_price_foreign ?? i.total_price_foreign ?? 0)
+              : (i.total_price_foreign ?? i.discounted_total_price_foreign ?? 0)
+          ),
+          0
+        ) *
+        (livePct / 100) *
+        (editMode
+          ? (Number(headerValues.exchange_rate) || Number(po.exchange_rate) || 0)
+          : Number(po.exchange_rate || 0)
+        )
+      )
+    : null
+
+  const commissionPerUnit = isCreating ? 0 : (po!.total_ordered_qty > 0
+    ? Math.round((liveCommissionFee ?? po!.commission_fee ?? 0) / po!.total_ordered_qty)
+    : 0)
 
   const orderItemsContent = (() => {
     const visibleDetails = isCreating
       ? []
-      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id) && !item.is_draft)
+      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
 
     type DisplayGroup = {
       groupKey: string
@@ -638,6 +630,23 @@ export default function PurchaseOrderDetailPage() {
       return s + base
     }, 0)
 
+    const maxUnitForeign = group.existingItems.length > 0
+      ? Math.max(...group.existingItems.map(i =>
+          hasDiscount
+            ? Number(i.discounted_unit_price_foreign ?? i.unit_price_foreign ?? 0)
+            : Number(i.unit_price_foreign ?? 0)))
+      : 0
+    const maxUnitIdr = Math.round(maxUnitForeign * poExchangeRate)
+    const maxCogsPerUnit = group.existingItems.length > 0
+      ? Math.max(...group.existingItems.map(i => {
+          if (i.cogs_per_unit_idr != null) return i.cogs_per_unit_idr
+          const unitF = hasDiscount
+            ? Number(i.discounted_unit_price_foreign ?? i.unit_price_foreign ?? 0)
+            : Number(i.unit_price_foreign ?? 0)
+          return Math.round(unitF * poExchangeRate) + freightPerUnit + commissionPerUnit
+        }))
+      : 0
+
     return (
       <tbody key={group.groupKey}>
         <tr
@@ -680,14 +689,22 @@ export default function PurchaseOrderDetailPage() {
           <td className={`px-3 py-2 whitespace-nowrap ${doiAfterColor(groupDoiAfter)}`}>
             {groupDoiAfter !== null ? `${groupDoiAfter}d` : '—'}
           </td>
-          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground font-normal">
+            {maxUnitForeign > 0
+              ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(maxUnitForeign)}`
+              : '—'}
+          </td>
           {hasDiscount && <td className="px-3 py-2" />}
-          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground font-normal">
+            {maxUnitIdr > 0 ? formatIDR(maxUnitIdr) : '—'}
+          </td>
           <td className="px-3 py-2 whitespace-nowrap">
             {sumTotalForeign > 0 ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(sumTotalForeign)}` : '—'}
           </td>
           <td className="px-3 py-2 whitespace-nowrap">{sumTotalIdr > 0 ? formatIDR(sumTotalIdr) : '—'}</td>
-          <td className="px-3 py-2" />
+          <td className="px-3 py-2 whitespace-nowrap font-medium text-amber-700">
+            {maxCogsPerUnit > 0 ? formatIDR(maxCogsPerUnit) : '—'}
+          </td>
           <td className="px-3 py-2" />
           {editMode && canAddDeleteItems && <td />}
         </tr>
@@ -793,7 +810,7 @@ export default function PurchaseOrderDetailPage() {
                 <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
                 <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
                 <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
-                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{item.cogs_per_unit_idr != null ? '—' : (cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—')}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{item.cogs_per_unit_idr != null ? formatIDR(item.cogs_per_unit_idr) : (cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—')}</td>
                 <td className="px-3 py-1.5">
                   {showRemarks ? (
                     <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
@@ -810,23 +827,7 @@ export default function PurchaseOrderDetailPage() {
                   </td>
                 )}
               </tr>
-              {item.cogs_per_unit_idr != null && (
-                <tr className="bg-muted/20">
-                  <td colSpan={20} className="pl-10 pr-3 py-1 text-[10px] text-muted-foreground">
-                    <span className="font-medium text-foreground">Shipping/unit:</span>{' '}
-                    {formatIDR(item.shipping_per_unit_idr ?? 0)}
-                    {' · '}
-                    <span className="font-medium text-foreground">Delivery/unit:</span>{' '}
-                    {formatIDR(item.delivery_per_unit_idr ?? 0)}
-                    {' · '}
-                    <span className="font-medium text-foreground">Commission/unit:</span>{' '}
-                    {formatIDR(item.commission_per_unit_idr ?? 0)}
-                    {' · '}
-                    <span className="font-medium text-amber-700">COGS/unit:</span>{' '}
-                    <span className="font-bold text-amber-700">{formatIDR(item.cogs_per_unit_idr)}</span>
-                  </td>
-                </tr>
-              )}
+
             </React.Fragment>
           )
         })}
@@ -991,21 +992,9 @@ export default function PurchaseOrderDetailPage() {
                   <Button
                     size="sm"
                     onClick={() => setShowAdvanceModal(true)}
-                    disabled={po!.next_status === 'DELIVERED' && hasDraftLines}
-                    title={
-                      po!.next_status === 'DELIVERED' && hasDraftLines
-                        ? 'Finalize all draft lines before advancing to DELIVERED'
-                        : undefined
-                    }
                   >
                     → {po!.next_status}
                   </Button>
-                  {po!.next_status === 'DELIVERED' && hasDraftLines && (
-                    <p className="text-xs text-amber-600">
-                      <AlertTriangle className="inline h-3 w-3 mr-0.5" />
-                      Finalize {draftLines.length} draft {draftLines.length === 1 ? 'line' : 'lines'} to advance
-                    </p>
-                  )}
                 </div>
               )}
             </>
@@ -1185,7 +1174,12 @@ export default function PurchaseOrderDetailPage() {
               />
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Commission (IDR)</p>
-                <p className="text-sm font-semibold">{po?.commission_fee != null ? formatIDR(po?.commission_fee) : '—'}</p>
+                <p className="text-sm font-semibold">
+                  {(() => {
+                    const val = liveCommissionFee ?? po?.commission_fee
+                    return val != null ? formatIDR(val) : '—'
+                  })()}
+                </p>
               </div>
               <EditableInfoItem
                 field="weight"
@@ -1260,7 +1254,10 @@ export default function PurchaseOrderDetailPage() {
             <h2 className="text-sm font-semibold mb-3">Attachments</h2>
             <div className="grid grid-cols-4 gap-3">
               {attachments.map(({ label, field, url }) => {
-                const isFileEditable = (editMode && po?.editable_fields?.header?.includes(field)) ?? false
+                const isFileEditable =
+                  (editMode &&
+                    (po?.editable_fields?.header?.includes(field) ?? false) &&
+                    !(po?.status === 'COMPLETED' && !!url)) ?? false
                 const fileSelected = !!headerValues[field]
                 return (
                   <div key={label} className="flex flex-col items-center gap-2 rounded-lg border p-3 text-center">
@@ -1379,7 +1376,7 @@ export default function PurchaseOrderDetailPage() {
                         value={`${currencySymbol} ${formatForeignAmount(totalForeignAmount)}`}
                       />
                     )}
-                    <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
+                    <SummaryRow label="Commission" value={(() => { const val = liveCommissionFee ?? po!.commission_fee; return val != null ? formatIDR(val) : '—' })()} />
                     <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
                     <SummaryRow label="Freight" value={(po!.shipping_fee ?? 0) > 0 ? formatIDR(po!.shipping_fee!) : '—'} />
                     <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
@@ -1507,6 +1504,18 @@ export default function PurchaseOrderDetailPage() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
+            {!isCreating && allGroupKeys.length > 0 && (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+                onClick={() => {
+                  if (allCollapsed) setCollapsedGroups(new Set())
+                  else setCollapsedGroups(new Set(allGroupKeys))
+                }}
+              >
+                {allCollapsed ? 'Expand all' : 'Collapse all'}
+              </button>
             )}
             {editMode && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
@@ -1519,19 +1528,14 @@ export default function PurchaseOrderDetailPage() {
                 Has Discount
               </label>
             )}
-            {isCreating && (
+            {editMode && canAddDeleteItems && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  if (!activeSupplierId) {
-                    setSupplierPickValue('')
-                    setShowSupplierPickModal(true)
-                    return
-                  }
-                  setShowImportModal(true)
-                }}
+                onClick={() => setShowImportWizard(true)}
+                disabled={!activeSupplierId}
+                title={!activeSupplierId ? 'Set a supplier on this PO first' : undefined}
               >
                 <Upload className="h-3 w-3 mr-1" /> Import from Excel
               </Button>
@@ -1576,120 +1580,7 @@ export default function PurchaseOrderDetailPage() {
             {orderItemsContent}
           </table>
         </div>
-      {isCreating && draftPoolLines.length > 0 && (
-        <div className="mt-2 space-y-1 px-6 pb-4">
-          <p className="text-xs font-medium text-muted-foreground px-1">Sourcing Pool Lines</p>
-          {draftPoolLines.map((dl, i) => (
-            <div key={dl.sourcing_item_id} className="grid grid-cols-[24px_1fr_80px_90px_28px] gap-2 items-center px-1">
-              {dl.image_proxy_url ? (
-                <img src={dl.image_proxy_url} alt="" className="w-6 h-6 rounded object-cover border border-border" />
-              ) : (
-                <div className="w-6 h-6 rounded bg-muted" />
-              )}
-              <span className="text-xs truncate">
-                {dl.product_name} — {dl.variant_name}
-                {dl.variant_id != null ? (
-                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">Mapped</Badge>
-                ) : (
-                  <Badge variant="info" className="ml-1.5 text-[10px] px-1 py-0">Pool</Badge>
-                )}
-              </span>
-              <span className="text-xs text-center">{dl.ordered_qty}</span>
-              <span className="text-xs text-right">{dl.unit_price_foreign}</span>
-              <button
-                type="button"
-                aria-label="Remove draft line"
-                className="h-5 w-5 flex items-center justify-center text-muted-foreground hover:text-destructive"
-                onClick={() => setDraftPoolLines(prev => prev.filter((_, idx) => idx !== i))}
-              >
-                <XIcon className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
       </div>
-
-      {isCreating && activeSupplierId && (
-        <PoolBrowser
-          supplierId={activeSupplierId}
-          newItemKeys={newItemKeys}
-          onAddLines={handleAddPoolLines}
-        />
-      )}
-
-      {!isCreating && draftLines.length > 0 && (
-        <div className="rounded-lg border bg-card">
-          <div className="px-6 py-4 border-b flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold">
-                Draft Lines ({draftLines.length})
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Finalize each line to create a Product + Variant before advancing to DELIVERED.
-              </p>
-            </div>
-            {po!.next_status === 'DELIVERED' && (
-              <div className="flex items-center gap-1.5 text-amber-600 text-xs font-medium shrink-0 mt-0.5">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-                Required before DELIVERED
-              </div>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="border-b bg-muted/30 text-muted-foreground">
-                  <th className="w-10 px-3 py-2" />
-                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Product</th>
-                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Variant</th>
-                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Qty</th>
-                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Unit Price</th>
-                  <th className="px-3 py-2 w-24" />
-                </tr>
-              </thead>
-              <tbody>
-                {draftLines.map((item) => (
-                  <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
-                    <td className="px-3 py-2">
-                      {item.product_photo_url ? (
-                        <img
-                          src={item.product_photo_url}
-                          alt=""
-                          className="h-8 w-8 rounded object-cover border border-border"
-                        />
-                      ) : (
-                        <div className="h-8 w-8 rounded bg-muted" />
-                      )}
-                    </td>
-                    <td className="px-3 py-2 font-medium whitespace-nowrap">
-                      {item.draft_product_name || item.product_name}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
-                      {item.product_variant_name || '—'}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">{item.ordered_qty}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {item.unit_price_foreign != null
-                        ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(item.unit_price_foreign)}`
-                        : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setFinalizingDetail(item)}
-                      >
-                        Finalize
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {!isCreating && po?.next_status && (
         <StatusAdvanceModal
@@ -1731,64 +1622,15 @@ export default function PurchaseOrderDetailPage() {
           setShowNewSupplierModal(false)
         }}
       />
-      {finalizingDetail && (
-        <FinalizeDraftLineModal
-          open
-          onClose={() => setFinalizingDetail(null)}
-          poId={po!.id}
-          detail={finalizingDetail}
-        />
-      )}
-      {isCreating && (
-        <SourcingPoolImportModal
-          open={showImportModal}
-          onClose={() => setShowImportModal(false)}
+      {!isCreating && po && (
+        <SourcingImportWizard
+          open={showImportWizard}
+          onClose={() => setShowImportWizard(false)}
+          poId={po.id}
           supplierId={activeSupplierId ?? ''}
-          supplierName={suppliers.find(s => s.id === activeSupplierId)?.name ?? ''}
-          onImportSuccess={(importedRows) => {
-            setNewItemKeys(new Set(importedRows.map((r) => `${r.product_name}|${r.variant_name}`)))
-          }}
+          supplierName={suppliers?.find((s) => s.id === activeSupplierId)?.name ?? ''}
         />
       )}
-      <Dialog open={showSupplierPickModal} onOpenChange={(o) => !o && setShowSupplierPickModal(false)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Select Supplier</DialogTitle>
-          </DialogHeader>
-          <div className="py-2">
-            <p className="text-sm text-muted-foreground mb-3">
-              Choose a supplier to import items from their sourcing pool.
-            </p>
-            <Select value={supplierPickValue} onValueChange={setSupplierPickValue}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select supplier..." />
-              </SelectTrigger>
-              <SelectContent>
-                {suppliers.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSupplierPickModal(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!supplierPickValue}
-              onClick={() => {
-                setHeaderField('supplier_id', supplierPickValue)
-                setShowSupplierPickModal(false)
-                setShowImportModal(true)
-              }}
-            >
-              Continue to Import
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import client from './client'
-import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolItemsResponse, SourcingPoolPreviewRow, SourcingPoolPreviewResult, SourcingPoolImportResult } from '../types/purchasing'
+import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolPreviewResult, ColorAbbreviation, ImportAndAddRequest, ImportAndAddResult, ResolveSourcingConflictsRequest, ResolveSourcingConflictsResult } from '../types/purchasing'
 import type { PaginatedResponse } from '../types/inventory'
 
 export const getPurchaseOrders = (params?: Record<string, string | number>) =>
@@ -42,15 +42,6 @@ export const getReplenishment = (params?: { warehouse_id?: string }) =>
 export const getPurchaseOrderSummary = (params?: Record<string, string>) =>
   client.get<PurchaseOrderSummary>('/purchase-order/summary/', { params })
 
-export const getSourcingPoolItems = (supplierId: string, search?: string) =>
-  client.get<SourcingPoolItemsResponse>('/sourcing-pool/items/', {
-    params: {
-      supplier_id: supplierId,
-      page_size: 200,
-      ...(search ? { search } : {}),
-    },
-  })
-
 export const downloadSourcingPoolTemplate = () =>
   client.get('/sourcing-pool/template/', { responseType: 'blob' })
 
@@ -62,32 +53,17 @@ export const previewSourcingPoolUpload = (file: File) => {
   })
 }
 
-export const importSourcingPoolRows = (supplierId: string, rows: SourcingPoolPreviewRow[]) =>
-  client.post<SourcingPoolImportResult>('/sourcing-pool/import/', {
-    supplier_id: supplierId,
-    rows,
-  })
+export const getColorAbbreviations = () =>
+  client.get<ColorAbbreviation[]>('/sourcing-pool/color-abbreviations/')
 
-export const addDraftLine = (
-  poId: string,
-  data: { sourcing_item_id: string; ordered_qty: number; unit_price_foreign?: number },
-) =>
-  client.post<{ detail_id: string }>(`/purchase-order/${poId}/draft-lines/`, data)
+export const upsertColorAbbreviation = (data: { color_name: string; abbreviation: string }) =>
+  client.post<ColorAbbreviation>('/sourcing-pool/color-abbreviations/', data)
 
-export const finalizeDraftLine = (
-  poId: string,
-  detailId: string,
-  data: {
-    sku_suffix: string
-    category_id?: string | null
-    product_name?: string
-    dim1_key?: string
-    dim1_value?: string
-    dim2_key?: string
-    dim2_value?: string
-  },
-) =>
-  client.post<{ detail_id: string; variant_id: string }>(
-    `/purchase-order/${poId}/details/${detailId}/finalize/`,
-    data,
-  )
+export const deleteColorAbbreviation = (color_name: string) =>
+  client.delete('/sourcing-pool/color-abbreviations/', { data: { color_name } })
+
+export const importAndAdd = (poId: string, data: ImportAndAddRequest) =>
+  client.post<ImportAndAddResult>(`/purchase-order/${poId}/import-and-add/`, data)
+
+export const resolveSourcingConflicts = (poId: string, data: ResolveSourcingConflictsRequest) =>
+  client.post<ResolveSourcingConflictsResult>(`/purchase-order/${poId}/resolve-sourcing-conflicts/`, data)
