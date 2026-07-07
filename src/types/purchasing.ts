@@ -13,6 +13,7 @@ export interface PurchaseOrderDetail {
   id: string
   variant_id: string
   product_variant_name: string
+  sku_variant_code?: string
   product_id: string
   product_name: string
   product_supplier_link: string | null
@@ -32,6 +33,19 @@ export interface PurchaseOrderDetail {
   avg_sales_7d: string | null
   stock_on_hand: number
   incoming_qty: number
+  variant_values: Record<string, string>
+  last_unit_price_foreign: string | null
+  last_currency: string | null
+  last_discounted_unit_price_foreign: string | null
+  shipping_per_unit_idr: number | null
+  delivery_per_unit_idr: number | null
+  commission_per_unit_idr: number | null
+  cogs_per_unit_idr: number | null
+  product_has_dimensions: boolean | null
+  sourcing_item_id: string | null
+  is_draft: boolean
+  draft_product_name: string
+  product_dim1_key: string | null
 }
 
 export interface PurchaseOrder {
@@ -79,6 +93,7 @@ export interface PurchaseOrder {
   delivery_order_invoice_file: string | null
   packing_list_file: string | null
   note: string | null
+  has_discount: boolean
   editable_fields: {
     header: string[]
     order_detail: string[]
@@ -128,4 +143,77 @@ export interface ReplenishmentItem {
   avg_sales_7d: number
   avg_sales_14d: number
   avg_sales_30d: number
+}
+
+export interface SourcingPoolItem {
+  id: string
+  product_name: string | null
+  product_name_derived?: boolean
+  variant_name: string
+  category_id: string | null
+  category_name: string | null
+  category_code: string | null
+  unit_price: string
+  discounted_price: string | null
+  qty_suggested: number | null
+  supplier_link: string | null
+  image_url: string | null
+  image_proxy_url: string | null
+  image_download_status: 'PENDING' | 'DONE' | 'FAILED'
+  notes: string | null
+  times_ordered: number
+  cdate: string
+  udate: string
+  variant_id: string | null
+  variant_code: string | null
+}
+
+export interface SourcingPoolItemsResponse {
+  pool_id: string | null
+  count?: number
+  next?: string | null
+  previous?: string | null
+  results?: SourcingPoolItem[]
+  items?: SourcingPoolItem[]
+}
+
+export interface SourcingPoolPreviewRow {
+  product_name?: string | null
+  variant_name: string
+  unit_price: number | string
+  discounted_price?: number | string | null
+  qty_suggested?: number | null
+  category_code?: string
+  supplier_link?: string | null
+  image_url?: string | null
+  notes?: string | null
+  [key: string]: unknown
+}
+
+export interface SourcingPoolPreviewError {
+  row?: number
+  message?: string
+  errors?: string[]
+  [key: string]: unknown
+}
+
+export interface SourcingPoolPreviewResult {
+  valid: SourcingPoolPreviewRow[]
+  errors: SourcingPoolPreviewError[]
+}
+
+export interface SourcingPoolImportResult {
+  created: number
+  updated: number
+  pool_id: string
+}
+
+export interface DraftPoolLine {
+  sourcing_item_id: string
+  product_name: string | null
+  variant_name: string
+  ordered_qty: number
+  unit_price_foreign: number
+  image_proxy_url: string | null
+  variant_id: string | null
 }

@@ -6,7 +6,7 @@ import {
   bulkCreateProducts, bulkUpdateInventory, adjustStock, getAvgSales, getInventorySummary, updateVariantPrice,
   getSuppliers, createSupplier, updateSupplier, deleteSupplier,
   getProductSuppliers, createProductSupplier, deleteProductSupplier,
-  saveVariants, deleteCategory,
+  saveVariants, deleteCategory,   uploadVariantPhoto, deleteVariantPhoto, uploadDimensionImage, deleteDimensionImage,
   getCompanyMarketplaces, createCompanyMarketplace, updateCompanyMarketplace, deleteCompanyMarketplace,
   getBusinessEntities, createBusinessEntity,
   updateBusinessEntity, deleteBusinessEntity, getProductBusinessEntities,
@@ -14,6 +14,7 @@ import {
 } from '../api/inventory'
 import type { SaveVariantsPayload } from '../api/inventory'
 import client from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 import type { Product } from '../types/inventory'
 
 export const useCategories = (params?: Record<string, string | number>) =>
@@ -94,12 +95,14 @@ export const useVariantSearch = (
     enabled,
   })
 
-export const useWarehouses = (page = 1, pageSize = 100) =>
-  useQuery({
-    queryKey: ['warehouses', page, pageSize],
+export function useWarehouses(page = 1, pageSize = 100) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['warehouses', user?.company_id ?? null, page, pageSize],
     queryFn: () => getWarehouses({ page, page_size: pageSize }).then(r => r.data),
     staleTime: 1000 * 60 * 10,
   })
+}
 
 export const useCreateWarehouse = () => {
   const qc = useQueryClient()
@@ -375,5 +378,40 @@ export const useSaveVariants = (productId: string) => {
       qc.invalidateQueries({ queryKey: ['product', productId] })
       qc.invalidateQueries({ queryKey: ['products'] })
     },
+  })
+}
+
+export const useUploadVariantPhoto = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ variantId, image }: { variantId: string; image: File }) =>
+      uploadVariantPhoto(productId, variantId, image).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
+  })
+}
+
+export const useDeleteVariantPhoto = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (variantId: string) => deleteVariantPhoto(productId, variantId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
+  })
+}
+
+export const useUploadDimensionImage = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dimKey, dimValue, photo }: { dimKey: string; dimValue: string; photo: File }) =>
+      uploadDimensionImage(productId, dimKey, dimValue, photo).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
+  })
+}
+
+export const useDeleteDimensionImage = (productId: string) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ dimKey, dimValue }: { dimKey: string; dimValue: string }) =>
+      deleteDimensionImage(productId, dimKey, dimValue),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product', productId] }),
   })
 }

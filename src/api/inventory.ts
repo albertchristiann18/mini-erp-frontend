@@ -63,6 +63,19 @@ export const uploadProductPhoto = (productId: string, image: File) => {
   })
 }
 
+export const uploadVariantPhoto = (productId: string, variantId: string, image: File) => {
+  const form = new FormData()
+  form.append('image', image)
+  return client.post<{ photo_url: string }>(
+    `/product/${productId}/variants/${variantId}/photo/`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+}
+
+export const deleteVariantPhoto = (productId: string, variantId: string) =>
+  client.delete(`/product/${productId}/variants/${variantId}/photo/`)
+
 export const deleteProductPhoto = (productId: string, photoId: string) =>
   client.delete(`/product/${productId}/photos/${photoId}/`)
 
@@ -206,4 +219,37 @@ export interface ReconcileResult {
 export const marketplaceReconcileStock = (formData: FormData) =>
   client.post<ReconcileResult>('/inventory/marketplace_reconcile/', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+  })
+
+export interface DimensionImageResult {
+  id: string
+  dim_key: string
+  dim_value: string
+  photo_url: string | null
+}
+
+export const uploadDimensionImage = (
+  productId: string,
+  dimKey: string,
+  dimValue: string,
+  photo: File,
+): Promise<import('axios').AxiosResponse<DimensionImageResult>> => {
+  const form = new FormData()
+  form.append('dim_key', dimKey)
+  form.append('dim_value', dimValue)
+  form.append('photo', photo)
+  return client.post<DimensionImageResult>(
+    `/product/${productId}/dimension-image/`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+}
+
+export const deleteDimensionImage = (
+  productId: string,
+  dimKey: string,
+  dimValue: string,
+): Promise<import('axios').AxiosResponse<void>> =>
+  client.delete(`/product/${productId}/dimension-image/`, {
+    data: { dim_key: dimKey, dim_value: dimValue },
   })

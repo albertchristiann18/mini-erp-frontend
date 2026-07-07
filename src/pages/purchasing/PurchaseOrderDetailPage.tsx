@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
 import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
@@ -7,17 +7,36 @@ import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSele
 import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
+import { FinalizeDraftLineModal } from '../../features/purchasing/components/FinalizeDraftLineModal'
+import { SourcingPoolImportModal } from '../../features/purchasing/components/SourcingPoolImportModal'
+import { PoolBrowser } from '../../features/purchasing/components/PoolBrowser'
+import { useAddDraftLine } from '../../features/purchasing/hooks/useSourcingPool'
+import type { DraftPoolLine } from '../../types/purchasing'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { ArrowLeft, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, X as XIcon } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, ChevronDown, ExternalLink, FileDown, Pencil, Save, Trash2, Plus, Upload, X as XIcon, ImagePlus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, PurchaseOrderDetail, ReplenishmentItem } from '../../types/purchasing'
+
+import { uploadVariantPhoto } from '../../api/inventory'
 import type { BadgeProps } from '../../components/ui/badge'
+
+type ModalDraftItem = {
+  product_variant_id: string
+  product_variant_label: string
+  product_id: string
+  product_name: string
+  product_supplier_link: string | null
+  product_photo_url: string | null
+  ordered_qty: string
+  unit_price_foreign: string
+  discounted_unit_price_foreign: string
+}
 
 function getCurrencySymbol(currency: string | null | undefined): string {
   const map: Record<string, string> = {
@@ -98,16 +117,15 @@ export default function PurchaseOrderDetailPage() {
   const isCreating = id === 'new'
   const { data: po, isLoading } = usePurchaseOrder(isCreating ? '' : id!)
   const { user } = useAuth()
-  const createMutation = useCreatePurchaseOrder((newId: string) => {
-    toast.success('Purchase order created')
-    navigate(`/purchasing/orders/${newId}`)
-  })
+  const createMutation = useCreatePurchaseOrder()
   const { data: warehouseData } = useWarehouses()
   const warehouses = warehouseData?.results ?? []
   const { data: suppliersData } = useSuppliers({ active_only: 'true' })
   const suppliers = suppliersData?.results ?? []
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [showAdvanceModal, setShowAdvanceModal] = useState(false)
+  const [variantPhotoOverrides, setVariantPhotoOverrides] = useState<Record<string, string>>({})
+  const [uploadingVariantPhoto, setUploadingVariantPhoto] = useState<Record<string, boolean>>({})
   const [validationErrors, setValidationErrors] = useState<string[]>([])
   const [editMode, setEditMode] = useState(isCreating)
   const [headerValues, setHeaderValues] = useState<Record<string, string | File>>({})
@@ -125,7 +143,13 @@ export default function PurchaseOrderDetailPage() {
     unit_price_foreign: string
     discounted_unit_price_foreign: string
   }>>([])
+  const activeSupplierId: string | undefined =
+    (po?.supplier_id as string | undefined) ??
+    (headerValues.supplier_id ? String(headerValues.supplier_id) : undefined) ??
+    undefined
   const [addItemModalOpen, setAddItemModalOpen] = useState(false)
+  const [finalizingDetail, setFinalizingDetail] = useState<PurchaseOrderDetail | null>(null)
+
   const [showNewSupplierModal, setShowNewSupplierModal] = useState(false)
   const updateMutation = useUpdatePurchaseOrder()
   const [hasDiscount, setHasDiscount] = useState(false)
@@ -138,6 +162,25 @@ export default function PurchaseOrderDetailPage() {
       return next
     })
 
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showSupplierPickModal, setShowSupplierPickModal] = useState(false)
+  const [supplierPickValue, setSupplierPickValue] = useState('')
+  const [draftPoolLines, setDraftPoolLines] = useState<DraftPoolLine[]>([])
+  const [newItemKeys, setNewItemKeys] = useState<Set<string>>(new Set())
+  const addDraftLineMutation = useAddDraftLine()
+
+  const handleVariantPhotoUpload = async (variantId: string, productId: string, file: File) => {
+    setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: true }))
+    try {
+      const r = await uploadVariantPhoto(productId, variantId, file)
+      setVariantPhotoOverrides(prev => ({ ...prev, [variantId]: r.data.photo_url }))
+    } catch {
+      toast.error('Failed to upload photo')
+    } finally {
+      setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: false }))
+    }
+  }
+
   const [avgWindow, setAvgWindow] = useState<7 | 14 | 30>(30)
   const { data: replenishData } = useReplenishment()
   const stockMap = useMemo<Map<string, ReplenishmentItem>>(() => {
@@ -145,6 +188,18 @@ export default function PurchaseOrderDetailPage() {
     for (const item of replenishData?.results ?? []) m.set(item.variant_id, item)
     return m
   }, [replenishData])
+
+  const [groupBy, setGroupBy] = useState<string>('product')
+
+  const availableGroupKeys = useMemo<string[]>(() => {
+    const keySet = new Set<string>()
+    for (const item of (po?.order_details ?? [])) {
+      for (const key of Object.keys(item.variant_values ?? {})) {
+        keySet.add(key)
+      }
+    }
+    return Array.from(keySet)
+  }, [po?.order_details])
 
   const usedVariantIds = useMemo<Set<string>>(() => {
     const ids = new Set<string>()
@@ -159,14 +214,18 @@ export default function PurchaseOrderDetailPage() {
 
   useEffect(() => {
     if (!po) return
-    const anyDiscounted = (po.order_details ?? []).some(item =>
-      item.discounted_unit_price_foreign != null &&
-      item.discounted_unit_price_foreign !== item.unit_price_foreign
-    )
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHasDiscount(anyDiscounted)
+    setGroupBy('product')
+    setHasDiscount(po.has_discount ?? false)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- po is compared by id
   }, [po?.id])
+
+  useEffect(() => {
+    if (isCreating) {
+      setNewItemKeys(new Set())
+      setDraftPoolLines([])
+    }
+  }, [activeSupplierId, isCreating])
 
   if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
@@ -231,20 +290,40 @@ export default function PurchaseOrderDetailPage() {
       [itemId]: { ...(prev[itemId] ?? {}), [field]: value }
     }))
 
-  const addNewItem = () =>
-    setNewItems(prev => [...prev, {
-      _tempId: `new-${Date.now()}-${prev.length}`,
-      product_variant_id: '',
-      product_variant_label: '',
-      product_id: '',
-      product_name: '',
-      product_supplier_link: null,
-      product_photo_url: null,
-      ordered_qty: '1',
-      unit_price_foreign: '',
-      discounted_unit_price_foreign: '',
-    }])
-  void addNewItem
+  const handleCurrencyChange = (field: string, val: string | File) => {
+    setHeaderField(field, val)
+    if (field !== 'currency' || typeof val !== 'string') return
+    const newCurrency = val
+    let filledCount = 0
+    let existingPricedCount = 0
+    for (const item of po?.order_details ?? []) {
+      if (deletedDetailIds.has(item.id)) continue
+      const currentPrice = detailValues[item.id]?.unit_price_foreign ?? item.unit_price_foreign
+      const isEmpty = !currentPrice || Number(currentPrice) === 0
+      if (!isEmpty) {
+        existingPricedCount++
+      }
+      if (isEmpty && item.last_currency === newCurrency && item.last_unit_price_foreign) {
+        setDetailField(item.id, 'unit_price_foreign', item.last_unit_price_foreign)
+        if (po?.has_discount && item.last_discounted_unit_price_foreign) {
+          const currentDiscounted =
+            detailValues[item.id]?.discounted_unit_price_foreign ??
+            item.discounted_unit_price_foreign
+          const isDiscountedEmpty = !currentDiscounted || Number(currentDiscounted) === 0
+          if (isDiscountedEmpty) {
+            setDetailField(item.id, 'discounted_unit_price_foreign', item.last_discounted_unit_price_foreign)
+          }
+        }
+        filledCount++
+      }
+    }
+    if (filledCount > 0) {
+      toast.info('Unit prices auto-filled from last purchase price')
+    }
+    if (existingPricedCount > 0) {
+      toast.warning('Currency changed — existing prices may be in the old currency')
+    }
+  }
 
   const removeNewItem = (_tempId: string) =>
     setNewItems(prev => prev.filter(n => n._tempId !== _tempId))
@@ -252,21 +331,15 @@ export default function PurchaseOrderDetailPage() {
   const updateNewItem = (_tempId: string, field: string, value: string) =>
     setNewItems(prev => prev.map(n => n._tempId === _tempId ? { ...n, [field]: value } : n))
 
-  const handleAddItemFromModal = (draft: {
-    product_variant_id: string
-    product_variant_label: string
-    product_id: string
-    product_name: string
-    product_supplier_link: string | null
-    product_photo_url: string | null
-    ordered_qty: string
-    unit_price_foreign: string
-    discounted_unit_price_foreign: string
-  }) => {
-    setNewItems(prev => [...prev, {
-      ...draft,
-      _tempId: `new-${Date.now()}-${prev.length}`,
-    }])
+  const handleAddItemFromModal = (items: ModalDraftItem[]) => {
+    const timestamp = Date.now()
+    setNewItems(prev => [
+      ...prev,
+      ...items.map((item, i) => ({
+        ...item,
+        _tempId: `new-${timestamp}-${prev.length + i}`,
+      })),
+    ])
   }
 
   const deleteExistingItem = (itemId: string) =>
@@ -276,7 +349,7 @@ export default function PurchaseOrderDetailPage() {
     const errors: string[] = []
     if (!headerValues.warehouse_id) errors.push('Warehouse is required')
     const validItems = newItems.filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign !== '')
-    if (validItems.length === 0) errors.push('At least one order item with variant, quantity, and price is required')
+    if (validItems.length === 0 && draftPoolLines.length === 0) errors.push('At least one order item or sourcing pool selection is required')
     if (errors.length > 0) {
       setValidationErrors(errors)
       return
@@ -290,24 +363,79 @@ export default function PurchaseOrderDetailPage() {
       const val = headerValues[field]
       if (val != null && val !== '') payload[field] = numericFields.includes(field) ? Number(val) : val
     }
-    payload.order_details = validItems.map(n => ({
-      product_variant_id: n.product_variant_id,
-      ordered_qty: Number(n.ordered_qty),
-      unit_price_foreign: Number(n.unit_price_foreign),
-      ...(hasDiscount && n.discounted_unit_price_foreign
-        ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
-        : {}),
-    }))
+    const mappedPoolLines = draftPoolLines.filter((dl) => dl.variant_id != null)
+    const unmappedPoolLines = draftPoolLines.filter((dl) => dl.variant_id == null)
+    payload.order_details = [
+      ...validItems.map(n => ({
+        product_variant_id: n.product_variant_id,
+        ordered_qty: Number(n.ordered_qty),
+        unit_price_foreign: Number(n.unit_price_foreign),
+        ...(hasDiscount && n.discounted_unit_price_foreign
+          ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) }
+          : {}),
+      })),
+      ...mappedPoolLines.map((dl) => ({
+        product_variant_id: dl.variant_id!,
+        ordered_qty: dl.ordered_qty,
+        unit_price_foreign: dl.unit_price_foreign,
+      })),
+    ]
     try {
-      await createMutation.mutateAsync(payload)
+      const result = await createMutation.mutateAsync(payload)
+      const newId = result.id
+      for (const dl of unmappedPoolLines) {
+        try {
+          await addDraftLineMutation.mutateAsync({
+            poId: newId,
+            sourcing_item_id: dl.sourcing_item_id,
+            ordered_qty: dl.ordered_qty,
+            unit_price_foreign: dl.unit_price_foreign,
+          })
+        } catch {
+          toast.error(`Failed to add draft line: ${dl.variant_name}`)
+        }
+      }
+      toast.success('Purchase order created')
+      navigate(`/purchasing/orders/${newId}`)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to create purchase order'
-      toast.error(msg)
+      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
+      if (data && typeof data === 'object') {
+        const messages: string[] = []
+        for (const [field, msg] of Object.entries(data)) {
+          const label = HEADER_FIELD_CONFIG[field]?.label ?? field
+          const text = Array.isArray(msg) ? msg.join(', ') : String(msg)
+          messages.push(`${label}: ${text}`)
+        }
+        if (messages.length > 0) {
+          setValidationErrors(messages)
+          return
+        }
+      }
+      toast.error('Failed to create purchase order')
+    }
+  }
+
+  const handleAddPoolLines = (newLines: DraftPoolLine[]) => {
+    const mergedNames: string[] = []
+    const updated = [...draftPoolLines]
+    for (const line of newLines) {
+      const existingIdx = updated.findIndex((dl) => dl.sourcing_item_id === line.sourcing_item_id)
+      if (existingIdx !== -1) {
+        updated[existingIdx] = { ...updated[existingIdx], ordered_qty: updated[existingIdx].ordered_qty + line.ordered_qty }
+        mergedNames.push(line.variant_name)
+      } else {
+        updated.push(line)
+      }
+    }
+    setDraftPoolLines(updated)
+    for (const name of mergedNames) {
+      toast.info(`Qty merged — "${name}" already in this order`)
     }
   }
 
   const handleSave = async () => {
     const payload: Record<string, unknown> = {}
+    payload.has_discount = hasDiscount
     for (const [key, value] of Object.entries(headerValues)) {
       if (value !== '' && value !== null && value !== undefined) payload[key] = value
     }
@@ -339,8 +467,15 @@ export default function PurchaseOrderDetailPage() {
     }
     if (Object.keys(payload).length === 0) { cancelEditMode(); return }
     try {
-      await updateMutation.mutateAsync({ id: po!.id, data: payload })
+      const result = await updateMutation.mutateAsync({ id: po!.id, data: payload })
       toast.success('Purchase order updated')
+      const compressedFiles = (result as { data?: { compressed_files?: string[] } }).data?.compressed_files
+      if (compressedFiles && compressedFiles.length > 0) {
+        const labels = compressedFiles.map(
+          (f: string) => HEADER_FIELD_CONFIG[f]?.label ?? f
+        )
+        toast.info(`PDF compressed to reduce size: ${labels.join(', ')}`)
+      }
       cancelEditMode()
     } catch (err: unknown) {
       const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
@@ -372,13 +507,16 @@ export default function PurchaseOrderDetailPage() {
     const liveStats = !hasSnapshot ? stockMap.get(item.variant_id) : undefined
     const soh = hasSnapshot ? item.stock_on_hand : (liveStats?.stock_on_hand ?? 0)
     const incoming = hasSnapshot ? item.incoming_qty : (liveStats?.incoming_qty ?? 0)
-    const avg = hasSnapshot
+    const rawAvg = hasSnapshot
       ? (avgWindow === 7 ? Number(item.avg_sales_7d ?? 0) : Number(item.avg_sales ?? 0))
       : (avgWindow === 7 ? (liveStats?.avg_sales_7d ?? 0) : avgWindow === 14 ? (liveStats?.avg_sales_14d ?? 0) : (liveStats?.avg_sales_30d ?? 0))
+    const hasData = hasSnapshot || liveStats !== undefined
+    const avg = rawAvg > 0 ? rawAvg : (hasData ? 1 / avgWindow : 0)
     const upcoming = soh + incoming + item.ordered_qty
     const doi = avg > 0 ? Math.round((soh + incoming) / avg) : null
     const doiAfter = avg > 0 ? Math.round(upcoming / avg) : null
-    return { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot }
+    const recommendedQty = avg > 0 ? Math.max(0, Math.ceil(avg * 90 - soh - incoming)) : null
+    return { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot, recommendedQty }
   }
 
   const poExchangeRate = isCreating
@@ -392,10 +530,13 @@ export default function PurchaseOrderDetailPage() {
     ? Math.round((po!.commission_fee ?? 0) / po!.total_ordered_qty)
     : 0)
 
+  const draftLines = isCreating ? [] : (po?.order_details ?? []).filter((d) => d.is_draft)
+  const hasDraftLines = draftLines.length > 0
+
   const orderItemsContent = (() => {
     const visibleDetails = isCreating
       ? []
-      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id))
+      : (po?.order_details ?? []).filter(item => !deletedDetailIds.has(item.id) && !item.is_draft)
 
     type DisplayGroup = {
       groupKey: string
@@ -409,13 +550,31 @@ export default function PurchaseOrderDetailPage() {
     const groupMap = new Map<string, DisplayGroup>()
 
     for (const item of visibleDetails) {
-      const key = item.product_id || 'unknown'
+      let key: string
+      let groupLabel: string
+      let groupPhoto: string | null
+
+      if (groupBy === 'product') {
+        key = item.product_id || 'unknown'
+        groupLabel = item.product_name || 'Unknown Product'
+        groupPhoto = item.product_photo_url ?? null
+      } else if (groupBy === 'flat') {
+        key = item.id
+        groupLabel = item.product_variant_name || item.product_name || ''
+        groupPhoto = null
+      } else {
+        const dimValue = item.variant_values?.[groupBy] ?? 'Other'
+        key = `${item.product_id}_${dimValue}`
+        groupLabel = `${item.product_name} ${dimValue}`
+        groupPhoto = item.product_photo_url ?? null
+      }
+
       if (!groupMap.has(key)) {
         groupMap.set(key, {
           groupKey: key,
-          productName: item.product_name || 'Unknown Product',
+          productName: groupLabel,
           productSupplierLink: item.product_supplier_link,
-          productPhotoUrl: item.product_photo_url ?? null,
+          productPhotoUrl: groupPhoto,
           existingItems: [],
           newItemsList: [],
         })
@@ -440,6 +599,17 @@ export default function PurchaseOrderDetailPage() {
       }
     }
 
+    for (const group of groupMap.values()) {
+      group.existingItems.sort((a, b) => {
+        const aKeys = Object.keys(a.variant_values ?? {})
+        const dim1Key = aKeys[0] ?? ''
+        const dim2Key = aKeys[1] ?? ''
+        const cmp2 = String(a.variant_values?.[dim2Key] ?? '').localeCompare(String(b.variant_values?.[dim2Key] ?? ''))
+        if (cmp2 !== 0) return cmp2
+        return String(a.variant_values?.[dim1Key] ?? '').localeCompare(String(b.variant_values?.[dim1Key] ?? ''))
+      })
+    }
+
     return Array.from(groupMap.values()).map(group => {
     const showRemarks = !isCreating && editMode && (po?.editable_fields.order_detail.includes('remarks') ?? false)
 
@@ -450,6 +620,8 @@ export default function PurchaseOrderDetailPage() {
     const sumAvg = groupStockData.reduce((s, d) => s + d.avg, 0)
     const groupDoi = sumAvg > 0 ? Math.round((sumSOH + sumIncoming) / sumAvg) : null
     const groupDoiAfter = sumAvg > 0 ? Math.round(sumUpcoming / sumAvg) : null
+    const sumRecommended = groupStockData.reduce((s, d) => s + (d.recommendedQty ?? 0), 0)
+    const hasAnyRec = groupStockData.some(d => d.recommendedQty !== null)
     const sumOrdered = group.existingItems.reduce((s, i) => s + i.ordered_qty, 0) +
       group.newItemsList.reduce((s, n) => s + Number(n.ordered_qty || 0), 0)
     const sumReceived = group.existingItems.reduce((s, i) => s + (i.received_qty ?? 0), 0)
@@ -472,7 +644,7 @@ export default function PurchaseOrderDetailPage() {
           className="bg-muted/40 border-b cursor-pointer hover:bg-muted/60 transition-colors font-semibold text-sm"
           onClick={() => toggleGroupCollapse(group.groupKey)}
         >
-          <td className="px-3 py-2 whitespace-nowrap">
+          <td colSpan={2} className="px-3 py-2 whitespace-nowrap">
             <div className="flex items-center gap-1.5">
               <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform', collapsedGroups.has(group.groupKey) && '-rotate-90')} />
               {group.productPhotoUrl ? (
@@ -491,8 +663,11 @@ export default function PurchaseOrderDetailPage() {
               )}
             </div>
           </td>
+          <td className="px-3 py-2 whitespace-nowrap font-medium text-violet-600">
+            {hasAnyRec ? sumRecommended : '\u2014'}
+          </td>
           <td className="px-3 py-2 whitespace-nowrap">{sumOrdered}</td>
-          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{sumReceived || '—'}</td>
+          <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{sumReceived || '\u2014'}</td>
           <td className="px-3 py-2 whitespace-nowrap">{sumSOH}</td>
           <td className="px-3 py-2 whitespace-nowrap text-blue-600">{sumIncoming}</td>
           <td className="px-3 py-2 whitespace-nowrap">{sumUpcoming}</td>
@@ -522,7 +697,7 @@ export default function PurchaseOrderDetailPage() {
           const rowChanges = detailValues[item.id] ?? {}
           const isDetailEditable = (field: string) =>
             editMode && (isCreating || (po?.editable_fields.order_detail.includes(field) ?? false))
-          const { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot } = getItemStockData(item)
+          const { soh, incoming, upcoming, avg, doi, doiAfter, hasSnapshot, recommendedQty } = getItemStockData(item)
 
           const effectiveUnitForeign = hasDiscount
             ? Number(rowChanges.discounted_unit_price_foreign ?? item.discounted_unit_price_foreign ?? item.unit_price_foreign ?? 0)
@@ -534,74 +709,125 @@ export default function PurchaseOrderDetailPage() {
           const cogsPerUnit = unitPriceIdr + freightPerUnit + commissionPerUnit
 
           return (
-            <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
-              <td className="pl-6 pr-3 py-1.5 whitespace-nowrap font-mono font-medium">{item.product_variant_name}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                {isDetailEditable('ordered_qty') ? (
-                  <Input type="number" className="h-7 w-14 text-xs"
-                    value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
-                    onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
-                ) : item.ordered_qty}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                {isDetailEditable('received_qty') ? (
-                  <Input type="number" className="h-7 w-14 text-xs"
-                    value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
-                    onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
-                ) : (item.received_qty ?? '—')}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{soh}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{incoming}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{upcoming}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
-                {avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
-                {hasSnapshot && <span className="text-[10px] text-muted-foreground/50 ml-0.5">*</span>}
-              </td>
-              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : doi !== null && doi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                {doi !== null ? `${doi}d` : '\u221E'}
-              </td>
-              <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
-                {doiAfter !== null ? `${doiAfter}d` : '\u221E'}
-              </td>
-              <td className="px-3 py-1.5 whitespace-nowrap">
-                {isDetailEditable('unit_price_foreign') ? (
-                  <Input type="number" step="0.001" className="h-7 w-20 text-xs"
-                    value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
-                    onChange={e => {
-                      setDetailField(item.id, 'unit_price_foreign', e.target.value)
-                      if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
-                    }} />
-                ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
-              </td>
-              {hasDiscount && (
+            <React.Fragment key={item.id}>
+              <tr className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
+                <td colSpan={2} className="pl-4 pr-3 py-1.5 whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <label className={`relative w-7 h-7 rounded border overflow-hidden shrink-0 cursor-pointer
+                      ${uploadingVariantPhoto[item.variant_id] ? 'opacity-50' : 'hover:opacity-80'}`}>
+                      {variantPhotoOverrides[item.variant_id] || item.product_photo_url ? (
+                        <img
+                          src={variantPhotoOverrides[item.variant_id] ?? item.product_photo_url ?? ''}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
+                          <ImagePlus className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingVariantPhoto[item.variant_id]}
+                        onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (file) handleVariantPhotoUpload(item.variant_id, item.product_id, file)
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                    <div className="flex flex-col min-w-0"><span className="font-mono font-medium">{item.product_variant_name}</span>{item.sku_variant_code && (<span className="text-[10px] text-muted-foreground font-mono leading-tight">{item.sku_variant_code}</span>)}</div>
+                  </div>
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-violet-600">
+                  {recommendedQty !== null ? recommendedQty : '\u221E'}
+                </td>
                 <td className="px-3 py-1.5 whitespace-nowrap">
-                  {isDetailEditable('discounted_unit_price_foreign') ? (
+                  {isDetailEditable('ordered_qty') ? (
+                    <Input type="number" className="h-7 w-14 text-xs"
+                      value={rowChanges.ordered_qty ?? String(item.ordered_qty)}
+                      onChange={e => setDetailField(item.id, 'ordered_qty', e.target.value)} />
+                  ) : item.ordered_qty}
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap">
+                  {isDetailEditable('received_qty') ? (
+                    <Input type="number" className="h-7 w-14 text-xs"
+                      value={rowChanges.received_qty ?? String(item.received_qty ?? '')}
+                      onChange={e => setDetailField(item.id, 'received_qty', e.target.value)} />
+                  ) : (item.received_qty ?? '—')}
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{soh}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap text-blue-600">{incoming}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium">{upcoming}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
+                  {avg > 0 ? `${avg.toFixed(1)}/d` : '—'}
+                  {hasSnapshot && <span className="text-[10px] text-muted-foreground/50 ml-0.5">*</span>}
+                </td>
+                <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doi !== null && doi < 14 ? 'text-red-600' : doi !== null && doi <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                  {doi !== null ? `${doi}d` : '\u221E'}
+                </td>
+                <td className={`px-3 py-1.5 whitespace-nowrap font-medium ${doiAfterColor(doiAfter)}`}>
+                  {doiAfter !== null ? `${doiAfter}d` : '\u221E'}
+                </td>
+                <td className="px-3 py-1.5 whitespace-nowrap">
+                  {isDetailEditable('unit_price_foreign') ? (
                     <Input type="number" step="0.001" className="h-7 w-20 text-xs"
-                      value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
-                      onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
-                  ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                      value={rowChanges.unit_price_foreign ?? String(item.unit_price_foreign ?? '')}
+                      onChange={e => {
+                        setDetailField(item.id, 'unit_price_foreign', e.target.value)
+                        if (hasDiscount) setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)
+                      }} />
+                  ) : (item.unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.unit_price_foreign)}` : '—')}
                 </td>
-              )}
-              <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
-              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—'}</td>
-              <td className="px-3 py-1.5">
-                {showRemarks ? (
-                  <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
-                    value={rowChanges.remarks ?? String(item.remarks ?? '')}
-                    onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
-                ) : <span className="text-muted-foreground">{item.remarks || ''}</span>}
-              </td>
-              {editMode && canAddDeleteItems && (
-                <td className="px-2 py-1 w-8">
-                  <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600"
-                    onClick={() => deleteExistingItem(item.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {hasDiscount && (
+                  <td className="px-3 py-1.5 whitespace-nowrap">
+                    {isDetailEditable('discounted_unit_price_foreign') ? (
+                      <Input type="number" step="0.001" className="h-7 w-20 text-xs"
+                        value={rowChanges.discounted_unit_price_foreign ?? String(item.discounted_unit_price_foreign ?? '')}
+                        onChange={e => setDetailField(item.id, 'discounted_unit_price_foreign', e.target.value)} />
+                    ) : (item.discounted_unit_price_foreign != null ? `${getCurrencySymbol(po?.currency ?? String(headerValues.currency))} ${formatForeignAmount(item.discounted_unit_price_foreign)}` : '—')}
+                  </td>
+                )}
+                <td className="px-3 py-1.5 whitespace-nowrap">{unitPriceIdr > 0 ? formatIDR(unitPriceIdr) : '—'}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap">{totalForeign > 0 ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(totalForeign)}` : '—'}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium">{totalIdr > 0 ? formatIDR(totalIdr) : '—'}</td>
+                <td className="px-3 py-1.5 whitespace-nowrap font-medium text-amber-700">{item.cogs_per_unit_idr != null ? '—' : (cogsPerUnit > 0 ? formatIDR(cogsPerUnit) : '—')}</td>
+                <td className="px-3 py-1.5">
+                  {showRemarks ? (
+                    <Input className="h-7 text-xs min-w-[80px]" placeholder="Remarks..."
+                      value={rowChanges.remarks ?? String(item.remarks ?? '')}
+                      onChange={e => setDetailField(item.id, 'remarks', e.target.value)} />
+                  ) : <span className="text-muted-foreground">{item.remarks || ''}</span>}
                 </td>
+                {editMode && canAddDeleteItems && (
+                  <td className="px-2 py-1 w-8">
+                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600"
+                      onClick={() => deleteExistingItem(item.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
+                )}
+              </tr>
+              {item.cogs_per_unit_idr != null && (
+                <tr className="bg-muted/20">
+                  <td colSpan={20} className="pl-10 pr-3 py-1 text-[10px] text-muted-foreground">
+                    <span className="font-medium text-foreground">Shipping/unit:</span>{' '}
+                    {formatIDR(item.shipping_per_unit_idr ?? 0)}
+                    {' · '}
+                    <span className="font-medium text-foreground">Delivery/unit:</span>{' '}
+                    {formatIDR(item.delivery_per_unit_idr ?? 0)}
+                    {' · '}
+                    <span className="font-medium text-foreground">Commission/unit:</span>{' '}
+                    {formatIDR(item.commission_per_unit_idr ?? 0)}
+                    {' · '}
+                    <span className="font-medium text-amber-700">COGS/unit:</span>{' '}
+                    <span className="font-bold text-amber-700">{formatIDR(item.cogs_per_unit_idr)}</span>
+                  </td>
+                </tr>
               )}
-            </tr>
+            </React.Fragment>
           )
         })}
         {editMode && canAddDeleteItems && group.newItemsList.map(n => {
@@ -610,29 +836,43 @@ export default function PurchaseOrderDetailPage() {
           const liveSoh = liveStats?.stock_on_hand ?? 0
           const liveIncoming = liveStats?.incoming_qty ?? 0
           const liveUpcoming = liveStats ? liveSoh + liveIncoming + ordQty : null
-          const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+          const rawAvgLive = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+          const avg = rawAvgLive > 0 ? rawAvgLive : (liveStats ? 1 / avgWindow : 0)
           const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
           const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
+          const liveRec = liveStats && avg > 0
+            ? Math.max(0, Math.ceil(avg * 90 - liveSoh - liveIncoming))
+            : null
           const unitForeign = Number(n.unit_price_foreign) || 0
           const unitIdr = Math.round(unitForeign * poExchangeRate)
           const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
 
           return (
             <tr key={n._tempId} className="border-b last:border-b-0">
-              <td className="px-2 py-1 min-w-[160px]">
+              <td colSpan={2} className="px-2 py-1 min-w-[160px]">
                 <VariantSearchSelect
                   value={n.product_variant_id}
                   selectedLabel={n.product_variant_label}
-                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) => {
+                  supplierId={activeSupplierId}
+                  onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, _lastCurrency, lastDiscountedUnitPriceForeign) => {
                     updateNewItem(n._tempId, 'product_variant_id', id)
                     updateNewItem(n._tempId, 'product_variant_label', label)
                     updateNewItem(n._tempId, 'product_id', productId)
                     updateNewItem(n._tempId, 'product_name', productName)
                     updateNewItem(n._tempId, 'product_supplier_link', productSupplierLink ?? '')
                     updateNewItem(n._tempId, 'product_photo_url', productPhotoUrl ?? '')
+                    if (lastUnitPriceForeign && parseFloat(lastUnitPriceForeign) > 0) {
+                      updateNewItem(n._tempId, 'unit_price_foreign', lastUnitPriceForeign)
+                    }
+                    if (hasDiscount && lastDiscountedUnitPriceForeign && parseFloat(lastDiscountedUnitPriceForeign) > 0) {
+                      updateNewItem(n._tempId, 'discounted_unit_price_foreign', lastDiscountedUnitPriceForeign)
+                    }
                   }}
                   placeholder="Select variant"
                 />
+              </td>
+              <td className="px-3 py-1.5 whitespace-nowrap font-medium text-violet-600">
+                {liveRec !== null ? liveRec : (liveStats ? '\u221E' : '\u2014')}
               </td>
               <td className="px-2 py-1">
                 <Input type="number" className="h-7 w-14 text-xs"
@@ -688,7 +928,7 @@ export default function PurchaseOrderDetailPage() {
     )
     })
   })()
-
+  
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -747,9 +987,26 @@ export default function PurchaseOrderDetailPage() {
                 </Button>
               )}
               {user?.is_staff && po!.next_status && (
-                <Button size="sm" onClick={() => setShowAdvanceModal(true)}>
-                  → {po!.next_status}
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    size="sm"
+                    onClick={() => setShowAdvanceModal(true)}
+                    disabled={po!.next_status === 'DELIVERED' && hasDraftLines}
+                    title={
+                      po!.next_status === 'DELIVERED' && hasDraftLines
+                        ? 'Finalize all draft lines before advancing to DELIVERED'
+                        : undefined
+                    }
+                  >
+                    → {po!.next_status}
+                  </Button>
+                  {po!.next_status === 'DELIVERED' && hasDraftLines && (
+                    <p className="text-xs text-amber-600">
+                      <AlertTriangle className="inline h-3 w-3 mr-0.5" />
+                      Finalize {draftLines.length} draft {draftLines.length === 1 ? 'line' : 'lines'} to advance
+                    </p>
+                  )}
+                </div>
               )}
             </>
           )}
@@ -772,7 +1029,7 @@ export default function PurchaseOrderDetailPage() {
                     value={String(headerValues.warehouse_id ?? '')}
                     onValueChange={val => setHeaderField('warehouse_id', val)}
                   >
-                    <SelectTrigger className="h-7 text-xs">
+                    <SelectTrigger className="h-7 text-xs" data-testid="warehouse-select-trigger">
                       <SelectValue placeholder="Select warehouse..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -792,7 +1049,7 @@ export default function PurchaseOrderDetailPage() {
                     value={String(headerValues.supplier_id ?? po?.supplier_id ?? '')}
                     onValueChange={val => setHeaderField('supplier_id', val === 'none' ? '' : val)}
                   >
-                    <SelectTrigger className="h-7 text-xs">
+                    <SelectTrigger className="h-7 text-xs" data-testid="supplier-select-trigger">
                       <SelectValue placeholder="No supplier" />
                     </SelectTrigger>
                     <SelectContent>
@@ -897,7 +1154,7 @@ export default function PurchaseOrderDetailPage() {
                 editMode={editMode}
                 editable={isCreating || (po?.editable_fields?.header?.includes('currency') ?? false)}
                 headerValues={headerValues}
-                setHeaderField={setHeaderField}
+                setHeaderField={handleCurrencyChange}
               />
               <EditableInfoItem
                 field="exchange_rate"
@@ -957,6 +1214,26 @@ export default function PurchaseOrderDetailPage() {
                 headerValues={headerValues}
                 setHeaderField={setHeaderField}
               />
+              {(() => {
+                const effectiveShippingPerCbm = Number(
+                  headerValues.shipping_fee_per_cbm ?? po?.shipping_fee_per_cbm ?? 0
+                )
+                if (effectiveShippingPerCbm <= 0) return null
+                const poStatus = po?.status
+                if (poStatus === 'DELIVERED' || poStatus === 'COMPLETED' || poStatus === 'CANCELLED') return null
+                const noDimsCount = (po?.order_details ?? []).filter(
+                  item => item.product_has_dimensions === false
+                ).length
+                if (noDimsCount === 0) return null
+                return (
+                  <div className="col-span-2 flex items-center gap-2 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                    <span>⚠</span>
+                    <span>
+                      {noDimsCount} item{noDimsCount > 1 ? 's' : ''} have no product dimensions — shipping fee not allocated to those items.
+                    </span>
+                  </div>
+                )
+              })()}
               <EditableInfoItem
                 field="forecast_cbm"
                 label="Forecast CBM"
@@ -1043,21 +1320,37 @@ export default function PurchaseOrderDetailPage() {
               const estGoods = newItems.reduce((s, n) => {
                 const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
                 return s + price * (Number(n.ordered_qty) || 0)
-              }, 0) * poExchangeRate
-              const commPct = Number(headerValues.commission_fee_pct) || 0
+  }, 0) * poExchangeRate
+  const estGoodsForeign = newItems.reduce((s, n) => {
+    const price = hasDiscount
+      ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0)
+      : (Number(n.unit_price_foreign) || 0)
+    return s + price * (Number(n.ordered_qty) || 0)
+  }, 0)
+  const estCurrencySymbol = getCurrencySymbol(String(headerValues.currency ?? ''))
+  const estForeignLabel = `Goods (${String(headerValues.currency ?? 'Foreign')})`
+  const commPct = Number(headerValues.commission_fee_pct) || 0
               const estCommission = Math.round(newItems.reduce((s, n) => {
                 const price = hasDiscount ? (Number(n.discounted_unit_price_foreign) || Number(n.unit_price_foreign) || 0) : (Number(n.unit_price_foreign) || 0)
                 return s + price * (Number(n.ordered_qty) || 0)
               }, 0) * (commPct / 100) * poExchangeRate)
               const estFreight = Math.round((Number(headerValues.forecast_cbm) || 0) * (Number(headerValues.forecast_shipping_fee_per_cbm) || 0))
-              const estTotal = Math.round(estGoods) + estCommission + estFreight
+              const estDelivery = Math.round((Number(headerValues.delivery_fee) || 0) * poExchangeRate)
+              const estTotal = Math.round(estGoods) + estCommission + estFreight + estDelivery
               const totalUnits = newItems.reduce((s, n) => s + (Number(n.ordered_qty) || 0), 0)
               const totalSkus = newItems.filter(n => n.product_variant_id).length
               return (
                 <div className="space-y-3 text-sm">
                   <SummaryRow label="Goods" value={estGoods > 0 ? formatIDR(Math.round(estGoods)) : '—'} />
+                  {estGoodsForeign > 0 && (
+                    <SummaryRow
+                      label={estForeignLabel}
+                      value={`${estCurrencySymbol} ${formatForeignAmount(estGoodsForeign)}`}
+                    />
+                  )}
                   <SummaryRow label="Commission" value={estCommission > 0 ? formatIDR(estCommission) : '—'} />
                   <SummaryRow label="Forecast Freight" value={estFreight > 0 ? formatIDR(estFreight) : '—'} />
+                  <SummaryRow label="Supplier Delivery" value={estDelivery > 0 ? formatIDR(estDelivery) : '—'} />
                   <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
                     <span>Est. Total</span>
                     <span>{estTotal > 0 ? formatIDR(estTotal) : '—'}</span>
@@ -1065,23 +1358,41 @@ export default function PurchaseOrderDetailPage() {
                   <p className="text-xs text-muted-foreground pt-1">{totalUnits} units · {totalSkus} SKUs</p>
                 </div>
               )
-            })() : (
-              <>
-                <div className="space-y-3 text-sm">
-                  <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
-                  <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
-                  <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
-                  <SummaryRow label="Freight" value={po!.shipping_fee != null ? formatIDR(po!.shipping_fee) : '—'} />
-                  <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
-                    <span>Total Amount</span>
-                    <span>{formatIDR(po!.total_amount)}</span>
+            })() : (() => {
+              const totalForeignAmount = (po!.order_details ?? []).reduce(
+                (s, i) => s + Number(
+                  hasDiscount
+                    ? (i.discounted_total_price_foreign ?? i.total_price_foreign ?? 0)
+                    : (i.total_price_foreign ?? i.discounted_total_price_foreign ?? 0)
+                ),
+                0
+              )
+              const currencySymbol = getCurrencySymbol(po!.currency)
+              const foreignLabel = `Goods (${po!.currency ?? 'Foreign'})`
+              return (
+                <>
+                  <div className="space-y-3 text-sm">
+                    <SummaryRow label="Goods" value={computedGoodsAmount > 0 ? formatIDR(computedGoodsAmount) : '—'} />
+                    {totalForeignAmount > 0 && (
+                      <SummaryRow
+                        label={foreignLabel}
+                        value={`${currencySymbol} ${formatForeignAmount(totalForeignAmount)}`}
+                      />
+                    )}
+                    <SummaryRow label="Commission" value={po!.commission_fee != null ? formatIDR(po!.commission_fee) : '—'} />
+                    <SummaryRow label="Supplier Delivery" value={deliveryFeeIdr > 0 ? formatIDR(deliveryFeeIdr) : '—'} />
+                    <SummaryRow label="Freight" value={(po!.shipping_fee ?? 0) > 0 ? formatIDR(po!.shipping_fee!) : '—'} />
+                    <div className="border-t pt-2 mt-2 flex justify-between font-bold text-base">
+                      <span>Total Amount</span>
+                      <span>{formatIDR(po!.total_amount)}</span>
+                    </div>
                   </div>
-                </div>
-                <div className="border-t pt-3 mt-3 space-y-3">
-                  <StatBox label="COGS Ratio" value={po!.cost_ratio_cogs != null ? `${po!.cost_ratio_cogs.toFixed(2)}%` : '—'} />
-                </div>
-              </>
-            )}
+                  <div className="border-t pt-3 mt-3 space-y-3">
+                    <StatBox label="COGS Ratio" value={po!.cost_ratio_cogs != null ? `${po!.cost_ratio_cogs.toFixed(2)}%` : '—'} />
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           {/* Order Summary card */}
@@ -1161,7 +1472,7 @@ export default function PurchaseOrderDetailPage() {
       <div className="rounded-lg border bg-card">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <h2 className="text-base font-semibold">Order Items</h2>
-          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
             <div className="flex rounded-md border overflow-hidden text-xs h-6">
               <button
                 type="button"
@@ -1179,6 +1490,24 @@ export default function PurchaseOrderDetailPage() {
                 onClick={() => setAvgWindow(30)}
               >30d</button>
             </div>
+            {!isCreating && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Group by:</span>
+                <Select value={groupBy} onValueChange={setGroupBy}>
+                  <SelectTrigger className="h-6 text-xs w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">Product</SelectItem>
+                    {availableGroupKeys.map(k => (
+                      <SelectItem key={k} value={k}>
+                        {k.charAt(0).toUpperCase() + k.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {editMode && (
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
                 <input
@@ -1190,8 +1519,30 @@ export default function PurchaseOrderDetailPage() {
                 Has Discount
               </label>
             )}
+            {isCreating && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (!activeSupplierId) {
+                    setSupplierPickValue('')
+                    setShowSupplierPickModal(true)
+                    return
+                  }
+                  setShowImportModal(true)
+                }}
+              >
+                <Upload className="h-3 w-3 mr-1" /> Import from Excel
+              </Button>
+            )}
             {editMode && canAddDeleteItems && (
-              <Button type="button" size="sm" variant="outline" onClick={() => setAddItemModalOpen(true)}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setAddItemModalOpen(true)}
+              >
                 <Plus className="h-3 w-3 mr-1" /> Add Item
               </Button>
             )}
@@ -1201,7 +1552,9 @@ export default function PurchaseOrderDetailPage() {
           <table className="w-full min-w-max text-xs border-collapse">
             <thead>
               <tr className="border-b bg-muted/30 text-muted-foreground">
+                <th className="w-8" />
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap min-w-[160px]">Variant</th>
+                <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Rec.</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Order</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Receive</th>
                 <th className="px-3 py-2 text-left font-medium whitespace-nowrap">SOH</th>
@@ -1223,7 +1576,121 @@ export default function PurchaseOrderDetailPage() {
             {orderItemsContent}
           </table>
         </div>
+      {isCreating && draftPoolLines.length > 0 && (
+        <div className="mt-2 space-y-1 px-6 pb-4">
+          <p className="text-xs font-medium text-muted-foreground px-1">Sourcing Pool Lines</p>
+          {draftPoolLines.map((dl, i) => (
+            <div key={dl.sourcing_item_id} className="grid grid-cols-[24px_1fr_80px_90px_28px] gap-2 items-center px-1">
+              {dl.image_proxy_url ? (
+                <img src={dl.image_proxy_url} alt="" className="w-6 h-6 rounded object-cover border border-border" />
+              ) : (
+                <div className="w-6 h-6 rounded bg-muted" />
+              )}
+              <span className="text-xs truncate">
+                {dl.product_name} — {dl.variant_name}
+                {dl.variant_id != null ? (
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">Mapped</Badge>
+                ) : (
+                  <Badge variant="info" className="ml-1.5 text-[10px] px-1 py-0">Pool</Badge>
+                )}
+              </span>
+              <span className="text-xs text-center">{dl.ordered_qty}</span>
+              <span className="text-xs text-right">{dl.unit_price_foreign}</span>
+              <button
+                type="button"
+                aria-label="Remove draft line"
+                className="h-5 w-5 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                onClick={() => setDraftPoolLines(prev => prev.filter((_, idx) => idx !== i))}
+              >
+                <XIcon className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       </div>
+
+      {isCreating && activeSupplierId && (
+        <PoolBrowser
+          supplierId={activeSupplierId}
+          newItemKeys={newItemKeys}
+          onAddLines={handleAddPoolLines}
+        />
+      )}
+
+      {!isCreating && draftLines.length > 0 && (
+        <div className="rounded-lg border bg-card">
+          <div className="px-6 py-4 border-b flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold">
+                Draft Lines ({draftLines.length})
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Finalize each line to create a Product + Variant before advancing to DELIVERED.
+              </p>
+            </div>
+            {po!.next_status === 'DELIVERED' && (
+              <div className="flex items-center gap-1.5 text-amber-600 text-xs font-medium shrink-0 mt-0.5">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                Required before DELIVERED
+              </div>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/30 text-muted-foreground">
+                  <th className="w-10 px-3 py-2" />
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Product</th>
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Variant</th>
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Qty</th>
+                  <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Unit Price</th>
+                  <th className="px-3 py-2 w-24" />
+                </tr>
+              </thead>
+              <tbody>
+                {draftLines.map((item) => (
+                  <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10 transition-colors">
+                    <td className="px-3 py-2">
+                      {item.product_photo_url ? (
+                        <img
+                          src={item.product_photo_url}
+                          alt=""
+                          className="h-8 w-8 rounded object-cover border border-border"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded bg-muted" />
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-medium whitespace-nowrap">
+                      {item.draft_product_name || item.product_name}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
+                      {item.product_variant_name || '—'}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">{item.ordered_qty}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      {item.unit_price_foreign != null
+                        ? `${getCurrencySymbol(po?.currency)} ${formatForeignAmount(item.unit_price_foreign)}`
+                        : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setFinalizingDetail(item)}
+                      >
+                        Finalize
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {!isCreating && po?.next_status && (
         <StatusAdvanceModal
           open={showAdvanceModal}
@@ -1239,12 +1706,11 @@ export default function PurchaseOrderDetailPage() {
         hasDiscount={hasDiscount}
         stockMap={stockMap}
         avgWindow={avgWindow}
-        poExchangeRate={poExchangeRate}
-        freightPerUnit={freightPerUnit}
-        commissionPerUnit={commissionPerUnit}
         currency={po?.currency ?? String(headerValues.currency ?? '')}
         excludeVariantIds={usedVariantIds}
+        supplierId={activeSupplierId}
       />
+
       {!isCreating && po && (
         <PurchaseOrderExportModal
           open={exportModalOpen}
@@ -1255,6 +1721,7 @@ export default function PurchaseOrderDetailPage() {
       <ValidationModal
         errors={validationErrors}
         onClose={() => setValidationErrors([])}
+        title="Save Error"
       />
       <SupplierFormModal
         open={showNewSupplierModal}
@@ -1264,6 +1731,64 @@ export default function PurchaseOrderDetailPage() {
           setShowNewSupplierModal(false)
         }}
       />
+      {finalizingDetail && (
+        <FinalizeDraftLineModal
+          open
+          onClose={() => setFinalizingDetail(null)}
+          poId={po!.id}
+          detail={finalizingDetail}
+        />
+      )}
+      {isCreating && (
+        <SourcingPoolImportModal
+          open={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          supplierId={activeSupplierId ?? ''}
+          supplierName={suppliers.find(s => s.id === activeSupplierId)?.name ?? ''}
+          onImportSuccess={(importedRows) => {
+            setNewItemKeys(new Set(importedRows.map((r) => `${r.product_name}|${r.variant_name}`)))
+          }}
+        />
+      )}
+      <Dialog open={showSupplierPickModal} onOpenChange={(o) => !o && setShowSupplierPickModal(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Select Supplier</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground mb-3">
+              Choose a supplier to import items from their sourcing pool.
+            </p>
+            <Select value={supplierPickValue} onValueChange={setSupplierPickValue}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select supplier..." />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSupplierPickModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!supplierPickValue}
+              onClick={() => {
+                setHeaderField('supplier_id', supplierPickValue)
+                setShowSupplierPickModal(false)
+                setShowImportModal(true)
+              }}
+            >
+              Continue to Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1289,7 +1814,7 @@ function EditableInfoItem({
             value={String(headerValues[field] ?? value ?? '')}
             onValueChange={val => setHeaderField(field, val)}
           >
-            <SelectTrigger className="h-7 text-xs">
+            <SelectTrigger className="h-7 text-xs" data-testid={field === 'currency' ? 'currency-select-trigger' : undefined}>
               <SelectValue placeholder="Select..." />
             </SelectTrigger>
             <SelectContent>
@@ -1364,208 +1889,407 @@ function StatBox({ label, value, highlight }: { label: string; value: string; hi
   )
 }
 
-function AddItemModal({
-  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, poExchangeRate, freightPerUnit, commissionPerUnit, currency, excludeVariantIds,
-}: {
-  open: boolean
-  onClose: () => void
-  onAdd: (draft: {
-    product_variant_id: string
-    product_variant_label: string
-    product_id: string
-    product_name: string
-    product_supplier_link: string | null
-    product_photo_url: string | null
-    ordered_qty: string
-    unit_price_foreign: string
-    discounted_unit_price_foreign: string
-  }) => void
-  hasDiscount: boolean
-  stockMap: Map<string, ReplenishmentItem>
-  avgWindow: 7 | 14 | 30
-  poExchangeRate: number
-  freightPerUnit: number
-  commissionPerUnit: number
-  currency: string
-  excludeVariantIds: Set<string>
-}) {
-  const emptyDraft = {
+type RowDraft = ModalDraftItem & { tempId: string }
+
+function makeEmptyRow(): RowDraft {
+  return {
+    tempId: `r-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     product_variant_id: '',
     product_variant_label: '',
     product_id: '',
     product_name: '',
-    product_supplier_link: null as string | null,
-    product_photo_url: null as string | null,
+    product_supplier_link: null,
+    product_photo_url: null,
     ordered_qty: '1',
     unit_price_foreign: '',
     discounted_unit_price_foreign: '',
   }
-  const [draft, setDraft] = useState({ ...emptyDraft })
+}
+
+function AddItemRow({
+  row, index, stockMap, avgWindow, currency, hasDiscount, showAll, supplierId,
+  allExcluded, onUpdate, onRemove, canRemove, onQuickCreated,
+}: {
+  row: RowDraft
+  index: number
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 14 | 30
+  currency: string
+  hasDiscount: boolean
+  showAll: boolean
+  supplierId?: string
+  allExcluded: Set<string>
+  onUpdate: (patch: Partial<RowDraft>) => void
+  onRemove: () => void
+  canRemove: boolean
+  onQuickCreated?: (variants: Array<{
+    id: string
+    label: string
+    productId: string
+    productName: string
+    productSupplierLink: string | null
+    productPhotoUrl: string | null
+    lastUnitPriceForeign: string | null
+    lastCurrency: string | null
+    lastDiscountedUnitPriceForeign: string | null
+  }>) => void
+}) {
+  const rowExcluded = useMemo(() => {
+    const s = new Set(allExcluded)
+    if (row.product_variant_id) s.delete(row.product_variant_id)
+    return s
+  }, [allExcluded, row.product_variant_id])
+
+  const liveStats = row.product_variant_id ? stockMap.get(row.product_variant_id) : undefined
+  const ordQty = Number(row.ordered_qty) || 0
+  const liveSoh = liveStats?.stock_on_hand ?? 0
+  const liveIncoming = liveStats?.incoming_qty ?? 0
+  const rawAvg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
+  const avg = rawAvg > 0 ? rawAvg : (liveStats ? 1 / avgWindow : 0)
+  const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
+  const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
+
+  return (
+    <div className="rounded-lg border bg-card p-2 space-y-1.5">
+      <div className="flex items-start gap-1.5">
+        <span className="text-xs text-muted-foreground w-4 pt-1.5 shrink-0 text-right">{index + 1}</span>
+
+        <div className="flex-1 min-w-0">
+          <VariantSearchSelect
+            value={row.product_variant_id}
+            selectedLabel={row.product_variant_label}
+            excludeVariantIds={rowExcluded}
+            supplierId={showAll ? undefined : supplierId}
+            onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl, lastUnitPriceForeign, lastCurrency, lastDiscountedUnitPriceForeign) => {
+              const autoFill =
+                lastUnitPriceForeign &&
+                lastCurrency &&
+                lastCurrency === currency &&
+                parseFloat(lastUnitPriceForeign) > 0
+              const autoFillDiscount =
+                hasDiscount &&
+                lastDiscountedUnitPriceForeign &&
+                lastCurrency === currency &&
+                parseFloat(lastDiscountedUnitPriceForeign) > 0
+              onUpdate({
+                product_variant_id: id,
+                product_variant_label: label,
+                product_id: productId,
+                product_name: productName,
+                product_supplier_link: productSupplierLink ?? null,
+                product_photo_url: productPhotoUrl ?? null,
+                ...(autoFill ? { unit_price_foreign: lastUnitPriceForeign! } : {}),
+                ...(autoFillDiscount ? { discounted_unit_price_foreign: lastDiscountedUnitPriceForeign! } : {}),
+              })
+            }}
+            onQuickCreated={onQuickCreated}
+            placeholder="Search variant..."
+          />
+          {liveStats && (
+            <p className="text-[10px] text-muted-foreground leading-none mt-0.5">
+              SOH {liveSoh} · Inc {liveIncoming} · {avg > 0 ? `${avg.toFixed(1)}/d` : '—'} · DOI {doi !== null ? `${doi}d` : '∞'} → {doiAfter !== null ? `${doiAfter}d` : (ordQty > 0 ? '∞' : '—')}
+            </p>
+          )}
+        </div>
+
+        {canRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive shrink-0 mt-1"
+          >
+            <XIcon className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 pl-5">
+        <div className="w-20 shrink-0">
+          <p className="text-[10px] text-muted-foreground mb-0.5">Qty <span className="text-red-500">*</span></p>
+          <Input
+            type="number"
+            min="1"
+            className="h-7 text-xs"
+            value={row.ordered_qty}
+            onChange={e => onUpdate({ ordered_qty: e.target.value })}
+          />
+        </div>
+        <div className="w-28 shrink-0">
+          <p className="text-[10px] text-muted-foreground mb-0.5">Unit Price ({getCurrencySymbol(currency)})</p>
+          <Input
+            type="number"
+            step="0.001"
+            className="h-7 text-xs"
+            value={row.unit_price_foreign}
+            onChange={e => onUpdate({ unit_price_foreign: e.target.value })}
+          />
+        </div>
+        {hasDiscount && (
+          <div className="w-28 shrink-0">
+            <p className="text-[10px] text-muted-foreground mb-0.5">Disc. Price ({getCurrencySymbol(currency)})</p>
+            <Input
+              type="number"
+              step="0.001"
+              className="h-7 text-xs"
+              value={row.discounted_unit_price_foreign}
+              onChange={e => onUpdate({ discounted_unit_price_foreign: e.target.value })}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function AddItemModal({
+  open, onClose, onAdd, hasDiscount, stockMap, avgWindow, currency, excludeVariantIds, supplierId,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (items: ModalDraftItem[]) => void
+  hasDiscount: boolean
+  stockMap: Map<string, ReplenishmentItem>
+  avgWindow: 7 | 14 | 30
+  currency: string
+  excludeVariantIds: Set<string>
+  supplierId?: string
+}) {
+  const [rows, setRows] = useState<RowDraft[]>([makeEmptyRow()])
+  const [bulkPrice, setBulkPrice] = useState('')
+  const [bulkQty, setBulkQty] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraft({ ...emptyDraft })
+      setRows([makeEmptyRow()])
+      setBulkPrice('')
+      setBulkQty('')
+      setShowAll(false)
       setError('')
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const liveStats = draft.product_variant_id ? stockMap.get(draft.product_variant_id) : undefined
-  const ordQty = Number(draft.ordered_qty) || 0
-  const liveSoh = liveStats?.stock_on_hand ?? 0
-  const liveIncoming = liveStats?.incoming_qty ?? 0
-  const avg = liveStats ? (avgWindow === 7 ? liveStats.avg_sales_7d : avgWindow === 14 ? liveStats.avg_sales_14d : liveStats.avg_sales_30d) : 0
-  const doi = liveStats && avg > 0 ? Math.round((liveSoh + liveIncoming) / avg) : null
-  const doiAfter = liveStats && avg > 0 && ordQty > 0 ? Math.round((liveSoh + liveIncoming + ordQty) / avg) : null
-  const unitForeign = Number(draft.unit_price_foreign) || 0
-  const unitIdr = Math.round(unitForeign * poExchangeRate)
-  const cogsPerUnit = unitIdr + freightPerUnit + commissionPerUnit
+  const allExcluded = useMemo(() => {
+    const combined = new Set(excludeVariantIds)
+    for (const r of rows) if (r.product_variant_id) combined.add(r.product_variant_id)
+    return combined
+  }, [excludeVariantIds, rows])
 
-  const handleAdd = () => {
-    if (!draft.product_variant_id) { setError('Please select a variant'); return }
-    if (!draft.ordered_qty || Number(draft.ordered_qty) <= 0) { setError('Quantity must be greater than 0'); return }
-    onAdd(draft)
+  const addRow = () => setRows(prev => [...prev, makeEmptyRow()])
+
+  const removeRow = (tempId: string) =>
+    setRows(prev => prev.length > 1 ? prev.filter(r => r.tempId !== tempId) : prev)
+
+  const updateRow = (tempId: string, patch: Partial<RowDraft>) =>
+    setRows(prev => prev.map(r => r.tempId === tempId ? { ...r, ...patch } : r))
+
+  const handleQuickCreated = (
+    tempId: string,
+    variants: Array<{
+      id: string
+      label: string
+      productId: string
+      productName: string
+      productSupplierLink: string | null
+      productPhotoUrl: string | null
+      lastUnitPriceForeign: string | null
+      lastCurrency: string | null
+      lastDiscountedUnitPriceForeign: string | null
+    }>,
+  ) => {
+    if (variants.length === 0) return
+    const first = variants[0]
+    const autoFillFirst =
+      first.lastUnitPriceForeign &&
+      first.lastCurrency === currency &&
+      parseFloat(first.lastUnitPriceForeign) > 0
+    const autoFillDiscFirst =
+      hasDiscount &&
+      first.lastDiscountedUnitPriceForeign &&
+      parseFloat(first.lastDiscountedUnitPriceForeign) > 0
+
+    updateRow(tempId, {
+      product_variant_id: first.id,
+      product_variant_label: first.label,
+      product_id: first.productId,
+      product_name: first.productName,
+      product_supplier_link: first.productSupplierLink,
+      product_photo_url: first.productPhotoUrl,
+      ...(autoFillFirst ? { unit_price_foreign: first.lastUnitPriceForeign! } : {}),
+      ...(autoFillDiscFirst ? { discounted_unit_price_foreign: first.lastDiscountedUnitPriceForeign! } : {}),
+    })
+
+    const rest = variants.slice(1)
+    if (rest.length > 0) {
+      setRows(prev => {
+        const newRows = rest.map(v => {
+          const autoFill =
+            v.lastUnitPriceForeign &&
+            v.lastCurrency === currency &&
+            parseFloat(v.lastUnitPriceForeign) > 0
+          const autoFillDisc =
+            hasDiscount &&
+            v.lastDiscountedUnitPriceForeign &&
+            parseFloat(v.lastDiscountedUnitPriceForeign) > 0
+          return {
+            ...makeEmptyRow(),
+            product_variant_id: v.id,
+            product_variant_label: v.label,
+            product_id: v.productId,
+            product_name: v.productName,
+            product_supplier_link: v.productSupplierLink,
+            product_photo_url: v.productPhotoUrl,
+            ...(autoFill ? { unit_price_foreign: v.lastUnitPriceForeign! } : {}),
+            ...(autoFillDisc ? { discounted_unit_price_foreign: v.lastDiscountedUnitPriceForeign! } : {}),
+          }
+        })
+        const currentIdx = prev.findIndex(r => r.tempId === tempId)
+        if (currentIdx === -1) return [...prev, ...newRows]
+        return [...prev.slice(0, currentIdx + 1), ...newRows, ...prev.slice(currentIdx + 1)]
+      })
+    }
+  }
+
+  const handleBulkPrice = (val: string) => {
+    setBulkPrice(val)
+    setRows(prev => prev.map(r => ({
+      ...r,
+      unit_price_foreign: val,
+      ...(hasDiscount ? { discounted_unit_price_foreign: val } : {}),
+    })))
+  }
+
+  const handleBulkQty = (val: string) => {
+    setBulkQty(val)
+    setRows(prev => prev.map(r => ({
+      ...r,
+      ordered_qty: val,
+    })))
+  }
+
+  const handleConfirm = () => {
+    const valid = rows.filter(r => r.product_variant_id && Number(r.ordered_qty) > 0)
+    if (valid.length === 0) { setError('Add at least one item with a variant and quantity.'); return }
+    onAdd(valid.map(r => ({
+  product_variant_id: r.product_variant_id,
+  product_variant_label: r.product_variant_label,
+  product_id: r.product_id,
+  product_name: r.product_name,
+  product_supplier_link: r.product_supplier_link,
+  product_photo_url: r.product_photo_url,
+  ordered_qty: r.ordered_qty,
+  unit_price_foreign: r.unit_price_foreign,
+  discounted_unit_price_foreign: r.discounted_unit_price_foreign,
+})))
     onClose()
   }
 
   return (
     <Dialog open={open} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Add Item</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1.5">Variant <span className="text-red-500">*</span></p>
-            <VariantSearchSelect
-              value={draft.product_variant_id}
-              selectedLabel={draft.product_variant_label}
-              excludeVariantIds={excludeVariantIds}
-              onSelect={(id, label, productId, productName, productSupplierLink, productPhotoUrl) =>
-                setDraft(prev => ({
-                  ...prev,
-                  product_variant_id: id,
-                  product_variant_label: label,
-                  product_id: productId,
-                  product_name: productName,
-                  product_supplier_link: productSupplierLink ?? null,
-                  product_photo_url: productPhotoUrl ?? null,
-                }))
-              }
-              placeholder="Search and select variant..."
-            />
-          </div>
-
-          {liveStats && (
-            <div className="grid grid-cols-4 gap-2 rounded-lg bg-muted/40 p-3 text-xs">
-              <div>
-                <p className="text-muted-foreground">SOH</p>
-                <p className="font-semibold">{liveSoh}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Incoming</p>
-                <p className="font-semibold text-blue-600">{liveIncoming}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">AVG ({avgWindow}d)</p>
-                <p className="font-semibold">{avg > 0 ? `${avg.toFixed(1)}/d` : '\u2014'}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">DOI</p>
-                <p className={cn('font-semibold', doi !== null && doi < 14 ? 'text-red-600' : '')}>{doi !== null ? `${doi}d` : '\u221E'}</p>
-              </div>
-            </div>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-row items-center justify-between pr-8">
+          <DialogTitle>Add Items</DialogTitle>
+          {supplierId && (
+            <button
+              type="button"
+              onClick={() => setShowAll(prev => !prev)}
+              className={`text-xs px-2 py-1 rounded border ${showAll ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+            >
+              {showAll ? 'Filtered off' : 'Filter by supplier'}
+            </button>
           )}
+        </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Quantity <span className="text-red-500">*</span></p>
+        <div className="space-y-3 py-2 flex-1 min-h-0 overflow-y-auto">
+          {/* Bulk inputs */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                Bulk unit price ({getCurrencySymbol(currency)})
+              </label>
+              <Input
+                type="number"
+                step="0.001"
+                className="h-7 text-xs w-36"
+                placeholder="Apply to all rows"
+                value={bulkPrice}
+                onChange={e => handleBulkPrice(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                Bulk qty
+              </label>
               <Input
                 type="number"
                 min="1"
-                className="h-8 text-sm"
-                value={draft.ordered_qty}
-                onChange={e => setDraft(prev => ({ ...prev, ordered_qty: e.target.value }))}
-              />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Unit Price ({getCurrencySymbol(currency)})</p>
-              <Input
-                type="number"
-                step="0.001"
-                className="h-8 text-sm"
-                value={draft.unit_price_foreign}
-                onChange={e => setDraft(prev => ({
-                  ...prev,
-                  unit_price_foreign: e.target.value,
-                  discounted_unit_price_foreign: hasDiscount ? e.target.value : prev.discounted_unit_price_foreign,
-                }))}
+                step="1"
+                className="h-7 text-xs w-24"
+                placeholder="Apply to all rows"
+                value={bulkQty}
+                onChange={e => handleBulkQty(e.target.value)}
               />
             </div>
           </div>
 
-          {hasDiscount && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Discounted Price ({getCurrencySymbol(currency)})</p>
-              <Input
-                type="number"
-                step="0.001"
-                className="h-8 text-sm"
-                value={draft.discounted_unit_price_foreign}
-                onChange={e => setDraft(prev => ({ ...prev, discounted_unit_price_foreign: e.target.value }))}
+          {/* Row list */}
+          <div className="space-y-2 pr-1">
+            {rows.map((row, idx) => (
+              <AddItemRow
+                key={row.tempId}
+                row={row}
+                index={idx}
+                stockMap={stockMap}
+                avgWindow={avgWindow}
+                currency={currency}
+                hasDiscount={hasDiscount}
+                showAll={showAll}
+                supplierId={supplierId}
+                allExcluded={allExcluded}
+                onUpdate={patch => updateRow(row.tempId, patch)}
+                onRemove={() => removeRow(row.tempId)}
+                canRemove={rows.length > 1}
+                onQuickCreated={variants => handleQuickCreated(row.tempId, variants)}
               />
-            </div>
-          )}
+            ))}
 
-          {unitForeign > 0 && (
-            <div className="grid grid-cols-2 gap-2 rounded-lg border p-3 text-xs">
-              <div>
-                <p className="text-muted-foreground">Unit Price (IDR)</p>
-                <p className="font-semibold">{formatIDR(unitIdr)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Total ({getCurrencySymbol(currency)})</p>
-                <p className="font-semibold">{getCurrencySymbol(currency)} {formatForeignAmount(unitForeign * ordQty)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Total (IDR)</p>
-                <p className="font-semibold">{formatIDR(unitIdr * ordQty)}</p>
-              </div>
-              {cogsPerUnit > 0 && (
-                <div>
-                  <p className="text-muted-foreground">COGS/unit</p>
-                  <p className="font-semibold text-amber-700">{formatIDR(cogsPerUnit)}</p>
-                </div>
-              )}
-              {doiAfter !== null && ordQty > 0 && (
-                <div className="col-span-2">
-                  <p className="text-muted-foreground">DOI after this order</p>
-                  <p className={cn('font-semibold', doiAfterColor(doiAfter))}>{doiAfter}d</p>
-                </div>
-              )}
-            </div>
-          )}
+            <button
+              type="button"
+              onClick={addRow}
+              className="flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+            >
+              <Plus className="h-3 w-3" /> Add row
+            </button>
+          </div>
 
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
-        <DialogFooter>
-          <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" onClick={handleAdd}>Add to Order</Button>
+
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleConfirm}
+            disabled={rows.every(r => !r.product_variant_id)}
+          >
+            Add {rows.filter(r => r.product_variant_id && Number(r.ordered_qty) > 0).length || ''} item{rows.filter(r => r.product_variant_id && Number(r.ordered_qty) > 0).length !== 1 ? 's' : ''}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-function ValidationModal({ errors, onClose }: { errors: string[]; onClose: () => void }) {
+function ValidationModal({ errors, onClose, title }: { errors: string[]; onClose: () => void; title?: string }) {
   if (errors.length === 0) return null
   return (
     <Dialog open={errors.length > 0} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Required Fields Missing</DialogTitle>
+          <DialogTitle>{title ?? 'Validation Error'}</DialogTitle>
         </DialogHeader>
         <ul className="space-y-2 py-2">
           {errors.map((e, i) => (

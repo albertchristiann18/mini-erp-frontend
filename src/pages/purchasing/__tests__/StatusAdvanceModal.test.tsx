@@ -66,6 +66,7 @@ const mockPO: PurchaseOrder = {
   delivery_order_invoice_file: null,
   packing_list_file: null,
   note: null,
+  has_discount: false,
   editable_fields: {
     header: [],
     order_detail: [],

@@ -33,20 +33,13 @@ import {
 import { Badge } from '../../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { PhotoUploadGrid } from '../../components/inventory/PhotoUploadGrid'
-import { ArrowLeft, X, Plus, Pencil } from 'lucide-react'
-import type { Product, ProductPhoto, VariantDimension, VariantDimensionValue } from '../../types/inventory'
+import { ArrowLeft, X, Plus } from 'lucide-react'
+import type { Product, ProductPhoto, VariantDimension, DimensionImage } from '../../types/inventory'
 import type { SaveVariantsPayload, SaveVariantItem } from '../../api/inventory'
-
-type VariantRow = {
-  id?: string
-  variantValues: Record<string, string>
-  sku_variant_code: string
-  base_price: number
-  current_cogs: number
-  total_available_qty: number
-  hasStock: boolean
-  removed: boolean
-}
+import { uploadVariantPhoto, uploadDimensionImage, deleteDimensionImage, saveVariants as saveVariantsApi } from '../../api/inventory'
+import { VariasiSetupSection } from '../../features/inventory/components/VariasiSetupSection'
+import { DaftarVariasiTable } from '../../features/inventory/components/DaftarVariasiTable'
+import type { VariantRow } from '../../features/inventory/types'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -60,50 +53,84 @@ const schema = z.object({
 })
 type FormValues = z.infer<typeof schema>
 
-function getLabelForDim(dim: VariantDimension, valueId: string | undefined): string {
-  if (!valueId) return ''
-  return dim.values.find(v => v.id === valueId)?.label ?? valueId
-}
-
-function cartesian<T>(arrays: T[][]): T[][] {
-  if (arrays.length === 0) return [[]]
-  return arrays.reduce<T[][]>(
-    (acc, arr) => acc.flatMap(combo => arr.map(item => [...combo, item])),
-    [[]],
-  )
-}
-
-function initializeDimensions(product: Product): VariantDimension[] {
-  const rawOpts = product.variant_options
-  if (!rawOpts || typeof rawOpts !== 'object' || Array.isArray(rawOpts)) return []
-  return Object.entries(rawOpts as Record<string, string[]>).map(([name, values], idx) => ({
-    id: name,
-    name,
-    order: idx + 1,
-    values: (values ?? []).map(v => ({ id: v, label: v })),
-  }))
-}
-
-function initializeRows(product: Product): VariantRow[] {
+// eslint-disable-next-line react-refresh/only-export-components
+export function initializeRows(product: Product, dims: VariantDimension[]): VariantRow[] {
+  const dimNames = new Set(dims.map(d => d.name))
   return (Array.isArray(product.variants) ? product.variants : [])
     .filter(v => v.is_active)
-    .map(v => ({
-      id: v.id,
-      variantValues: v.variant_values ?? {},
-      sku_variant_code: v.sku_variant_code,
-      base_price: v.base_price,
-      current_cogs: v.current_cogs ?? 0,
-      total_available_qty: v.total_available_qty ?? 0,
-      hasStock: (v.total_incoming_qty ?? 0) > 0 || (v.total_available_qty ?? 0) > 0,
-      removed: false,
-    }))
+    .map(v => {
+      let variantValues: Record<string, string> = v.variant_values ?? {}
+
+      const unmatchedKeys = Object.keys(variantValues).filter(k => !dimNames.has(k))
+      const unmatchedDims = dims.filter(d => !(d.name in variantValues))
+      if (unmatchedKeys.length > 0 && unmatchedKeys.length === unmatchedDims.length) {
+        const repaired = { ...variantValues }
+        unmatchedDims.forEach((dim, i) => {
+          repaired[dim.name] = variantValues[unmatchedKeys[i]]
+          delete repaired[unmatchedKeys[i]]
+        })
+        variantValues = repaired
+      }
+
+      return {
+        id: v.id,
+        variantValues,
+        sku_variant_code: v.sku_variant_code,
+        base_price: v.base_price,
+        current_cogs: v.current_cogs ?? 0,
+        total_available_qty: v.total_available_qty ?? 0,
+        hasStock: (v.total_incoming_qty ?? 0) > 0 || (v.total_available_qty ?? 0) > 0,
+        removed: false,
+        photoUrl: v.photo_url ?? null,
+        pendingPhoto: null,
+      }
+    })
 }
 
-function suggestSku(productSku: string, dims: VariantDimension[], vv: Record<string, string>): string {
-  const parts = [productSku]
+function initializeDimState(product: Product): {
+  dim1Key: string; dim1Options: string[]; dim2Key: string; dim2Options: string[]
+} {
+  if (product.dim1_key) {
+    return {
+      dim1Key: product.dim1_key,
+      dim1Options: product.dim1_options ?? [],
+      dim2Key: product.dim2_key ?? '',
+      dim2Options: product.dim2_options ?? [],
+    }
+  }
+  // Backward compat: infer from variant_options (pre-Phase B products)
+  const rawOpts = product.variant_options
+  if (!rawOpts || typeof rawOpts !== 'object' || Array.isArray(rawOpts)) {
+    return { dim1Key: '', dim1Options: [], dim2Key: '', dim2Options: [] }
+  }
+  const entries = Object.entries(rawOpts as Record<string, string[]>)
+  return {
+    dim1Key: entries[0]?.[0] ?? '',
+    dim1Options: entries[0]?.[1] ?? [],
+    dim2Key: entries[1]?.[0] ?? '',
+    dim2Options: entries[1]?.[1] ?? [],
+  }
+}
+
+function toDimensions(
+  dim1Key: string,
+  dim1Options: string[],
+  dim2Key: string,
+  dim2Options: string[],
+): VariantDimension[] {
+  const dims: VariantDimension[] = []
+  if (dim1Key) dims.push({ id: dim1Key, name: dim1Key, order: 1, values: dim1Options.map(v => ({ id: v, label: v })) })
+  if (dim2Key) dims.push({ id: dim2Key, name: dim2Key, order: 2, values: dim2Options.map(v => ({ id: v, label: v })) })
+  return dims
+}
+
+function suggestSku(productSku: string, dims: VariantDimension[], vv: Record<string, string>, categoryCode?: string): string {
+  const parts: string[] = []
+  if (categoryCode) parts.push(categoryCode.toUpperCase())
+  if (productSku) parts.push(productSku.toUpperCase())
   for (const dim of dims) {
     const valId = vv[dim.id]
-    if (valId) parts.push(valId.toUpperCase().replace(/-/g, ''))
+    if (valId) parts.push(valId.toUpperCase().replace(/[^A-Z0-9]/g, ''))
   }
   return parts.join('-')
 }
@@ -131,16 +158,20 @@ export default function ProductEditPage() {
 
   const [photos, setPhotos] = useState<ProductPhoto[]>([])
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const [dimensions, setDimensions] = useState<VariantDimension[]>([])
   const [rows, setRows] = useState<VariantRow[]>([])
-  const [addValueInputs, setAddValueInputs] = useState<Record<number, string>>({})
-  const [addDimName, setAddDimName] = useState('')
-  const [showAddDim, setShowAddDim] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [brand, setBrand] = useState('')
-  const [addValueActiveIdx, setAddValueActiveIdx] = useState<number | null>(null)
-  const [renamingDimIdx, setRenamingDimIdx] = useState<number | null>(null)
-  const [renameDimValue, setRenameDimValue] = useState('')
+  const [dim1Key, setDim1Key] = useState('')
+  const [dim1Options, setDim1Options] = useState<string[]>([])
+  const [dim2Key, setDim2Key] = useState('')
+  const [dim2Options, setDim2Options] = useState<string[]>([])
+  const [showDim1, setShowDim1] = useState(false)
+  const [showDim2, setShowDim2] = useState(false)
+  const [dimensionImages, setDimensionImages] = useState<DimensionImage[]>([])
+  const [pendingDimImageDeletions, setPendingDimImageDeletions] = useState<
+    Array<{ dimKey: string; dimValue: string }>
+  >([])
+  const [removeDimConfirm, setRemoveDimConfirm] = useState<1 | 2 | null>(null)
 const [newSupplierSelectedId, setNewSupplierSelectedId] = useState('')
 const [newSupplierLink, setNewSupplierLink] = useState('')
 const [supplierSearch, setSupplierSearch] = useState('')
@@ -176,115 +207,37 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       })
       setBrand(product.specifications?.Merek ?? product.specifications?.Brand ?? '')
       setPhotos(product.photos ?? [])
-      const dims = initializeDimensions(product)
-      const initialRows = initializeRows(product)
-      setDimensions(dims)
-      setRows(initialRows)
+      const dimState = initializeDimState(product)
+      setDim1Key(dimState.dim1Key)
+      setDim1Options(dimState.dim1Options)
+      setDim2Key(dimState.dim2Key)
+      setDim2Options(dimState.dim2Options)
+      setShowDim1(!!dimState.dim1Key || dimState.dim1Options.length > 0)
+      setShowDim2(!!dimState.dim2Key || dimState.dim2Options.length > 0)
+      setDimensionImages(product.dimension_images ?? [])
+      const dims = toDimensions(dimState.dim1Key, dimState.dim1Options, dimState.dim2Key, dimState.dim2Options)
+      setRows(initializeRows(product, dims))
+      setPendingDimImageDeletions([])
     }
   }, [product?.id, isEditing])
 
   const categories = categoriesData?.results ?? []
+  const selectedCategoryCode = categories.find(c => c.id === watch('category'))?.category_code ?? ''
 
-  const handleAddValue = (dimIdx: number) => {
-    const label = (addValueInputs[dimIdx] ?? '').trim()
-    if (!label) return
-    const dim = dimensions[dimIdx]
-    if (dim.values.some(v => v.label === label)) {
-      toast.error('Value already exists')
-      return
-    }
-
-    const newValue: VariantDimensionValue = { id: label, label }
-
-    setDimensions(prev =>
-      prev.map((d, i) => (i === dimIdx ? { ...d, values: [...d.values, newValue] } : d)),
-    )
-    setAddValueInputs(prev => ({ ...prev, [dimIdx]: '' }))
-
-    const otherDims = dimensions.filter((_, i) => i !== dimIdx)
-    const otherDimsWithValues = otherDims.filter(d => d.values.length > 0)
-    const combos =
-      otherDimsWithValues.length > 0
-        ? cartesian(otherDimsWithValues.map(d => d.values))
-        : [[]] as VariantDimensionValue[][]
-
-    const productSku = product?.sku_code ?? 'SKU'
-    const allDimsAfterUpdate = dimensions.map((d, i) =>
-      i === dimIdx ? { ...d, values: [...d.values, newValue] } : d,
-    )
-
-    const newRows: VariantRow[] = combos.map(combo => {
-      const vv: Record<string, string> = { [dim.id]: newValue.id }
-      otherDimsWithValues.forEach((otherDim, ci) => {
-        vv[otherDim.id] = combo[ci].id
+  const handleAddProductSupplier = async () => {
+    if (!newSupplierSelectedId) return
+    try {
+      await createProductSupplierMutation.mutateAsync({
+        supplier_id: newSupplierSelectedId,
+        supplier_link: newSupplierLink || null,
       })
-      return {
-        variantValues: vv,
-        sku_variant_code: suggestSku(productSku, allDimsAfterUpdate, vv),
-        base_price: 0,
-        current_cogs: 0,
-        total_available_qty: 0,
-        hasStock: false,
-        removed: false,
-      }
-    })
-
-    setRows(prev => [...prev, ...newRows])
-  }
-
-  const handleRemoveValue = (dimIdx: number, val: VariantDimensionValue) => {
-    const dim = dimensions[dimIdx]
-    const affected = rows.filter(r => !r.removed && r.variantValues[dim.id] === val.id)
-    const withStock = affected.filter(r => r.hasStock)
-    if (withStock.length > 0) {
-      toast.error(`Cannot remove "${val.label}" - ${withStock.length} variant(s) have stock history`)
-      return
+      setNewSupplierSelectedId('')
+      setNewSupplierLink('')
+      setSupplierSearch('')
+      toast.success('Supplier linked')
+    } catch {
+      toast.error('Failed to link supplier')
     }
-    setDimensions(prev =>
-      prev.map((d, i) => (i === dimIdx ? { ...d, values: d.values.filter(v => v.id !== val.id) } : d)),
-    )
-    setRows(prev =>
-      prev.map(r => (r.variantValues[dim.id] === val.id ? { ...r, removed: true } : r)),
-    )
-  }
-
-  const handleAddDimension = () => {
-    const name = addDimName.trim()
-    if (!name) return
-    if (dimensions.length >= 3) {
-      toast.error('Maximum 3 dimensions')
-      return
-    }
-    const order = dimensions.length + 1
-    const newDim: VariantDimension = { id: name, name, order, values: [] }
-    setDimensions(prev => [...prev, newDim])
-    setAddDimName('')
-    setShowAddDim(false)
-  }
-
-  const handleDeleteDimension = (dimIdx: number) => {
-    const dim = dimensions[dimIdx]
-    const withStock = rows.filter(r => !r.removed && r.variantValues[dim.id] && r.hasStock)
-    if (withStock.length > 0) {
-      toast.error(`Cannot delete "${dim.name}" — ${withStock.length} variant(s) have stock history`)
-      return
-    }
-    setDimensions(prev => prev.filter((_, i) => i !== dimIdx))
-    setRows(prev =>
-      prev.map(r =>
-        r.variantValues[dim.id] ? { ...r, removed: true } : r,
-      ),
-    )
-  }
-
-  const handleRenameDimension = (dimIdx: number) => {
-    const newName = renameDimValue.trim()
-    if (!newName) return
-    setDimensions(prev =>
-      prev.map((d, i) => (i === dimIdx ? { ...d, name: newName } : d)),
-    )
-    setRenamingDimIdx(null)
-    setRenameDimValue('')
   }
 
   const handleRemoveRow = (idx: number) => {
@@ -303,64 +256,171 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
     setRows(prev => prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r)))
   }
 
-  const handleGenerateVariants = () => {
-    const activeDims = dimensions.filter(d => d.values.length > 0)
-    if (activeDims.length === 0) {
-      toast.error('Add dimension values first')
-      return
-    }
-    const combos = cartesian(activeDims.map(d => d.values))
-    const productSku = product?.sku_code ?? 'SKU'
-    let added = 0
-    const newRows: VariantRow[] = []
-    for (const combo of combos) {
-      const vv: Record<string, string> = {}
-      activeDims.forEach((dim, i) => { vv[dim.id] = combo[i].id })
-      const exists = rows.some(
-        r => !r.removed && activeDims.every(d => r.variantValues[d.id] === vv[d.id]),
+  const handleDim1OptionsChange = (newOptions: string[]) => {
+    if (!dim1Key) return
+    const removed = dim1Options.filter(o => !newOptions.includes(o))
+    if (removed.length > 0) {
+      const hasRemovedStock = removed.some(removedVal =>
+        rows.some(r => !r.removed && r.variantValues[dim1Key] === removedVal && r.hasStock)
       )
-      if (!exists) {
-        newRows.push({
-          variantValues: vv,
-          sku_variant_code: suggestSku(productSku, dimensions, vv),
-          base_price: 0,
-          current_cogs: 0,
-          total_available_qty: 0,
-          hasStock: false,
-          removed: false,
-        })
-        added++
+      if (hasRemovedStock) {
+        toast.error('Tidak dapat menghapus opsi: ada varian dengan stok')
+        return
       }
+      setRows(prev =>
+        prev.map(r =>
+          !r.removed && removed.includes(r.variantValues[dim1Key] ?? '')
+            ? { ...r, removed: true }
+            : r
+        )
+      )
     }
-    if (added === 0) {
-      toast.error('All variant combinations already exist')
-      return
+    const added = newOptions.filter(o => !dim1Options.includes(o))
+    setDim1Options(newOptions)
+    if (added.length > 0) {
+      const productSku = product?.sku_code ?? ''
+      const newRows: VariantRow[] = []
+      for (const newVal of added) {
+        if (dim2Key && dim2Options.length > 0) {
+          for (const d2Val of dim2Options) {
+            const vv = { [dim1Key]: newVal, [dim2Key]: d2Val }
+            const exists = rows.some(r => !r.removed && r.variantValues[dim1Key] === newVal && r.variantValues[dim2Key] === d2Val)
+            if (!exists) newRows.push({ variantValues: vv, sku_variant_code: suggestSku(productSku, toDimensions(dim1Key, newOptions, dim2Key, dim2Options), vv, selectedCategoryCode), base_price: 0, current_cogs: 0, total_available_qty: 0, hasStock: false, removed: false, photoUrl: null, pendingPhoto: null })
+          }
+        } else {
+          const vv = { [dim1Key]: newVal }
+          const exists = rows.some(r => !r.removed && r.variantValues[dim1Key] === newVal)
+          if (!exists) newRows.push({ variantValues: vv, sku_variant_code: suggestSku(productSku, toDimensions(dim1Key, newOptions, dim2Key, dim2Options), vv, selectedCategoryCode), base_price: 0, current_cogs: 0, total_available_qty: 0, hasStock: false, removed: false, photoUrl: null, pendingPhoto: null })
+        }
+      }
+      if (newRows.length > 0) setRows(prev => [...prev, ...newRows])
     }
-    setRows(prev => [...prev, ...newRows])
-    toast.success(`Generated ${added} new variant(s)`)
   }
 
-  const handleAddProductSupplier = async () => {
-    if (!newSupplierSelectedId) return
+  const handleDim2OptionsChange = (newOptions: string[]) => {
+    if (!dim2Key) return
+    const removed = dim2Options.filter(o => !newOptions.includes(o))
+    if (removed.length > 0) {
+      const hasRemovedStock = removed.some(removedVal =>
+        rows.some(r => !r.removed && r.variantValues[dim2Key] === removedVal && r.hasStock)
+      )
+      if (hasRemovedStock) {
+        toast.error('Tidak dapat menghapus opsi: ada varian dengan stok')
+        return
+      }
+      setRows(prev =>
+        prev.map(r =>
+          !r.removed && removed.includes(r.variantValues[dim2Key] ?? '')
+            ? { ...r, removed: true }
+            : r
+        )
+      )
+    }
+    const added = newOptions.filter(o => !dim2Options.includes(o))
+    setDim2Options(newOptions)
+    if (added.length > 0) {
+      const productSku = product?.sku_code ?? ''
+      const newRows: VariantRow[] = []
+      for (const newVal of added) {
+        for (const d1Val of dim1Options) {
+          const vv = { [dim1Key]: d1Val, [dim2Key]: newVal }
+          const exists = rows.some(r => !r.removed && r.variantValues[dim1Key] === d1Val && r.variantValues[dim2Key] === newVal)
+          if (!exists) newRows.push({ variantValues: vv, sku_variant_code: suggestSku(productSku, toDimensions(dim1Key, dim1Options, dim2Key, newOptions), vv, selectedCategoryCode), base_price: 0, current_cogs: 0, total_available_qty: 0, hasStock: false, removed: false, photoUrl: null, pendingPhoto: null })
+        }
+      }
+      if (newRows.length > 0) setRows(prev => [...prev, ...newRows])
+    }
+  }
+
+  const handleAddVariasi = (slot: 1 | 2) => {
+    if (slot === 1) setShowDim1(true)
+    else setShowDim2(true)
+  }
+
+  const handleRemoveDim1 = () => setRemoveDimConfirm(1)
+
+  const handleRemoveDim2 = () => setRemoveDimConfirm(2)
+
+  const confirmRemoveDim = () => {
+    if (removeDimConfirm === 1) {
+      if (dim1Key) setRows(prev => prev.map(r => dim1Key && r.variantValues[dim1Key] ? { ...r, removed: true } : r))
+      setShowDim1(false)
+      setShowDim2(false)
+      setDim1Key('')
+      setDim1Options([])
+      setDim2Key('')
+      setDim2Options([])
+    } else if (removeDimConfirm === 2) {
+      if (dim2Key) setRows(prev => prev.map(r => dim2Key && r.variantValues[dim2Key] ? { ...r, removed: true } : r))
+      setShowDim2(false)
+      setDim2Key('')
+      setDim2Options([])
+    }
+    setRemoveDimConfirm(null)
+  }
+
+  const handleSwapConfirmed = () => {
+    const imagesToDelete = dimensionImages
+      .filter(di => di.dim_key === dim1Key)
+      .map(di => ({ dimKey: di.dim_key, dimValue: di.dim_value }))
+    if (imagesToDelete.length > 0) {
+      setPendingDimImageDeletions(prev => [...prev, ...imagesToDelete])
+      setDimensionImages(prev => prev.filter(di => di.dim_key !== dim1Key))
+    }
+    const oldDim1Key = dim1Key
+    const oldDim1Opts = dim1Options
+    setDim1Key(dim2Key)
+    setDim1Options(dim2Options)
+    setDim2Key(oldDim1Key)
+    setDim2Options(oldDim1Opts)
+  }
+
+  const handleBulkFillPrice = (dim1Value: string, price: number) => {
+    setRows(prev => prev.map(r => !r.removed && r.variantValues[dim1Key] === dim1Value ? { ...r, base_price: price } : r))
+  }
+
+  const handleDimensionImageUpload = async (dimKey: string, dimValue: string, file: File) => {
+    if (!id) return
     try {
-      await createProductSupplierMutation.mutateAsync({
-        supplier_id: newSupplierSelectedId,
-        supplier_link: newSupplierLink || null,
+      const result = await uploadDimensionImage(id, dimKey, dimValue, file)
+      const photoUrl = result.data.photo_url ?? ''
+      setDimensionImages(prev => {
+        const filtered = prev.filter(di => !(di.dim_key === dimKey && di.dim_value === dimValue))
+        return [...filtered, { dim_key: dimKey, dim_value: dimValue, photo_url: photoUrl }]
       })
-      setNewSupplierSelectedId('')
-      setNewSupplierLink('')
-      setSupplierSearch('')
-      toast.success('Supplier linked')
     } catch {
-      toast.error('Failed to link supplier')
+      toast.error('Gagal mengupload foto variasi')
+    }
+  }
+
+  const handleDimensionImageDelete = async (dimKey: string, dimValue: string) => {
+    if (!id) return
+    try {
+      await deleteDimensionImage(id, dimKey, dimValue)
+      setDimensionImages(prev => prev.filter(di => !(di.dim_key === dimKey && di.dim_value === dimValue)))
+    } catch {
+      toast.error('Gagal menghapus foto variasi')
     }
   }
 
   const onSubmit = async (values: FormValues) => {
-    setIsSaving(true)
-    try {
-      let productId = id ?? ''
+    if (showDim1 && showDim2 && dim1Key && dim2Key && dim1Key === dim2Key) {
+      toast.error('Variasi 1 dan Variasi 2 tidak boleh memiliki nama yang sama')
+      return
+    }
 
+    const dimStructureChanged = isEditing && product && (
+      (product.dim1_key ?? '') !== dim1Key ||
+      (product.dim2_key ?? '') !== dim2Key ||
+      JSON.stringify(product.dim1_options ?? []) !== JSON.stringify(dim1Options) ||
+      JSON.stringify(product.dim2_options ?? []) !== JSON.stringify(dim2Options)
+    )
+
+    setIsSaving(true)
+    let productId = id ?? ''
+
+    // Step 1: Save product info
+    try {
       if (isEditing) {
         await updateMutation.mutateAsync({
           id: productId,
@@ -374,6 +434,10 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
             width: values.width ?? 0,
             height: values.height ?? 0,
             specifications: { ...(product?.specifications ?? {}), Merek: brand },
+            dim1_key: dim1Key,
+            dim2_key: dim2Key,
+            dim1_options: dim1Options,
+            dim2_options: dim2Options,
           },
         })
       } else {
@@ -386,16 +450,38 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
           width: values.width ?? 0,
           height: values.height ?? 0,
           specifications: { Merek: brand },
+          dim1_key: dim1Key,
+          dim2_key: dim2Key,
+          dim1_options: dim1Options,
+          dim2_options: dim2Options,
           variants: [],
         })
         productId = created.id
       }
+    } catch {
+      toast.error(isEditing ? 'Failed to save product' : 'Failed to create product')
+      setIsSaving(false)
+      return
+    }
+
+    // Step 2: Save variants (separate error message so user knows info was saved)
+    try {
+      if (pendingDimImageDeletions.length > 0 && id) {
+        await Promise.allSettled(
+          pendingDimImageDeletions.map(({ dimKey, dimValue }) =>
+            deleteDimensionImage(id, dimKey, dimValue)
+          )
+        )
+        setPendingDimImageDeletions([])
+      }
+
+      const variantOptionsForSave: Record<string, string[]> = {}
+      if (dim1Key) variantOptionsForSave[dim1Key] = dim1Options
+      if (dim2Key) variantOptionsForSave[dim2Key] = dim2Options
 
       const activeRows = rows.filter(r => !r.removed)
       const variantsPayload: SaveVariantsPayload = {
-        variant_options: Object.fromEntries(
-          dimensions.map(d => [d.name, d.values.map(v => v.label)])
-        ),
+        variant_options: variantOptionsForSave,
         variants: activeRows.map(r => ({
           ...(r.id ? { id: r.id } : {}),
           variant_values: r.variantValues,
@@ -405,7 +491,6 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       }
 
       if (!isEditing) {
-        const { saveVariants: saveVariantsApi } = await import('../../api/inventory')
         await saveVariantsApi(productId, variantsPayload)
         qc.invalidateQueries({ queryKey: ['product', productId] })
         qc.invalidateQueries({ queryKey: ['products'] })
@@ -413,10 +498,18 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
         await saveMutation.mutateAsync(variantsPayload)
       }
 
+      const activeRowsWithPhotos = rows.filter(r => !r.removed && r.id && r.pendingPhoto)
+      await Promise.allSettled(
+        activeRowsWithPhotos.map(r => uploadVariantPhoto(productId, r.id!, r.pendingPhoto!).catch(() => {}))
+      )
+
+      if (dimStructureChanged) {
+        toast.warning('Struktur variasi berubah — listing Shopee mungkin perlu disinkronkan ulang')
+      }
       toast.success(isEditing ? 'Product saved' : 'Product created')
       navigate(`/inventory/products/${productId}`)
     } catch {
-      toast.error(isEditing ? 'Failed to save product' : 'Failed to create product')
+      toast.error('Info produk tersimpan. Gagal menyimpan varian — coba lagi.')
     } finally {
       setIsSaving(false)
     }
@@ -425,8 +518,6 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
   if (isEditing && productLoading) {
     return <div className="p-8 text-center text-muted-foreground">Loading...</div>
   }
-
-  const activeRows = rows.filter(r => !r.removed)
 
   return (
     <div className="space-y-6">
@@ -572,261 +663,51 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
 
         </div>
 
+        {/* Variasi Section */}
         <div className="rounded-lg border bg-card p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">Variant Management</h2>
-            {dimensions.length < 3 && (
-              showAddDim ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Attribute name (e.g. Color)"
-                    value={addDimName}
-                    onChange={e => setAddDimName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') { e.preventDefault(); handleAddDimension() }
-                    }}
-                    className="max-w-[200px]"
-                    autoFocus
-                  />
-                  <Button type="button" size="sm" onClick={handleAddDimension}>Add</Button>
-                  <Button type="button" size="sm" variant="ghost"
-                    onClick={() => { setShowAddDim(false); setAddDimName('') }}>
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Button type="button" size="sm" variant="outline" onClick={() => setShowAddDim(true)}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Attribute
-                </Button>
-              )
-            )}
-          </div>
-
-          {dimensions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No attributes yet. Click &quot;Add Attribute&quot; to define variant types (e.g. Color, Size).
-            </p>
-          ) : (
-            <div className="space-y-5">
-              {dimensions.map((dim, dimIdx) => (
-                <div key={dim.id}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {renamingDimIdx === dimIdx ? (
-                      <>
-                        <Input
-                          autoFocus
-                          value={renameDimValue}
-                          onChange={e => setRenameDimValue(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') { e.preventDefault(); handleRenameDimension(dimIdx) }
-                            if (e.key === 'Escape') { setRenamingDimIdx(null); setRenameDimValue('') }
-                          }}
-                          className="h-7 w-32 text-sm"
-                        />
-                        <Button
-                          type="button" size="sm" className="h-7 px-2 text-xs"
-                          onClick={() => handleRenameDimension(dimIdx)}
-                        >
-                          Save
-                        </Button>
-                        <Button
-                          type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs"
-                          onClick={() => { setRenamingDimIdx(null); setRenameDimValue('') }}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                          {dim.name}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => { setRenamingDimIdx(dimIdx); setRenameDimValue(dim.name) }}
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                          title="Rename attribute"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDimension(dimIdx)}
-                          className="text-xs text-muted-foreground hover:text-destructive"
-                          title="Delete attribute"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    {dim.values.map(val => (
-                      <Badge key={val.id} variant="secondary" className="gap-1 pr-1 text-sm py-1">
-                        {val.label}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveValue(dimIdx, val)}
-                          className="ml-1 hover:text-destructive"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-
-                    {addValueActiveIdx === dimIdx ? (
-                      <div className="flex items-center gap-1">
-                        <Input
-                          autoFocus
-                          placeholder={`Add ${dim.name}`}
-                          value={addValueInputs[dimIdx] ?? ''}
-                          onChange={e =>
-                            setAddValueInputs(prev => ({ ...prev, [dimIdx]: e.target.value }))
-                          }
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              handleAddValue(dimIdx)
-                              setAddValueActiveIdx(null)
-                            }
-                            if (e.key === 'Escape') {
-                              setAddValueActiveIdx(null)
-                              setAddValueInputs(prev => ({ ...prev, [dimIdx]: '' }))
-                            }
-                          }}
-                          className="h-8 w-32 text-sm"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-8 px-2"
-                          onClick={() => {
-                            handleAddValue(dimIdx)
-                            setAddValueActiveIdx(null)
-                          }}
-                        >
-                          ✓
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2"
-                          onClick={() => {
-                            setAddValueActiveIdx(null)
-                            setAddValueInputs(prev => ({ ...prev, [dimIdx]: '' }))
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setAddValueActiveIdx(dimIdx)}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-dashed border-muted-foreground/40 text-sm text-muted-foreground hover:border-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <Plus className="h-3 w-3" /> Add {dim.name}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {dimensions.length > 0 && (
-            <div className="mt-6 pt-5 border-t">
-              <Button type="button" variant="outline" onClick={handleGenerateVariants}>
-                Generate Matrix
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                Generates all missing variant combinations from the attributes above.
-              </p>
-            </div>
-          )}
+          <h2 className="text-lg font-semibold mb-6">Variasi Produk</h2>
+          <VariasiSetupSection
+            dim1Key={dim1Key}
+            dim1Options={dim1Options}
+            dim2Key={dim2Key}
+            dim2Options={dim2Options}
+            showDim1={showDim1}
+            showDim2={showDim2}
+            hasDim1Stock={rows.some(r => !r.removed && !!dim1Key && !!r.variantValues[dim1Key] && r.hasStock)}
+            hasDim2Stock={rows.some(r => !r.removed && !!dim2Key && !!r.variantValues[dim2Key] && r.hasStock)}
+            onDim1KeyChange={setDim1Key}
+            onDim1OptionsChange={handleDim1OptionsChange}
+            onDim2KeyChange={setDim2Key}
+            onDim2OptionsChange={handleDim2OptionsChange}
+            onAddVariasi={handleAddVariasi}
+            onRemoveDim1={handleRemoveDim1}
+            onRemoveDim2={handleRemoveDim2}
+            onSwapConfirmed={handleSwapConfirmed}
+            onToastError={toast.error}
+          />
         </div>
 
+        {/* Daftar Variasi */}
         <div className="rounded-lg border bg-card">
-          <div className="p-4 border-b flex items-center justify-between flex-wrap gap-2">
+          <div className="p-4 border-b">
             <h2 className="text-base font-semibold">
-              Variant Matrix ({activeRows.length})
+              Daftar Variasi ({rows.filter(r => !r.removed).length})
             </h2>
-
           </div>
-
-          {activeRows.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              No variants yet. Add attribute values and click &quot;Generate Matrix&quot;.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30">
-                    {dimensions.map(d => (
-                      <th key={d.id} className="text-left px-4 py-3 font-medium">{d.name}</th>
-                    ))}
-                    <th className="text-left px-4 py-3 font-medium">SKU</th>
-                    <th className="text-left px-4 py-3 font-medium w-40">Price</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Stock</th>
-                    <th className="text-left px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 w-16"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {activeRows.map(row => {
-                    const rowIdx = rows.indexOf(row)
-                    const isNew = !row.id
-                    return (
-                      <tr key={rowIdx}>
-                        {dimensions.map(d => (
-                          <td key={d.id} className="px-4 py-3 font-medium">
-                            {getLabelForDim(d, row.variantValues[d.id])}
-                          </td>
-                        ))}
-                        <td className="px-4 py-3">
-                          <Input
-                            value={row.sku_variant_code}
-                            onChange={e =>
-                              handleRowChange(rowIdx, 'sku_variant_code', e.target.value)
-                            }
-                            className="h-8 font-mono text-xs w-48"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={row.base_price}
-                            onChange={e => handleRowChange(rowIdx, 'base_price', parseInt(e.target.value) || 0)}
-                            className="h-8 w-32"
-                          />
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {row.total_available_qty}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge variant={isNew ? 'secondary' : 'success'}>
-                            {isNew ? 'New' : 'Active'}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRow(rowIdx)}
-                            className="text-sm text-muted-foreground hover:text-destructive"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DaftarVariasiTable
+            dim1Key={dim1Key}
+            dim2Key={dim2Key}
+            dim1Options={dim1Options}
+            dim2Options={dim2Options}
+            rows={rows}
+            dimensionImages={dimensionImages}
+            isEditing={isEditing}
+            onRowChange={handleRowChange}
+            onRemoveRow={handleRemoveRow}
+            onBulkFillPrice={handleBulkFillPrice}
+            onDimensionImageUpload={handleDimensionImageUpload}
+            onDimensionImageDelete={handleDimensionImageDelete}
+          />
         </div>
 
         {isEditing && (
@@ -1056,6 +937,24 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
           </Button>
         </div>
       </form>
+
+      <Dialog open={removeDimConfirm !== null} onOpenChange={(open) => { if (!open) setRemoveDimConfirm(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Hapus Variasi {removeDimConfirm}?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            {removeDimConfirm === 1
+              ? `Semua baris varian untuk "${dim1Key}" akan dihapus. Tindakan ini tidak dapat dibatalkan sebelum disimpan.`
+              : `Semua baris varian untuk "${dim2Key}" akan dihapus. Tindakan ini tidak dapat dibatalkan sebelum disimpan.`
+            }
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemoveDimConfirm(null)}>Batal</Button>
+            <Button variant="destructive" onClick={confirmRemoveDim}>Hapus</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

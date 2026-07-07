@@ -35,8 +35,8 @@ const mockProduct = {
   cdate: '',
   udate: '',
   variants: [
-    { id: 'v1', product: 'p1', product_name: 'Test Product', company: 'c1', name: 'Black / M', sku: 'TP-001-BLK-M', sku_variant_code: 'TP-001-BLK-M', product_supplier_link: null, product_photo_url: null, base_price: 100000, total_available_qty: 10, total_incoming_qty: 0, is_active: true, cdate: '', udate: '' },
-    { id: 'v2', product: 'p1', product_name: 'Test Product', company: 'c1', name: 'White / L', sku: 'TP-001-WHT-L', sku_variant_code: 'TP-001-WHT-L', product_supplier_link: null, product_photo_url: null, base_price: 95000, total_available_qty: 5, total_incoming_qty: 0, is_active: true, cdate: '', udate: '' },
+    { id: 'v1', product: 'p1', product_name: 'Test Product', company: 'c1', name: 'Black / M', sku: 'TP-001-BLK-M', sku_variant_code: 'TP-001-BLK-M', product_supplier_link: null, product_photo_url: null, photo_url: null, base_price: 100000, total_available_qty: 10, total_incoming_qty: 0, is_active: true, cdate: '', udate: '' },
+    { id: 'v2', product: 'p1', product_name: 'Test Product', company: 'c1', name: 'White / L', sku: 'TP-001-WHT-L', sku_variant_code: 'TP-001-WHT-L', product_supplier_link: null, product_photo_url: null, photo_url: null, base_price: 95000, total_available_qty: 5, total_incoming_qty: 0, is_active: true, cdate: '', udate: '' },
   ],
 }
 

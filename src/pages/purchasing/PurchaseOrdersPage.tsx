@@ -191,7 +191,12 @@ export default function PurchaseOrdersPage() {
             ) : data.results.map(po => (
               <TableRow key={po.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/purchasing/orders/${po.id}`)}>
                 <TableCell className="font-mono text-xs font-medium">{po.purchase_order_number}</TableCell>
-                <TableCell><Badge variant={statusVariant[po.status]}>{po.status}</Badge></TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Badge variant={statusVariant[po.status]}>{po.status}</Badge>
+                    {po.has_discount && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600">Disc</Badge>}
+                  </div>
+                </TableCell>
                 <TableCell className="text-xs">{po.invoice_number ?? '—'}</TableCell>
                 <TableCell className="text-xs">{po.delivery_order_number ?? '—'}</TableCell>
                 <TableCell className="text-xs">{po.cdate ? formatDate(po.cdate) : '—'}</TableCell>

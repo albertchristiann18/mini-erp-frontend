@@ -29,6 +29,12 @@ export interface ProductPhoto {
   is_primary: boolean
 }
 
+export interface DimensionImage {
+  dim_key: string
+  dim_value: string
+  photo_url: string | null
+}
+
 export interface Product {
   id: string
   company: string
@@ -50,6 +56,11 @@ export interface Product {
   photos?: ProductPhoto[]
   variants?: ProductVariant[]
   variant_options?: Record<string, string[]>
+  dim1_key?: string
+  dim2_key?: string
+  dim1_options?: string[]
+  dim2_options?: string[]
+  dimension_images?: DimensionImage[]
   cdate: string
   udate: string
 }
@@ -64,6 +75,7 @@ export interface ProductVariant {
   sku_variant_code: string
   product_supplier_link: string | null
   product_photo_url: string | null
+  photo_url: string | null
   base_price: number
   current_cogs?: number
   total_available_qty: number
@@ -127,6 +139,9 @@ export interface ProductVariantStock {
   total_available_qty: number
   physical_qty: number
   is_active: boolean
+  last_unit_price_foreign: string | null
+  last_currency: string | null
+  last_discounted_unit_price_foreign: string | null
 }
 
 export interface AvgSalesVariant {

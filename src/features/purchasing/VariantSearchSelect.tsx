@@ -1,37 +1,53 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, Search } from 'lucide-react'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { cn } from '../../lib/utils'
 import { useVariantSearch } from '../../hooks/useInventory'
-import { QuickCreateVariantModal } from './QuickCreateVariantModal'
+import { QuickCreateProductModal } from './QuickCreateProductModal'
 
 interface Props {
   value: string
   selectedLabel?: string
-  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => void
+  onSelect: (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null, lastUnitPriceForeign: string | null, lastCurrency: string | null, lastDiscountedUnitPriceForeign: string | null) => void
+  onQuickCreated?: (variants: Array<{
+    id: string
+    label: string
+    productId: string
+    productName: string
+    productSupplierLink: string | null
+    productPhotoUrl: string | null
+    lastUnitPriceForeign: string | null
+    lastCurrency: string | null
+    lastDiscountedUnitPriceForeign: string | null
+  }>) => void
   placeholder?: string
   excludeVariantIds?: Set<string>
   supplierId?: string
 }
 
-export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, placeholder = 'Select variant', excludeVariantIds, supplierId }: Props) {
+export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabel, onSelect, onQuickCreated, placeholder = 'Select variant', excludeVariantIds, supplierId }: Props) {
   const [open, setOpen] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [activeSearch, setActiveSearch] = useState('')
   const [internalSelectedLabel, setInternalSelectedLabel] = useState('')
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
+  const [portalTarget, setPortalTarget] = useState<Element | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number }>({ top: 0, left: 0, width: 288 })
   const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      const inContainer = containerRef.current?.contains(e.target as Node)
+      const inDropdown = dropdownRef.current?.contains(e.target as Node)
+      if (!inContainer && !inDropdown) setOpen(false)
     }
     if (open) document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [open])
+
 
   const { data, isLoading } = useVariantSearch(
     {
@@ -53,9 +69,15 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
     }
   }
 
-  const handleSelect = (id: string, label: string, productId: string, productName: string, productSupplierLink: string | null, productPhotoUrl: string | null) => {
+  const handleSelect = (
+    id: string, label: string, productId: string, productName: string,
+    productSupplierLink: string | null, productPhotoUrl: string | null,
+    lastUnitPriceForeign: string | null, lastCurrency: string | null,
+    lastDiscountedUnitPriceForeign: string | null,
+  ) => {
     setInternalSelectedLabel(label)
-    onSelect(id, label, productId, productName, productSupplierLink, productPhotoUrl)
+    onSelect(id, label, productId, productName, productSupplierLink, productPhotoUrl,
+      lastUnitPriceForeign, lastCurrency, lastDiscountedUnitPriceForeign)
     setOpen(false)
     setSearchInput('')
     setActiveSearch('')
@@ -70,14 +92,31 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
           'bg-background hover:bg-accent transition-colors',
           value ? 'text-foreground' : 'text-muted-foreground',
         )}
-        onClick={() => setOpen(o => !o)}
+        onClick={() => {
+          if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect()
+            const dialog = containerRef.current.closest('[role="dialog"]') ?? null
+            setPortalTarget(dialog)
+            if (dialog) {
+              const dialogRect = dialog.getBoundingClientRect()
+              setDropdownPos({
+                top: rect.bottom - dialogRect.top + 4,
+                left: rect.left - dialogRect.left,
+                width: Math.max(rect.width, 288),
+              })
+            } else {
+              setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 288) })
+            }
+          }
+          setOpen(o => !o)
+        }}
       >
         <span className="truncate">{value ? (internalSelectedLabel || externalSelectedLabel || placeholder) : placeholder}</span>
         <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-md border bg-card shadow-lg">
+      {open && createPortal(
+        <div ref={dropdownRef} style={{ position: portalTarget ? 'absolute' : 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="rounded-md border bg-card shadow-lg">
           <div className="flex gap-1 border-b p-2">
             <Input
               className="h-7 text-xs"
@@ -108,11 +147,21 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
                   key={v.id}
                   type="button"
                   className="w-full px-3 py-1.5 text-left text-xs hover:bg-accent transition-colors"
-                  onClick={() => handleSelect(v.id, `${v.name} (${v.sku_variant_code})`, v.product, v.product_name, v.product_supplier_link ?? null, v.product_photo_url ?? null)}
+                  onClick={() => handleSelect(
+                    v.id,
+                    `${v.name} (${v.sku_variant_code})`,
+                    v.product,
+                    v.product_name,
+                    v.product_supplier_link ?? null,
+                    v.product_photo_url ?? null,
+                    v.last_unit_price_foreign ?? null,
+                    v.last_currency ?? null,
+                    v.last_discounted_unit_price_foreign ?? null,
+                  )}
                 >
-                  <div className="font-medium">{v.name}</div>
+                  <div className="font-medium">{v.product_name}</div>
                   <div className="text-muted-foreground">
-                    {v.sku_variant_code} · {v.product_name}
+                    {v.name} · {v.sku_variant_code}
                   </div>
                 </button>
               ))
@@ -127,15 +176,32 @@ export function VariantSearchSelect({ value, selectedLabel: externalSelectedLabe
               <span>+</span> New product
             </button>
           </div>
-        </div>
+        </div>,
+        portalTarget ?? document.body
       )}
 
-      <QuickCreateVariantModal
+      <QuickCreateProductModal
         open={quickCreateOpen}
         onClose={() => setQuickCreateOpen(false)}
-        onCreated={(id, label) => {
-          setInternalSelectedLabel(label)
-          onSelect(id, label, '', '', null, null)
+        supplierId={supplierId}
+        onCreated={(variants) => {
+          if (variants.length === 0) {
+            setQuickCreateOpen(false)
+            return
+          }
+          const enrichedVariants = variants.map(v => ({
+            ...v,
+            lastUnitPriceForeign: null as string | null,
+            lastCurrency: null as string | null,
+            lastDiscountedUnitPriceForeign: null as string | null,
+          }))
+          if (onQuickCreated) {
+            onQuickCreated(enrichedVariants)
+          } else {
+            const first = enrichedVariants[0]
+            setInternalSelectedLabel(first.label)
+            onSelect(first.id, first.label, first.productId, first.productName, first.productSupplierLink, first.productPhotoUrl, null, null, null)
+          }
           setQuickCreateOpen(false)
         }}
       />
