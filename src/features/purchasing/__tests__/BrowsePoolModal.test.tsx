@@ -313,3 +313,48 @@ it('empty_pool_shows_empty_state', async () => {
     expect(screen.getByText('No available pool items for this supplier.')).toBeInTheDocument()
   })
 })
+
+it('skipped_items_show_names_in_result', async () => {
+  vi.mocked(useSourcingPoolItems).mockReturnValue({
+    data: { pool_id: 'p1', items: mockItems },
+    isLoading: false,
+    isError: false,
+  } as unknown as ReturnType<typeof useSourcingPoolItems>)
+  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({ added: [], skipped: [{ item_id: 'item-ulid-1', product_name: 'Widget', variant_name: 'Red', reason: 'Already added to PO ORD-001' }], sku_conflicts: [] })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+
+  renderModal()
+  await goToPreview()
+  await userEvent.click(screen.getByText('Confirm & Add to PO'))
+
+  await waitFor(() => {
+    expect(screen.getByText(/Widget — Red: Already added to PO ORD-001/)).toBeInTheDocument()
+  })
+  expect(screen.getByText('1 item skipped')).toBeInTheDocument()
+})
+
+it('skipped_items_fallback_to_item_id', async () => {
+  vi.mocked(useSourcingPoolItems).mockReturnValue({
+    data: { pool_id: 'p1', items: mockItems },
+    isLoading: false,
+    isError: false,
+  } as unknown as ReturnType<typeof useSourcingPoolItems>)
+  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({ added: [], skipped: [{ item_id: 'item-ulid-1', product_name: '', variant_name: '', reason: 'Not found' }], sku_conflicts: [] })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+
+  renderModal()
+  await goToPreview()
+  await userEvent.click(screen.getByText('Confirm & Add to PO'))
+
+  await waitFor(() => {
+    expect(screen.getByText(/item-ulid-1: Not found/)).toBeInTheDocument()
+  })
+})

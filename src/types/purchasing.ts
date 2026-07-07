@@ -188,6 +188,8 @@ export interface AddedPoolItem {
 
 export interface SkippedPoolItem {
   item_id: string
+  product_name: string
+  variant_name: string
   reason: string
 }
 

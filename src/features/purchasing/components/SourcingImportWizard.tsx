@@ -337,7 +337,9 @@ export function SourcingImportWizard({ open, onClose, poId, supplierId }: Sourci
                 </summary>
                 <div className="mt-2 space-y-1">
                   {allSkipped.map((s, i) => (
-                    <p key={i} className="text-xs text-muted-foreground">{s.item_id}: {s.reason}</p>
+                    <p key={i} className="text-xs text-muted-foreground">
+                      {s.product_name || s.item_id}{s.variant_name ? ` — ${s.variant_name}` : ''}: {s.reason}
+                    </p>
                   ))}
                 </div>
               </details>

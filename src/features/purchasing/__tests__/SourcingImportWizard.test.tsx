@@ -705,3 +705,84 @@ it('save_all_colors_calls_upsert_and_reruns_preview', async () => {
     expect(previewMutate).toHaveBeenCalledTimes(2)
   })
 })
+
+it('skipped_items_show_names_in_result', async () => {
+  vi.mocked(usePreviewSourcingPool).mockReturnValue({
+    mutate: vi.fn((_file, callbacks) => {
+      callbacks?.onSuccess?.({
+        errors: [],
+        valid: [{ row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }],
+        dim_mismatches: [],
+        missing_colors: [],
+        missing_product_names: [],
+      })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof usePreviewSourcingPool>)
+
+  vi.mocked(useImportSourcingPool).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({ item_ids: ['item1'] })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useImportSourcingPool>)
+
+  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({ added: [], skipped: [{ item_id: 'item-ulid-1', product_name: 'Widget', variant_name: 'Red', reason: 'Already added to PO ORD-001' }], sku_conflicts: [] })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+
+  renderWizard()
+  await goToUploadStep()
+  await selectFile()
+  await userEvent.click(screen.getByText('Preview'))
+  await waitFor(() => { expect(screen.getByText('Continue →')).toBeEnabled() })
+  await userEvent.click(screen.getByText('Continue →'))
+
+  await waitFor(() => {
+    expect(screen.getByText(/Widget — Red: Already added to PO ORD-001/)).toBeInTheDocument()
+  })
+  expect(screen.getByText('1 item skipped')).toBeInTheDocument()
+})
+
+it('skipped_items_fallback_to_item_id', async () => {
+  vi.mocked(usePreviewSourcingPool).mockReturnValue({
+    mutate: vi.fn((_file, callbacks) => {
+      callbacks?.onSuccess?.({
+        errors: [],
+        valid: [{ row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }],
+        dim_mismatches: [],
+        missing_colors: [],
+        missing_product_names: [],
+      })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof usePreviewSourcingPool>)
+
+  vi.mocked(useImportSourcingPool).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({ item_ids: ['item1'] })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useImportSourcingPool>)
+
+  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({ added: [], skipped: [{ item_id: 'item-ulid-1', product_name: '', variant_name: '', reason: 'Not found' }], sku_conflicts: [] })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+
+  renderWizard()
+  await goToUploadStep()
+  await selectFile()
+  await userEvent.click(screen.getByText('Preview'))
+  await waitFor(() => { expect(screen.getByText('Continue →')).toBeEnabled() })
+  await userEvent.click(screen.getByText('Continue →'))
+
+  await waitFor(() => {
+    expect(screen.getByText(/item-ulid-1: Not found/)).toBeInTheDocument()
+  })
+})
