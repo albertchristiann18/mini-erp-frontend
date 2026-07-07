@@ -4,9 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../../../components/ui/button'
 import { Input } from '../../../components/ui/input'
 import { toast } from '../../../lib/toast'
-import { useDownloadSourcingPoolTemplate, usePreviewSourcingPool, useImportSourcingPool, useUpsertColorAbbreviation, useAddPoolItemsToPo, useResolveSkuConflicts } from '../hooks/useSourcingPool'
-import { SkuConflictResolver } from './SkuConflictResolver'
-import type { SourcingPoolPreviewResult, AddPoolItemsResult, ResolveSkuConflictsResult } from '../../../types/purchasing'
+import { useDownloadSourcingPoolTemplate, usePreviewSourcingPool, useImportAndAdd, useUpsertColorAbbreviation, useResolveSourcingConflicts } from '../hooks/useSourcingPool'
+import { SkuConflictResolver, type ConflictResolution } from './SkuConflictResolver'
+import type { SourcingPoolPreviewResult, ImportAndAddResult, ResolveSourcingConflictsResult } from '../../../types/purchasing'
 
 interface SourcingImportWizardProps {
   open: boolean
@@ -27,7 +27,7 @@ const stepLabel = (step: WizardStep): string => {
   }
 }
 
-export function SourcingImportWizard({ open, onClose, poId, supplierId }: SourcingImportWizardProps) {
+export function SourcingImportWizard({ open, onClose, poId, supplierId, supplierName }: SourcingImportWizardProps) {
   const [step, setStep] = useState<WizardStep>('download')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewResult, setPreviewResult] = useState<SourcingPoolPreviewResult | null>(null)
@@ -35,16 +35,15 @@ export function SourcingImportWizard({ open, onClose, poId, supplierId }: Sourci
   const [missingColorForms, setMissingColorForms] = useState<Record<string, string>>({})
   const [showNameDialog, setShowNameDialog] = useState(false)
   const [pendingNameOverrides, setPendingNameOverrides] = useState<Record<string, string>>({})
-  const [addResult, setAddResult] = useState<AddPoolItemsResult | null>(null)
-  const [resolveResult, setResolveResult] = useState<ResolveSkuConflictsResult | null>(null)
-  const [conflictResolutions, setConflictResolutions] = useState<Record<string, { action: 'add_to_existing' | 'skip'; product_id?: string }>>({})
+  const [addResult, setAddResult] = useState<ImportAndAddResult | null>(null)
+  const [resolveResult, setResolveResult] = useState<ResolveSourcingConflictsResult | null>(null)
+  const [conflictResolutions, setConflictResolutions] = useState<Record<string, ConflictResolution>>({})
 
   const downloadMutation = useDownloadSourcingPoolTemplate()
   const previewMutation = usePreviewSourcingPool()
-  const importMutation = useImportSourcingPool()
   const upsertColorMutation = useUpsertColorAbbreviation()
-  const addPoolMutation = useAddPoolItemsToPo()
-  const resolveConflictsMutation = useResolveSkuConflicts()
+  const importAndAddMutation = useImportAndAdd()
+  const resolveConflictsMutation = useResolveSourcingConflicts()
 
   const handleClose = () => {
     setStep('download')
@@ -82,39 +81,31 @@ export function SourcingImportWizard({ open, onClose, poId, supplierId }: Sourci
       if (override) return { ...row, product_name: override }
       return row
     })
-    importMutation.mutate(
-      { supplierId, rows: patchedRows },
+    importAndAddMutation.mutate(
+      {
+        poId,
+        data: {
+          supplier_id: supplierId,
+          rows: patchedRows,
+          dim_mismatch_resolutions: dimMismatchResolutions,
+        },
+      },
       {
         onSuccess: (result) => {
-          addPoolMutation.mutate(
-            {
-              poId,
-              data: {
-                item_ids: result.item_ids,
-                product_name_overrides: {},
-                dim_mismatch_resolutions: dimMismatchResolutions,
-              },
-            },
-            {
-              onSuccess: (addRes) => {
-                setAddResult(addRes)
-                if (addRes.sku_conflicts.length > 0) {
-                  setConflictResolutions(
-                    Object.fromEntries(
-                      addRes.sku_conflicts.map((c) => [
-                        c.item_id,
-                        { action: 'add_to_existing' as const, product_id: c.existing_product_id },
-                      ])
-                    )
-                  )
-                  setStep('resolve_conflicts')
-                } else {
-                  setStep('result')
-                }
-              },
-              onError: () => toast.error('Failed to add items to PO. Please try again.'),
-            }
-          )
+          setAddResult(result)
+          if (result.sku_conflicts.length > 0) {
+            setConflictResolutions(
+              Object.fromEntries(
+                result.sku_conflicts.map((c) => [
+                  c.row_key,
+                  { action: 'add_to_existing' as const, product_id: c.existing_product_id },
+                ])
+              )
+            )
+            setStep('resolve_conflicts')
+          } else {
+            setStep('result')
+          }
         },
         onError: () => toast.error('Import failed. Please try again.'),
       }
@@ -135,7 +126,7 @@ export function SourcingImportWizard({ open, onClose, poId, supplierId }: Sourci
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose() }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Import from Sourcing Pool</DialogTitle>
+          <DialogTitle>Import from Sourcing Pool — {supplierName}</DialogTitle>
           <p className="text-xs text-muted-foreground">{stepLabel(step)}</p>
         </DialogHeader>
         {step === 'download' && (
@@ -286,7 +277,7 @@ export function SourcingImportWizard({ open, onClose, poId, supplierId }: Sourci
             <DialogFooter>
               <Button variant="outline" onClick={() => setStep('download')}>← Back</Button>
               <Button
-                disabled={!previewResult || previewResult.valid.length === 0 || importMutation.isPending}
+                disabled={!previewResult || previewResult.valid.length === 0 || importAndAddMutation.isPending}
                 onClick={() => {
                   if (previewResult!.missing_product_names.length > 0) {
                     setPendingNameOverrides({})
@@ -295,7 +286,7 @@ export function SourcingImportWizard({ open, onClose, poId, supplierId }: Sourci
                     callImport()
                   }
                 }}>
-                {importMutation.isPending || addPoolMutation.isPending ? 'Processing...' : 'Continue →'}
+                {importAndAddMutation.isPending ? 'Processing...' : 'Continue →'}
               </Button>
             </DialogFooter>
           </>
@@ -304,16 +295,19 @@ export function SourcingImportWizard({ open, onClose, poId, supplierId }: Sourci
           <SkuConflictResolver
             conflicts={addResult.sku_conflicts}
             resolutions={conflictResolutions}
-            onResolutionChange={(itemId, resolution) => setConflictResolutions(prev => ({ ...prev, [itemId]: resolution }))}
+            onResolutionChange={(rowKey, resolution) => setConflictResolutions(prev => ({ ...prev, [rowKey]: resolution }))}
             onConfirm={() => resolveConflictsMutation.mutate(
               {
                 poId,
                 data: {
-                  resolutions: Object.entries(conflictResolutions).map(([item_id, r]) => ({
-                    item_id,
-                    action: r.action,
-                    ...(r.action === 'add_to_existing' && r.product_id ? { product_id: r.product_id } : {}),
-                  })),
+                  resolutions: addResult.sku_conflicts.map((c) => {
+                    const r = conflictResolutions[c.row_key]
+                    return {
+                      row: c.row,
+                      action: r.action,
+                      ...(r.action === 'add_to_existing' && r.product_id ? { product_id: r.product_id } : {}),
+                    }
+                  }),
                 },
               },
               {

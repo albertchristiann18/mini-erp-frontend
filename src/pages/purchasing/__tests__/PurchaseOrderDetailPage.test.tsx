@@ -74,10 +74,6 @@ vi.mock('../../../features/purchasing/components/SourcingImportWizard', () => ({
   SourcingImportWizard: () => null,
 }))
 
-vi.mock('../../../features/purchasing/components/BrowsePoolModal', () => ({
-  BrowsePoolModal: () => null,
-}))
-
 import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../../hooks/usePurchasing'
 import { useParams } from 'react-router-dom'
 import { toast } from '../../../lib/toast'

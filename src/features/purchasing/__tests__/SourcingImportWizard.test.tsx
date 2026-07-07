@@ -8,10 +8,9 @@ import { SourcingImportWizard } from '../components/SourcingImportWizard'
 vi.mock('../hooks/useSourcingPool', () => ({
   useDownloadSourcingPoolTemplate: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   usePreviewSourcingPool: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useImportSourcingPool: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useImportAndAdd: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useUpsertColorAbbreviation: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })),
-  useAddPoolItemsToPo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  useResolveSkuConflicts: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useResolveSourcingConflicts: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }))
 
 vi.mock('../../../lib/toast', () => ({
@@ -21,10 +20,9 @@ vi.mock('../../../lib/toast', () => ({
 import {
   useDownloadSourcingPoolTemplate,
   usePreviewSourcingPool,
-  useImportSourcingPool,
+  useImportAndAdd,
   useUpsertColorAbbreviation,
-  useAddPoolItemsToPo,
-  useResolveSkuConflicts,
+  useResolveSourcingConflicts,
 } from '../hooks/useSourcingPool'
 
 function renderWizard(overrides?: Partial<{ open: boolean }>) {
@@ -255,8 +253,8 @@ it('dim_mismatch_shows_radio_buttons', async () => {
   })
 })
 
-it('continue_calls_import_mutation', async () => {
-  const importMutate = vi.fn()
+it('continue_calls_import_and_add_mutation', async () => {
+  const importAndAddMutate = vi.fn()
   vi.mocked(usePreviewSourcingPool).mockReturnValue({
     mutate: vi.fn((_file, callbacks) => {
       callbacks?.onSuccess?.({
@@ -269,7 +267,7 @@ it('continue_calls_import_mutation', async () => {
     }),
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
-  vi.mocked(useImportSourcingPool).mockReturnValue({ mutate: importMutate, isPending: false } as unknown as ReturnType<typeof useImportSourcingPool>)
+  vi.mocked(useImportAndAdd).mockReturnValue({ mutate: importAndAddMutate, isPending: false } as unknown as ReturnType<typeof useImportAndAdd>)
 
   renderWizard()
   await goToUploadStep()
@@ -282,7 +280,7 @@ it('continue_calls_import_mutation', async () => {
   await userEvent.click(screen.getByText('Continue →'))
 
   await waitFor(() => {
-    expect(importMutate).toHaveBeenCalled()
+    expect(importAndAddMutate).toHaveBeenCalled()
   })
 })
 
@@ -300,19 +298,12 @@ it('import_success_no_conflicts_goes_to_result', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
-
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
       callbacks?.onSuccess?.({ added: [{ item_id: 'item1', po_detail_id: 'pd-1', product_name: 'Prod', variant_name: 'Red' }], skipped: [], sku_conflicts: [] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
   renderWizard()
   await goToUploadStep()
@@ -340,19 +331,12 @@ it('import_with_sku_conflicts_goes_to_resolve_step', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
+      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ row_key: 'row-1', row: { row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }, variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
-
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ item_id: 'si-1', variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
   renderWizard()
   await goToUploadStep()
@@ -381,19 +365,12 @@ it('resolve_step_shows_conflict_radio_buttons', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
+      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ row_key: 'row-1', row: { row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }, variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
-
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ item_id: 'si-1', variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
   renderWizard()
   await goToUploadStep()
@@ -424,21 +401,14 @@ it('resolve_confirm_calls_resolve_mutation', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
+      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ row_key: 'row-1', row: { row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }, variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ item_id: 'si-1', variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
-
-  vi.mocked(useResolveSkuConflicts).mockReturnValue({ mutate: resolveMutate, isPending: false } as unknown as ReturnType<typeof useResolveSkuConflicts>)
+  vi.mocked(useResolveSourcingConflicts).mockReturnValue({ mutate: resolveMutate, isPending: false } as unknown as ReturnType<typeof useResolveSourcingConflicts>)
 
   renderWizard()
   await goToUploadStep()
@@ -471,26 +441,19 @@ it('resolve_success_goes_to_result', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
+      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ row_key: 'row-1', row: { row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }, variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ item_id: 'si-1', variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
-
-  vi.mocked(useResolveSkuConflicts).mockReturnValue({
+  vi.mocked(useResolveSourcingConflicts).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
       callbacks?.onSuccess?.({ added: [{ item_id: 'si-1', po_detail_id: 'pd-1', product_name: 'Prod', variant_name: 'Red' }], skipped: [] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useResolveSkuConflicts>)
+  } as unknown as ReturnType<typeof useResolveSourcingConflicts>)
 
   renderWizard()
   await goToUploadStep()
@@ -523,19 +486,12 @@ it('result_step_shows_total_added', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1', 'item2'] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
-
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
       callbacks?.onSuccess?.({ added: [{ item_id: 'item1', po_detail_id: 'pd-1', product_name: 'Prod', variant_name: 'Red' }, { item_id: 'item2', po_detail_id: 'pd-2', product_name: 'Prod', variant_name: 'Blue' }], skipped: [], sku_conflicts: [] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
   renderWizard()
   await goToUploadStep()
@@ -566,19 +522,12 @@ it('result_step_done_button_calls_onClose', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
-
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
       callbacks?.onSuccess?.({ added: [{ item_id: 'item1', po_detail_id: 'pd-1', product_name: 'Prod', variant_name: 'Red' }], skipped: [], sku_conflicts: [] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
   render(
     <QueryClientProvider client={qc}>
@@ -720,19 +669,12 @@ it('skipped_items_show_names_in_result', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
-
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
       callbacks?.onSuccess?.({ added: [], skipped: [{ item_id: 'item-ulid-1', product_name: 'Widget', variant_name: 'Red', reason: 'Already added to PO ORD-001' }], sku_conflicts: [] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
   renderWizard()
   await goToUploadStep()
@@ -761,19 +703,12 @@ it('skipped_items_fallback_to_item_id', async () => {
     isPending: false,
   } as unknown as ReturnType<typeof usePreviewSourcingPool>)
 
-  vi.mocked(useImportSourcingPool).mockReturnValue({
-    mutate: vi.fn((_opts, callbacks) => {
-      callbacks?.onSuccess?.({ item_ids: ['item1'] })
-    }),
-    isPending: false,
-  } as unknown as ReturnType<typeof useImportSourcingPool>)
-
-  vi.mocked(useAddPoolItemsToPo).mockReturnValue({
+  vi.mocked(useImportAndAdd).mockReturnValue({
     mutate: vi.fn((_opts, callbacks) => {
       callbacks?.onSuccess?.({ added: [], skipped: [{ item_id: 'item-ulid-1', product_name: '', variant_name: '', reason: 'Not found' }], sku_conflicts: [] })
     }),
     isPending: false,
-  } as unknown as ReturnType<typeof useAddPoolItemsToPo>)
+  } as unknown as ReturnType<typeof useImportAndAdd>)
 
   renderWizard()
   await goToUploadStep()
@@ -784,5 +719,148 @@ it('skipped_items_fallback_to_item_id', async () => {
 
   await waitFor(() => {
     expect(screen.getByText(/item-ulid-1: Not found/)).toBeInTheDocument()
+  })
+})
+
+it('test_import_and_add_called_with_rows_not_ids', async () => {
+  const importAndAddMutate = vi.fn()
+
+  vi.mocked(usePreviewSourcingPool).mockReturnValue({
+    mutate: vi.fn((_file, callbacks) => {
+      callbacks?.onSuccess?.({
+        errors: [],
+        valid: [{ row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }],
+        dim_mismatches: [],
+        missing_colors: [],
+        missing_product_names: [],
+      })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof usePreviewSourcingPool>)
+
+  vi.mocked(useImportAndAdd).mockReturnValue({ mutate: importAndAddMutate, isPending: false } as unknown as ReturnType<typeof useImportAndAdd>)
+
+  renderWizard()
+  await goToUploadStep()
+  await selectFile()
+  await userEvent.click(screen.getByText('Preview'))
+  await waitFor(() => { expect(screen.getByText('Continue →')).toBeEnabled() })
+  await userEvent.click(screen.getByText('Continue →'))
+
+  await waitFor(() => {
+    expect(importAndAddMutate).toHaveBeenCalledWith(
+      { poId: 'po-1', data: { supplier_id: 'sup-1', rows: [{ row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }], dim_mismatch_resolutions: {} } },
+      expect.any(Object),
+    )
+  })
+})
+
+it('test_resolve_called_with_row_objects', async () => {
+  const resolveMutate = vi.fn()
+
+  vi.mocked(usePreviewSourcingPool).mockReturnValue({
+    mutate: vi.fn((_file, callbacks) => {
+      callbacks?.onSuccess?.({
+        errors: [],
+        valid: [{ row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }],
+        dim_mismatches: [],
+        missing_colors: [],
+        missing_product_names: [],
+      })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof usePreviewSourcingPool>)
+
+  vi.mocked(useImportAndAdd).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({ added: [], skipped: [], sku_conflicts: [{ row_key: 'row-1', row: { row: 1, variant_name: 'Red', unit_price: '10' }, variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' }] })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useImportAndAdd>)
+
+  vi.mocked(useResolveSourcingConflicts).mockReturnValue({ mutate: resolveMutate, isPending: false } as unknown as ReturnType<typeof useResolveSourcingConflicts>)
+
+  renderWizard()
+  await goToUploadStep()
+  await selectFile()
+  await userEvent.click(screen.getByText('Preview'))
+  await waitFor(() => { expect(screen.getByText('Continue →')).toBeEnabled() })
+  await userEvent.click(screen.getByText('Continue →'))
+
+  await waitFor(() => {
+    expect(screen.getByText('Confirm')).toBeInTheDocument()
+  })
+  await userEvent.click(screen.getByText('Confirm'))
+
+  await waitFor(() => {
+    expect(resolveMutate).toHaveBeenCalledWith(
+      { poId: 'po-1', data: { resolutions: [{ row: { row: 1, variant_name: 'Red', unit_price: '10' }, action: 'add_to_existing', product_id: 'p1' }] } },
+      expect.any(Object),
+    )
+  })
+})
+
+it('test_resolve_preserves_distinct_rows_across_multiple_conflicts', async () => {
+  const resolveMutate = vi.fn()
+
+  vi.mocked(usePreviewSourcingPool).mockReturnValue({
+    mutate: vi.fn((_file, callbacks) => {
+      callbacks?.onSuccess?.({
+        errors: [],
+        valid: [{ row: 1, variant_name: 'Red', unit_price: '10', qty_suggested: 5 }],
+        dim_mismatches: [],
+        missing_colors: [],
+        missing_product_names: [],
+      })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof usePreviewSourcingPool>)
+
+  vi.mocked(useImportAndAdd).mockReturnValue({
+    mutate: vi.fn((_opts, callbacks) => {
+      callbacks?.onSuccess?.({
+        added: [],
+        skipped: [],
+        sku_conflicts: [
+          { row_key: 'row-1', row: { row: 1, variant_name: 'Red', unit_price: '10' }, variant_code: 'ABC-001', sku_code: 'ABC-001', existing_product_id: 'p1', existing_product_name: 'Existing Prod' },
+          { row_key: 'row-2', row: { row: 2, variant_name: 'Blue', unit_price: '12' }, variant_code: 'ABC-002', sku_code: 'ABC-002', existing_product_id: 'p2', existing_product_name: 'Existing Prod 2' },
+        ],
+      })
+    }),
+    isPending: false,
+  } as unknown as ReturnType<typeof useImportAndAdd>)
+
+  vi.mocked(useResolveSourcingConflicts).mockReturnValue({ mutate: resolveMutate, isPending: false } as unknown as ReturnType<typeof useResolveSourcingConflicts>)
+
+  renderWizard()
+  await goToUploadStep()
+  await selectFile()
+  await userEvent.click(screen.getByText('Preview'))
+  await waitFor(() => { expect(screen.getByText('Continue →')).toBeEnabled() })
+  await userEvent.click(screen.getByText('Continue →'))
+
+  await waitFor(() => {
+    expect(screen.getByText('Confirm')).toBeInTheDocument()
+  })
+
+  // Resolve row-2 as 'skip' (the radio for row-2 is the second one, click "Skip")
+  const skipRadios = screen.getAllByText('Skip')
+  // For the second conflict, click Skip
+  await userEvent.click(skipRadios[1])
+
+  await userEvent.click(screen.getByText('Confirm'))
+
+  await waitFor(() => {
+    expect(resolveMutate).toHaveBeenCalledTimes(1)
+    const callArg = resolveMutate.mock.calls[0][0]
+    expect(callArg).toEqual({
+      poId: 'po-1',
+      data: {
+        resolutions: [
+          { row: { row: 1, variant_name: 'Red', unit_price: '10' }, action: 'add_to_existing', product_id: 'p1' },
+          { row: { row: 2, variant_name: 'Blue', unit_price: '12' }, action: 'skip' },
+        ],
+      },
+    })
   })
 })

@@ -1,5 +1,5 @@
 import client from './client'
-import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolItemsResponse, SourcingPoolPreviewRow, SourcingPoolPreviewResult, SourcingPoolImportResult, ColorAbbreviation, AddPoolItemsRequest, AddPoolItemsResult, ResolveSkuConflictsRequest, ResolveSkuConflictsResult } from '../types/purchasing'
+import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolPreviewResult, ColorAbbreviation, ImportAndAddRequest, ImportAndAddResult, ResolveSourcingConflictsRequest, ResolveSourcingConflictsResult } from '../types/purchasing'
 import type { PaginatedResponse } from '../types/inventory'
 
 export const getPurchaseOrders = (params?: Record<string, string | number>) =>
@@ -42,17 +42,6 @@ export const getReplenishment = (params?: { warehouse_id?: string }) =>
 export const getPurchaseOrderSummary = (params?: Record<string, string>) =>
   client.get<PurchaseOrderSummary>('/purchase-order/summary/', { params })
 
-export const getSourcingPoolItems = (supplierId: string, search?: string) =>
-  client.get<SourcingPoolItemsResponse>('/sourcing-pool/items/', {
-    params: {
-      supplier_id: supplierId,
-      is_used: false,
-      is_active: true,
-      page_size: 200,
-      ...(search ? { search } : {}),
-    },
-  })
-
 export const downloadSourcingPoolTemplate = () =>
   client.get('/sourcing-pool/template/', { responseType: 'blob' })
 
@@ -64,12 +53,6 @@ export const previewSourcingPoolUpload = (file: File) => {
   })
 }
 
-export const importSourcingPoolRows = (supplierId: string, rows: SourcingPoolPreviewRow[]) =>
-  client.post<SourcingPoolImportResult>('/sourcing-pool/import/', {
-    supplier_id: supplierId,
-    rows,
-  })
-
 export const getColorAbbreviations = () =>
   client.get<ColorAbbreviation[]>('/sourcing-pool/color-abbreviations/')
 
@@ -79,8 +62,8 @@ export const upsertColorAbbreviation = (data: { color_name: string; abbreviation
 export const deleteColorAbbreviation = (color_name: string) =>
   client.delete('/sourcing-pool/color-abbreviations/', { data: { color_name } })
 
-export const addPoolItemsToPo = (poId: string, data: AddPoolItemsRequest) =>
-  client.post<AddPoolItemsResult>(`/purchase-order/${poId}/add-pool-items/`, data)
+export const importAndAdd = (poId: string, data: ImportAndAddRequest) =>
+  client.post<ImportAndAddResult>(`/purchase-order/${poId}/import-and-add/`, data)
 
-export const resolveSkuConflicts = (poId: string, data: ResolveSkuConflictsRequest) =>
-  client.post<ResolveSkuConflictsResult>(`/purchase-order/${poId}/resolve-sku-conflicts/`, data)
+export const resolveSourcingConflicts = (poId: string, data: ResolveSourcingConflictsRequest) =>
+  client.post<ResolveSourcingConflictsResult>(`/purchase-order/${poId}/resolve-sourcing-conflicts/`, data)

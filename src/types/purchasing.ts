@@ -172,7 +172,8 @@ export interface ColorAbbreviation {
 }
 
 export interface SKUConflict {
-  item_id: string
+  row_key: string
+  row: SourcingPoolPreviewRow
   variant_code: string
   sku_code: string
   existing_product_id: string
@@ -193,69 +194,31 @@ export interface SkippedPoolItem {
   reason: string
 }
 
-export interface AddPoolItemsResult {
-  added: AddedPoolItem[]
-  sku_conflicts: SKUConflict[]
-  skipped: SkippedPoolItem[]
-}
-
-export interface AddPoolItemsRequest {
-  item_ids: string[]
-  product_name_overrides: Record<string, string>
+export interface ImportAndAddRequest {
+  supplier_id: string
+  rows: SourcingPoolPreviewRow[]
   dim_mismatch_resolutions: Record<string, 'variant_code' | 'dims'>
 }
 
-export interface SKUConflictResolution {
-  item_id: string
+export interface ImportAndAddResult {
+  added: AddedPoolItem[]
+  skipped: SkippedPoolItem[]
+  sku_conflicts: SKUConflict[]
+}
+
+export interface SourcingConflictResolution {
+  row: SourcingPoolPreviewRow
   action: 'add_to_existing' | 'skip'
   product_id?: string
 }
 
-export interface ResolveSkuConflictsRequest {
-  resolutions: SKUConflictResolution[]
+export interface ResolveSourcingConflictsRequest {
+  resolutions: SourcingConflictResolution[]
 }
 
-export interface ResolveSkuConflictsResult {
+export interface ResolveSourcingConflictsResult {
   added: AddedPoolItem[]
   skipped: SkippedPoolItem[]
-}
-
-export interface SourcingPoolItem {
-  id: string
-  product_name: string | null
-  product_name_derived?: boolean
-  variant_name: string
-  category_id: string | null
-  category_name: string | null
-  category_code: string | null
-  unit_price: string
-  discounted_price: string | null
-  qty_suggested: number | null
-  supplier_link: string | null
-  image_url: string | null
-  image_proxy_url: string | null
-  image_download_status: 'PENDING' | 'DONE' | 'FAILED'
-  notes: string | null
-  times_ordered: number
-  cdate: string
-  udate: string
-  variant_id: string | null
-  variant_code: string | null
-  dim1_key: string | null
-  dim1_value: string | null
-  dim2_key: string | null
-  dim2_value: string | null
-  is_used: boolean
-  is_active: boolean
-}
-
-export interface SourcingPoolItemsResponse {
-  pool_id: string | null
-  count?: number
-  next?: string | null
-  previous?: string | null
-  results?: SourcingPoolItem[]
-  items?: SourcingPoolItem[]
 }
 
 export interface SourcingPoolPreviewRow {
@@ -295,9 +258,4 @@ export interface SourcingPoolPreviewResult {
   dim_mismatches: DimMismatch[]
 }
 
-export interface SourcingPoolImportResult {
-  created: number
-  updated: number
-  pool_id: string
-  item_ids: string[]
-}
+

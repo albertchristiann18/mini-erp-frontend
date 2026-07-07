@@ -9,7 +9,6 @@ import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrde
 import { StatusAdvanceModal } from '../../components/modals/StatusAdvanceModal'
 import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
 import { SourcingImportWizard } from '../../features/purchasing/components/SourcingImportWizard'
-import { BrowsePoolModal } from '../../features/purchasing/components/BrowsePoolModal'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
@@ -160,7 +159,6 @@ export default function PurchaseOrderDetailPage() {
     })
 
   const [showImportWizard, setShowImportWizard] = useState(false)
-  const [showBrowsePool, setShowBrowsePool] = useState(false)
 
   const handleVariantPhotoUpload = async (variantId: string, productId: string, file: File) => {
     setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: true }))
@@ -1542,11 +1540,6 @@ export default function PurchaseOrderDetailPage() {
                 <Upload className="h-3 w-3 mr-1" /> Import from Excel
               </Button>
             )}
-            {editMode && canAddDeleteItems && activeSupplierId && (
-              <Button type="button" variant="outline" size="sm" onClick={() => setShowBrowsePool(true)}>
-                Browse Pool
-              </Button>
-            )}
             {editMode && canAddDeleteItems && (
               <Button
                 type="button"
@@ -1636,14 +1629,6 @@ export default function PurchaseOrderDetailPage() {
           poId={po.id}
           supplierId={activeSupplierId ?? ''}
           supplierName={suppliers?.find((s) => s.id === activeSupplierId)?.name ?? ''}
-        />
-      )}
-      {!isCreating && po && activeSupplierId && (
-        <BrowsePoolModal
-          open={showBrowsePool}
-          onClose={() => setShowBrowsePool(false)}
-          poId={po.id}
-          supplierId={activeSupplierId}
         />
       )}
     </div>
