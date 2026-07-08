@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Pagination } from '../../components/Pagination'
-import { WarehouseFormModal } from '../../components/modals/WarehouseFormModal'
+import { WarehouseFormModal } from './WarehouseFormModal'
 import { Plus, Pencil } from 'lucide-react'
 import type { Warehouse } from '../../types/inventory'
 

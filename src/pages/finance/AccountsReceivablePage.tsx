@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Pagination } from '../../components/Pagination'
-import { SettleReceivableModal } from '../../components/modals/SettleReceivableModal'
+import { SettleReceivableModal } from './SettleReceivableModal'
 import { formatIDR, formatDate } from '../../lib/utils'
 import type { ARStatus } from '../../types/finance'
 import type { BadgeProps } from '../../components/ui/badge'

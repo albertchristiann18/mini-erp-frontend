@@ -15,7 +15,7 @@ const mockDeleteMutateAsync = vi.fn().mockResolvedValue({})
 
 let mockAbbreviations = mockData
 
-vi.mock('../../../features/purchasing/hooks/useSourcingPool', () => ({
+vi.mock('../../../hooks/purchasing/useSourcingPool', () => ({
   useColorAbbreviations: vi.fn(() => ({ data: mockAbbreviations, isLoading: false })),
   useUpsertColorAbbreviation: vi.fn(() => ({ mutateAsync: mockUpsertMutateAsync, isPending: false })),
   useDeleteColorAbbreviation: vi.fn(() => ({ mutateAsync: mockDeleteMutateAsync, isPending: false })),

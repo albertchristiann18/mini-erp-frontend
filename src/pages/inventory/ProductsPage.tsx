@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
-import { BulkProductModal } from '../../components/modals/BulkProductModal'
+import { BulkProductModal } from './BulkProductModal'
 import { Plus, Upload, Pencil, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import type { Product } from '../../types/inventory'
 

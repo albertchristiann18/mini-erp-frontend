@@ -6,7 +6,7 @@ import { Pencil, Trash2 } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
-import { useColorAbbreviations, useUpsertColorAbbreviation, useDeleteColorAbbreviation } from '../../features/purchasing/hooks/useSourcingPool'
+import { useColorAbbreviations, useUpsertColorAbbreviation, useDeleteColorAbbreviation } from '../../hooks/purchasing/useSourcingPool'
 import { toast } from '../../lib/toast'
 import type { ColorAbbreviation } from '../../types/purchasing'
 

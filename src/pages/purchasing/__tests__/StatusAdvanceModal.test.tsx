@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { vi, it, expect } from "vitest"
-import { StatusAdvanceModal } from "../../../components/modals/StatusAdvanceModal"
+import { StatusAdvanceModal } from "../StatusAdvanceModal"
 import type { PurchaseOrder, POStatus } from "../../../types/purchasing"
 
 const mockCheckMutate = vi.fn()

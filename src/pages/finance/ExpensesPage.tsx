@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Pagination } from '../../components/Pagination'
-import { ExpenseFormModal } from '../../components/modals/ExpenseFormModal'
+import { ExpenseFormModal } from './ExpenseFormModal'
 import { formatIDR, formatDate } from '../../lib/utils'
 import { Plus, Pencil } from 'lucide-react'
 import type { Expense } from '../../types/finance'

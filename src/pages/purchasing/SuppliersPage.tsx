@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
-import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
+import { SupplierFormModal } from './SupplierFormModal'
 import { toast } from '../../lib/toast'
 import type { Supplier } from '../../types/inventory'
 

@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Pagination } from '../../components/Pagination'
-import { RecordPaymentModal } from '../../components/modals/RecordPaymentModal'
+import { RecordPaymentModal } from './RecordPaymentModal'
 import { formatIDR, formatDate } from '../../lib/utils'
 import type { APStatus } from '../../types/finance'
 import type { BadgeProps } from '../../components/ui/badge'

@@ -32,14 +32,14 @@ import {
 } from '../../components/ui/select'
 import { Badge } from '../../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
-import { PhotoUploadGrid } from '../../components/inventory/PhotoUploadGrid'
+import { PhotoUploadGrid } from './PhotoUploadGrid'
 import { ArrowLeft, X, Plus } from 'lucide-react'
 import type { Product, ProductPhoto, VariantDimension, DimensionImage } from '../../types/inventory'
 import type { SaveVariantsPayload, SaveVariantItem } from '../../api/inventory'
 import { uploadVariantPhoto, uploadDimensionImage, deleteDimensionImage, saveVariants as saveVariantsApi } from '../../api/inventory'
-import { VariasiSetupSection } from '../../features/inventory/components/VariasiSetupSection'
-import { DaftarVariasiTable } from '../../features/inventory/components/DaftarVariasiTable'
-import type { VariantRow } from '../../features/inventory/types'
+import { VariasiSetupSection } from './VariasiSetupSection'
+import { DaftarVariasiTable } from './DaftarVariasiTable'
+import type { VariantRow } from './types'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),

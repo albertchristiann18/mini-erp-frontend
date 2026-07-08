@@ -14,13 +14,14 @@ vi.mock('../../hooks/api/useInventory', () => ({
     },
   }),
   useCreateCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('../modals/CategoryFormModal', () => ({
+vi.mock('../../pages/inventory/CategoryFormModal', () => ({
   CategoryFormModal: ({ open, onCreated }: { open: boolean; onCreated?: (c: unknown) => void }) =>
     open ? <button onClick={() => onCreated?.({ id: 'c3', name: 'T-Shirt', category_code: 'TSH', description: '', is_active: true, company: 'co1', cdate: '', udate: '' })}>MockCreate</button> : null,
 }))

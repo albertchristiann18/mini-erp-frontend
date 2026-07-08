@@ -35,7 +35,7 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({ user: { is_staff: mockIsStaff } })),
 }))
 
-vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
+vi.mock('../VariantSearchSelect', () => ({
   VariantSearchSelect: ({ onSelect }: {
     value: string
     selectedLabel?: string
@@ -50,15 +50,15 @@ vi.mock('../../../features/purchasing/VariantSearchSelect', () => ({
   ),
 }))
 
-vi.mock('../../../features/purchasing/PurchaseOrderExportModal', () => ({
+vi.mock('../PurchaseOrderExportModal', () => ({
   PurchaseOrderExportModal: () => null,
 }))
 
-vi.mock('../../../components/modals/StatusAdvanceModal', () => ({
+vi.mock('../StatusAdvanceModal', () => ({
   StatusAdvanceModal: () => null,
 }))
 
-vi.mock('../../../components/modals/SupplierFormModal', () => ({
+vi.mock('../SupplierFormModal', () => ({
   SupplierFormModal: () => null,
 }))
 
@@ -70,7 +70,7 @@ vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }))
 
-vi.mock('../../../features/purchasing/components/SourcingImportWizard', () => ({
+vi.mock('../SourcingImportWizard', () => ({
   SourcingImportWizard: () => null,
 }))
 
