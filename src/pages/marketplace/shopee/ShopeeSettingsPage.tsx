@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listShops, createShop, deleteShop, triggerSync } from '../../api/shopee'
-import type { CreateShopPayload } from '../../types/shopee'
-import { toast } from '../../lib/toast'
-import { Button } from '../../components/ui/button'
-import { Badge } from '../../components/ui/badge'
-import { Input } from '../../components/ui/input'
-import { FormField } from '../../components/ui/form'
-import { Pagination } from '../../components/Pagination'
+import { listShops, createShop, deleteShop, triggerSync } from '../../../api/shopee'
+import type { CreateShopPayload } from '../../../types/shopee'
+import { toast } from '../../../lib/toast'
+import { Button } from '../../../components/ui/button'
+import { Badge } from '../../../components/ui/badge'
+import { Input } from '../../../components/ui/input'
+import { FormField } from '../../../components/ui/form'
+import { Pagination } from '../../../components/Pagination'
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from '../../components/ui/table'
+} from '../../../components/ui/table'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '../../components/ui/dialog'
+} from '../../../components/ui/dialog'
 
 const PAGE_SIZE = 20
 
@@ -158,7 +158,6 @@ export default function ShopeeSettingsPage() {
         </div>
       </div>
 
-      {/* Add Shop Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -196,7 +195,6 @@ export default function ShopeeSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>

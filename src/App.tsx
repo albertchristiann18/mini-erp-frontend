@@ -30,18 +30,18 @@ const AccountsPayablePage = lazy(() => import('./pages/finance/AccountsPayablePa
 const AccountsReceivablePage = lazy(() => import('./pages/finance/AccountsReceivablePage'))
 const ReportsPage = lazy(() => import('./pages/finance/ReportsPage'))
 const CashTransactionsPage = lazy(() => import('./pages/finance/CashTransactionsPage'))
-const MarketplaceSettingsPage = lazy(() => import('./pages/omnichannel/MarketplaceSettingsPage'))
-const ShopeeSettingsPage = lazy(() => import('./pages/shopee/ShopeeSettingsPage'))
-const ShopeeWebhookLogPage = lazy(() => import('./pages/shopee/ShopeeWebhookLogPage'))
-const TikTokSettingsPage = lazy(() => import('./pages/tiktok/TikTokSettingsPage'))
-const TikTokWebhookLogPage = lazy(() => import('./pages/tiktok/TikTokWebhookLogPage'))
+const MarketplaceSettingsPage = lazy(() => import('./pages/marketplace/MarketplaceSettingsPage'))
+const ShopeeSettingsPage = lazy(() => import('./pages/marketplace/shopee/ShopeeSettingsPage'))
+const ShopeeWebhookLogPage = lazy(() => import('./pages/marketplace/shopee/ShopeeWebhookLogPage'))
+const TikTokSettingsPage = lazy(() => import('./pages/marketplace/tiktok/TikTokSettingsPage'))
+const TikTokWebhookLogPage = lazy(() => import('./pages/marketplace/tiktok/TikTokWebhookLogPage'))
 const StockClosingPage = lazy(() => import('./pages/inventory/StockClosingPage'))
 const InventoryDashboardPage = lazy(() => import('./pages/dashboard/InventoryDashboardPage'))
 const BulkStockUpdatePage = lazy(() => import('./pages/inventory/BulkStockUpdatePage'))
-const MarketplaceReconcilePage = lazy(() => import('./pages/inventory/MarketplaceReconcilePage'))
+const MarketplaceReconcilePage = lazy(() => import('./pages/marketplace/MarketplaceReconcilePage'))
 const ProductEditPage = lazy(() => import('./pages/inventory/ProductEditPage'))
 const CategoriesPage = lazy(() => import('./pages/inventory/CategoriesPage'))
-const MarketplacesPage = lazy(() => import('./pages/inventory/MarketplacesPage'))
+const MarketplacesPage = lazy(() => import('./pages/marketplace/MarketplacesPage'))
 const BusinessEntitiesPage = lazy(() => import('./pages/inventory/BusinessEntitiesPage'))
 const ColorAbbreviationsPage = lazy(() => import('./pages/inventory/ColorAbbreviationsPage'))
 const SuppliersPage = lazy(() => import('./pages/purchasing/SuppliersPage'))
@@ -75,9 +75,7 @@ export default function App() {
                     <Route path="stock-closing" element={<Suspense fallback={<Loading />}><StockClosingPage /></Suspense>} />
                     <Route path="inventory-dashboard" element={<Suspense fallback={<Loading />}><InventoryDashboardPage /></Suspense>} />
                     <Route path="bulk-stock-update" element={<Suspense fallback={<Loading />}><BulkStockUpdatePage /></Suspense>} />
-                    <Route path="marketplace-reconcile" element={<Suspense fallback={<Loading />}><MarketplaceReconcilePage /></Suspense>} />
                     <Route path="categories" element={<Suspense fallback={<Loading />}><CategoriesPage /></Suspense>} />
-                    <Route path="marketplaces" element={<Suspense fallback={<Loading />}><MarketplacesPage /></Suspense>} />
                     <Route path="business-entities" element={<Suspense fallback={<Loading />}><BusinessEntitiesPage /></Suspense>} />
                     <Route path="color-abbreviations" element={<Suspense fallback={<Loading />}><ColorAbbreviationsPage /></Suspense>} />
                   </Route>
@@ -108,8 +106,10 @@ export default function App() {
                       element={<Suspense fallback={<Loading />}><CashTransactionsPage /></Suspense>}
                     />
                   </Route>
-                  <Route path="omnichannel">
+                  <Route path="marketplace">
                     <Route path="settings" element={<Suspense fallback={<Loading />}><MarketplaceSettingsPage /></Suspense>} />
+                    <Route path="channels" element={<Suspense fallback={<Loading />}><MarketplacesPage /></Suspense>} />
+                    <Route path="reconcile" element={<Suspense fallback={<Loading />}><MarketplaceReconcilePage /></Suspense>} />
                     <Route path="shopee/settings" element={<Suspense fallback={<Loading />}><ShopeeSettingsPage /></Suspense>} />
                     <Route path="shopee/webhook-logs" element={<Suspense fallback={<Loading />}><ShopeeWebhookLogPage /></Suspense>} />
                     <Route path="tiktok/settings" element={<Suspense fallback={<Loading />}><TikTokSettingsPage /></Suspense>} />

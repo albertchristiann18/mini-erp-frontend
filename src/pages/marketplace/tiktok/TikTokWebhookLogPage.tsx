@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listTikTokWebhookLogs } from '../../api/tiktok'
-import { Badge } from '../../components/ui/badge'
-import { Pagination } from '../../components/Pagination'
+import { listTikTokWebhookLogs } from '../../../api/tiktok'
+import { Badge } from '../../../components/ui/badge'
+import { Pagination } from '../../../components/Pagination'
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from '../../components/ui/table'
+} from '../../../components/ui/table'
 
 const PAGE_SIZE = 20
 

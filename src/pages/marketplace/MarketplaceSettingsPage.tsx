@@ -66,7 +66,6 @@ export default function MarketplaceSettingsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (editId) {
-      // For future edit support
       return
     }
     createMutation.mutate(form)
@@ -170,7 +169,6 @@ export default function MarketplaceSettingsPage() {
         </div>
       )}
 
-      {/* Connect / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -226,7 +224,6 @@ export default function MarketplaceSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listWebhookLogs } from '../../api/shopee'
-import { Badge } from '../../components/ui/badge'
-import { Pagination } from '../../components/Pagination'
+import { listWebhookLogs } from '../../../api/shopee'
+import { Badge } from '../../../components/ui/badge'
+import { Pagination } from '../../../components/Pagination'
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from '../../components/ui/table'
+} from '../../../components/ui/table'
 import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from '../../components/ui/select'
+} from '../../../components/ui/select'
 
 const PAGE_SIZE = 20
 

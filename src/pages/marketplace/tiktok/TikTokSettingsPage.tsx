@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listTikTokShops, createTikTokShop, updateTikTokShop, deleteTikTokShop, refreshTikTokToken } from '../../api/tiktok'
-import type { TikTokShopFormData } from '../../types/tiktok'
-import { toast } from '../../lib/toast'
-import { Button } from '../../components/ui/button'
-import { Badge } from '../../components/ui/badge'
-import { Input } from '../../components/ui/input'
-import { FormField } from '../../components/ui/form'
-import { Pagination } from '../../components/Pagination'
+import { listTikTokShops, createTikTokShop, updateTikTokShop, deleteTikTokShop, refreshTikTokToken } from '../../../api/tiktok'
+import type { TikTokShopFormData } from '../../../types/tiktok'
+import { toast } from '../../../lib/toast'
+import { Button } from '../../../components/ui/button'
+import { Badge } from '../../../components/ui/badge'
+import { Input } from '../../../components/ui/input'
+import { FormField } from '../../../components/ui/form'
+import { Pagination } from '../../../components/Pagination'
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
-} from '../../components/ui/table'
+} from '../../../components/ui/table'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '../../components/ui/dialog'
+} from '../../../components/ui/dialog'
 
 const PAGE_SIZE = 20
 
@@ -196,7 +196,6 @@ export default function TikTokSettingsPage() {
         </div>
       </div>
 
-      {/* Add/Edit Shop Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -231,7 +230,6 @@ export default function TikTokSettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent>
           <DialogHeader>

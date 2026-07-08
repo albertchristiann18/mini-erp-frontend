@@ -110,7 +110,7 @@ export default function BulkStockUpdatePage() {
         <Button variant="ghost" size="sm" onClick={() => navigate('/inventory/stock')}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Stock
         </Button>
-        <Button variant="outline" size="sm" onClick={() => navigate('/inventory/marketplace-reconcile')}>
+        <Button variant="outline" size="sm" onClick={() => navigate('/marketplace/reconcile')}>
           Marketplace Reconcile
         </Button>
       </div>

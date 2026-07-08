@@ -26,7 +26,6 @@ const navItems: NavItem[] = [
     children: [
       { label: 'Products', to: '/inventory/products' },
       { label: 'Categories', to: '/inventory/categories' },
-      { label: 'Marketplaces', to: '/inventory/marketplaces' },
       { label: 'Business Entities', to: '/inventory/business-entities' },
       { label: 'Color Abbreviations', to: '/inventory/color-abbreviations' },
       { label: 'Stock', to: '/inventory/stock' },
@@ -61,13 +60,14 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    label: 'Omnichannel', icon: <Store className="h-4 w-4" />,
+    label: 'Marketplace', icon: <Store className="h-4 w-4" />,
     children: [
-      { label: 'Marketplace Settings', to: '/omnichannel/settings' },
-      { label: 'Shopee Settings', to: '/omnichannel/shopee/settings' },
-      { label: 'Shopee Webhook Logs', to: '/omnichannel/shopee/webhook-logs' },
-      { label: 'TikTok Settings', to: '/omnichannel/tiktok/settings' },
-      { label: 'TikTok Webhook Logs', to: '/omnichannel/tiktok/webhook-logs' },
+      { label: 'Channels', to: '/marketplace/channels' },
+      { label: 'Marketplace Settings', to: '/marketplace/settings' },
+      { label: 'Shopee Settings', to: '/marketplace/shopee/settings' },
+      { label: 'Shopee Webhook Logs', to: '/marketplace/shopee/webhook-logs' },
+      { label: 'TikTok Settings', to: '/marketplace/tiktok/settings' },
+      { label: 'TikTok Webhook Logs', to: '/marketplace/tiktok/webhook-logs' },
     ],
   },
 ]
