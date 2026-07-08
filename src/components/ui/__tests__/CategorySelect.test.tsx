@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, it, expect, beforeEach } from 'vitest'
-import { CategorySelect } from './CategorySelect'
+import { CategorySelect } from '../CategorySelect'
 
-vi.mock('../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useCategories: () => ({
     data: {
       results: [
@@ -17,11 +17,11 @@ vi.mock('../../hooks/api/useInventory', () => ({
   useUpdateCategory: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
-vi.mock('../../lib/toast', () => ({
+vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-vi.mock('../../pages/inventory/CategoryFormModal', () => ({
+vi.mock('../../../pages/inventory/CategoryFormModal', () => ({
   CategoryFormModal: ({ open, onCreated }: { open: boolean; onCreated?: (c: unknown) => void }) =>
     open ? <button onClick={() => onCreated?.({ id: 'c3', name: 'T-Shirt', category_code: 'TSH', description: '', is_active: true, company: 'co1', cdate: '', udate: '' })}>MockCreate</button> : null,
 }))

@@ -2,15 +2,15 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
-import { VariantSearchSelect } from './VariantSearchSelect'
+import { VariantSearchSelect } from '../VariantSearchSelect'
 
 const mockUseVariantSearch = vi.fn()
 
-vi.mock('../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useVariantSearch: (...args: unknown[]) => mockUseVariantSearch(...args),
 }))
 
-vi.mock('./QuickCreateProductModal', () => ({
+vi.mock('../QuickCreateProductModal', () => ({
   QuickCreateProductModal: () => null,
 }))
 
