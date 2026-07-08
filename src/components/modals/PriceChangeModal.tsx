@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
-import { useUpdateVariantPrice } from '../../hooks/useInventory'
+import { useUpdateVariantPrice } from '../../hooks/api/useInventory'
 import { toast } from '../../lib/toast'
 import type { Product, ProductVariant } from '../../types/inventory'
 

@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect } from 'vitest'
 import MarketplaceReconcilePage from '../MarketplaceReconcilePage'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: vi.fn(),
   useCompanyMarketplaces: vi.fn(),
 }))
@@ -14,7 +14,7 @@ vi.mock('../../../api/inventory', () => ({
   marketplaceReconcileStock: vi.fn(),
 }))
 
-import { useWarehouses, useCompanyMarketplaces } from '../../../hooks/useInventory'
+import { useWarehouses, useCompanyMarketplaces } from '../../../hooks/api/useInventory'
 import { marketplaceReconcileStock } from '../../../api/inventory'
 
 const mockMarketplaces = {

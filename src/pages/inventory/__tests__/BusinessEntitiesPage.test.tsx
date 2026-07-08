@@ -10,7 +10,7 @@ const mockUseCreateBusinessEntity = vi.fn()
 const mockUseUpdateBusinessEntity = vi.fn()
 const mockUseAuth = vi.fn()
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useBusinessEntities: (...args: unknown[]) => mockUseBusinessEntities(...args),
   useCompanyMarketplaces: (...args: unknown[]) => mockUseCompanyMarketplaces(...args),
   useCreateBusinessEntity: (...args: unknown[]) => mockUseCreateBusinessEntity(...args),

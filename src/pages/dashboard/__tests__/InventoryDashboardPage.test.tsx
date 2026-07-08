@@ -3,12 +3,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
 import InventoryDashboardPage from '../InventoryDashboardPage'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useInventorySummary: vi.fn(),
   useAvgSales: vi.fn(),
 }))
 
-import { useInventorySummary, useAvgSales } from '../../../hooks/useInventory'
+import { useInventorySummary, useAvgSales } from '../../../hooks/api/useInventory'
 
 const mockWarehouses = [
   { id: 'w1', name: 'Gudang A' },

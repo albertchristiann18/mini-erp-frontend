@@ -16,7 +16,7 @@ const mockSuppliersData: { count: number; results: Record<string, unknown>[] } =
   ],
 }
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useSuppliers: () => ({ data: mockSuppliersData, isLoading: false }),
   useCreateSupplier: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
   useUpdateSupplier: () => ({ mutateAsync: mockUpdateMutateAsync, isPending: false }),

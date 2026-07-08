@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { vi, it, expect, beforeEach } from 'vitest'
 import { CategorySelect } from './CategorySelect'
 
-vi.mock('../../hooks/useInventory', () => ({
+vi.mock('../../hooks/api/useInventory', () => ({
   useCategories: () => ({
     data: {
       results: [

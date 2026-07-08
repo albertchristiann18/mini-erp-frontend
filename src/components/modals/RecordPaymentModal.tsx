@@ -7,7 +7,7 @@ import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useRecordPayment } from '../../hooks/useFinance'
+import { useRecordPayment } from '../../hooks/api/useFinance'
 import { toast } from '../../lib/toast'
 import { formatIDR } from '../../lib/utils'
 

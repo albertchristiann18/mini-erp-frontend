@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../../../components/ui/button'
 import { Badge } from '../../../components/ui/badge'
 import { Input } from '../../../components/ui/input'
-import { useVariantSearch } from '../../../hooks/useInventory'
+import { useVariantSearch } from '../../../hooks/api/useInventory'
 import type { ExcelImportUnmatchedSku, ExcelImportSkuMapping } from '../types'
 
 interface SkuResolutionModalProps {

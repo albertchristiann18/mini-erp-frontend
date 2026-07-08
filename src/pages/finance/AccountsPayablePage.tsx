@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useAccountsPayable } from '../../hooks/useFinance'
+import { useAccountsPayable } from '../../hooks/api/useFinance'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'

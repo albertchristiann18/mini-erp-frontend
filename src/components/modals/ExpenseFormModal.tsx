@@ -7,7 +7,7 @@ import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useExpenseCategories, useCreateExpense, useUpdateExpense } from '../../hooks/useFinance'
+import { useExpenseCategories, useCreateExpense, useUpdateExpense } from '../../hooks/api/useFinance'
 import { toast } from '../../lib/toast'
 import type { Expense } from '../../types/finance'
 

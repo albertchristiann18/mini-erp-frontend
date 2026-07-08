@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect } from 'vitest'
 import BulkStockUpdatePage from '../BulkStockUpdatePage'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: vi.fn(),
   useBulkUpdateInventory: vi.fn(),
 }))
@@ -14,7 +14,7 @@ vi.mock('../../../api/inventory', () => ({
   getProductVariantStocks: vi.fn(),
 }))
 
-import { useWarehouses, useBulkUpdateInventory } from '../../../hooks/useInventory'
+import { useWarehouses, useBulkUpdateInventory } from '../../../hooks/api/useInventory'
 import { getProductVariantStocks } from '../../../api/inventory'
 
 const mockVariants = {

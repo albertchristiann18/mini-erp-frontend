@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
  
 import { useParams, useNavigate } from 'react-router-dom'
-import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/usePurchasing'
-import { useWarehouses, useSuppliers } from '../../hooks/useInventory'
+import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/api/usePurchasing'
+import { useWarehouses, useSuppliers } from '../../hooks/api/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { VariantSearchSelect } from '../../features/purchasing/VariantSearchSelect'
 import { PurchaseOrderExportModal } from '../../features/purchasing/PurchaseOrderExportModal'

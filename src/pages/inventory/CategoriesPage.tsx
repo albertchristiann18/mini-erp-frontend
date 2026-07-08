@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useCategories, useUpdateCategory, useDeleteCategory } from '../../hooks/useInventory'
+import { useCategories, useUpdateCategory, useDeleteCategory } from '../../hooks/api/useInventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'

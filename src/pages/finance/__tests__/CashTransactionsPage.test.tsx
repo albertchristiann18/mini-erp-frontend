@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
 import CashTransactionsPage from '../CashTransactionsPage'
 
-vi.mock('../../../hooks/useFinance', () => ({
+vi.mock('../../../hooks/api/useFinance', () => ({
   useCashTransactions: vi.fn(),
   useCreateCashTransaction: vi.fn(),
   useUpdateCashTransaction: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('../../../hooks/useFinance', () => ({
 
 import {
   useCashTransactions, useCreateCashTransaction, useUpdateCashTransaction, useDeleteCashTransaction,
-} from '../../../hooks/useFinance'
+} from '../../../hooks/api/useFinance'
 
 const mockData = {
   results: [

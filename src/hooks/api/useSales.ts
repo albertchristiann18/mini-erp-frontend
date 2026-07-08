@@ -3,8 +3,8 @@ import {
   getSalesOrders, getSalesOrder,
   createSalesOrder, confirmSalesOrder, cancelSalesOrder,
   getReturns,
-} from '../api/sales'
-import type { SOStatus } from '../types/sales'
+} from '../../api/sales'
+import type { SOStatus } from '../../types/sales'
 
 export const useSalesOrders = (status?: SOStatus, page = 1) =>
   useQuery({

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useWarehouses } from '../../hooks/useInventory'
+import { useWarehouses } from '../../hooks/api/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'

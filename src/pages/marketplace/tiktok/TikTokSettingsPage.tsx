@@ -1,6 +1,11 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listTikTokShops, createTikTokShop, updateTikTokShop, deleteTikTokShop, refreshTikTokToken } from '../../../api/tiktok'
+import {
+  useTikTokShops,
+  useCreateTikTokShop,
+  useUpdateTikTokShop,
+  useDeleteTikTokShop,
+  useRefreshTikTokToken,
+} from '../../../hooks/api/useMarketplace'
 import type { TikTokShopFormData } from '../../../types/tiktok'
 import { toast } from '../../../lib/toast'
 import { Button } from '../../../components/ui/button'
@@ -27,59 +32,17 @@ const emptyForm: TikTokShopFormData = {
 }
 
 export default function TikTokSettingsPage() {
-  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState<TikTokShopFormData>({ ...emptyForm })
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['tiktok-shops', page],
-    queryFn: () => listTikTokShops(page),
-  })
-
-  const createMutation = useMutation({
-    mutationFn: createTikTokShop,
-    onSuccess: () => {
-      toast.success('Shop created')
-      queryClient.invalidateQueries({ queryKey: ['tiktok-shops'] })
-      setDialogOpen(false)
-      setForm({ ...emptyForm })
-    },
-    onError: () => toast.error('Failed to create shop'),
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<TikTokShopFormData> }) => updateTikTokShop(id, data),
-    onSuccess: () => {
-      toast.success('Shop updated')
-      queryClient.invalidateQueries({ queryKey: ['tiktok-shops'] })
-      setDialogOpen(false)
-      setEditId(null)
-      setForm({ ...emptyForm })
-    },
-    onError: () => toast.error('Failed to update shop'),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteTikTokShop,
-    onSuccess: () => {
-      toast.success('Shop deleted')
-      queryClient.invalidateQueries({ queryKey: ['tiktok-shops'] })
-      setDeleteId(null)
-    },
-    onError: () => toast.error('Failed to delete shop'),
-  })
-
-  const refreshMutation = useMutation({
-    mutationFn: refreshTikTokToken,
-    onSuccess: () => {
-      toast.success('Token refreshed')
-      queryClient.invalidateQueries({ queryKey: ['tiktok-shops'] })
-    },
-    onError: () => toast.error('Failed to refresh token'),
-  })
+  const { data, isLoading } = useTikTokShops(page)
+  const createMutation = useCreateTikTokShop()
+  const updateMutation = useUpdateTikTokShop()
+  const deleteMutation = useDeleteTikTokShop()
+  const refreshMutation = useRefreshTikTokToken()
 
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1
 
@@ -91,9 +54,24 @@ export default function TikTokSettingsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (editId) {
-      updateMutation.mutate({ id: editId, data: form })
+      updateMutation.mutate({ id: editId, data: form }, {
+        onSuccess: () => {
+          toast.success('Shop updated')
+          setDialogOpen(false)
+          setEditId(null)
+          setForm({ ...emptyForm })
+        },
+        onError: () => toast.error('Failed to update shop'),
+      })
     } else {
-      createMutation.mutate(form)
+      createMutation.mutate(form, {
+        onSuccess: () => {
+          toast.success('Shop created')
+          setDialogOpen(false)
+          setForm({ ...emptyForm })
+        },
+        onError: () => toast.error('Failed to create shop'),
+      })
     }
   }
 
@@ -165,7 +143,7 @@ export default function TikTokSettingsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => refreshMutation.mutate(shop.id)}
+                        onClick={() => refreshMutation.mutate(shop.id, { onSuccess: () => toast.success('Token refreshed'), onError: () => toast.error('Failed to refresh token') })}
                         disabled={refreshMutation.isPending}
                       >
                         Refresh Token
@@ -240,7 +218,10 @@ export default function TikTokSettingsPage() {
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              onClick={() => deleteId && deleteMutation.mutate(deleteId, {
+                onSuccess: () => { toast.success('Shop deleted'); setDeleteId(null) },
+                onError: () => toast.error('Failed to delete shop'),
+              })}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}

@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Input } from '../../components/ui/input'
 import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
-import { useInventorySummary, useAvgSales } from '../../hooks/useInventory'
+import { useInventorySummary, useAvgSales } from '../../hooks/api/useInventory'
 import { Pagination } from '../../components/Pagination'
 
 const formatIDR = (val: number) =>

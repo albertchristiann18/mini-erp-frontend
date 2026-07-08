@@ -10,7 +10,7 @@ import { Label } from '../../components/ui/label'
 import { toast } from '../../lib/toast'
 import {
   useCashTransactions, useCreateCashTransaction, useUpdateCashTransaction, useDeleteCashTransaction,
-} from '../../hooks/useFinance'
+} from '../../hooks/api/useFinance'
 import type { CashTransaction, CashTransactionCreate, TransactionCategory } from '../../types/finance'
 
 const CATEGORY_LABELS: Record<string, string> = {

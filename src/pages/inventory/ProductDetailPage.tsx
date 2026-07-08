@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useProduct, useSaveVariants, useProductSuppliers, useProductBusinessEntities, useAttachBusinessEntity, useDetachBusinessEntity, useBusinessEntities, useUpdateProductSupplier } from '../../hooks/useInventory'
+import { useProduct, useSaveVariants, useProductSuppliers, useProductBusinessEntities, useAttachBusinessEntity, useDetachBusinessEntity, useBusinessEntities, useUpdateProductSupplier } from '../../hooks/api/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'

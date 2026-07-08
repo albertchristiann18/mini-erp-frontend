@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { listWebhookLogs } from '../../../api/shopee'
+import { useShopeeWebhookLogs } from '../../../hooks/api/useMarketplace'
 import { Badge } from '../../../components/ui/badge'
 import { Pagination } from '../../../components/Pagination'
 import {
@@ -30,12 +29,7 @@ export default function ShopeeWebhookLogPage() {
   const [filter, setFilter] = useState<string>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const processed = filter === 'all' ? undefined : filter === 'processed'
-
-  const { data, isLoading } = useQuery({
-    queryKey: ['shopee-webhook-logs', page, filter],
-    queryFn: () => listWebhookLogs(page, processed),
-  })
+  const { data, isLoading } = useShopeeWebhookLogs(page, filter)
 
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1
 

@@ -6,7 +6,7 @@ import { FormField } from '../../components/ui/form'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { CategorySelect } from '../../components/ui/CategorySelect'
-import { useCreateProduct } from '../../hooks/useInventory'
+import { useCreateProduct } from '../../hooks/api/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { toast } from '../../lib/toast'
 

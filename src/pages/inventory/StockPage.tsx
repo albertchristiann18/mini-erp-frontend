@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProductVariantStocks, useWarehouses, useAdjustStock } from '../../hooks/useInventory'
+import { useProductVariantStocks, useWarehouses, useAdjustStock } from '../../hooks/api/useInventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Button } from '../../components/ui/button'

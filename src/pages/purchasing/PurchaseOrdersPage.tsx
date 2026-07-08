@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePurchaseOrdersFiltered, usePurchaseOrderSummary } from '../../hooks/usePurchasing'
+import { usePurchaseOrdersFiltered, usePurchaseOrderSummary } from '../../hooks/api/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'

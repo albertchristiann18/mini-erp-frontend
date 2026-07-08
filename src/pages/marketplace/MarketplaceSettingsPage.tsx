@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  getMarketplaceConnections,
-  createMarketplaceConnection,
-  deleteMarketplaceConnection,
-  toggleMarketplaceConnection,
-} from '../../api/marketplace'
+  useMarketplaceConnections,
+  useCreateMarketplaceConnection,
+  useToggleMarketplaceConnection,
+  useDeleteMarketplaceConnection,
+} from '../../hooks/api/useMarketplace'
 import type { MarketplaceConnectionFormData, MarketplacePlatform } from '../../types/marketplace'
 import { toast } from '../../lib/toast'
 import { cn } from '../../lib/utils'
@@ -23,52 +22,29 @@ const emptyForm: MarketplaceConnectionFormData = {
 }
 
 export default function MarketplaceSettingsPage() {
-  const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState<MarketplaceConnectionFormData>({ ...emptyForm })
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['marketplace-connections'],
-    queryFn: () => getMarketplaceConnections(),
-  })
-
-  const createMutation = useMutation({
-    mutationFn: createMarketplaceConnection,
-    onSuccess: () => {
-      toast.success('Marketplace connected')
-      queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] })
-      setDialogOpen(false)
-      setForm({ ...emptyForm })
-    },
-    onError: () => toast.error('Failed to connect marketplace'),
-  })
-
-  const toggleMutation = useMutation({
-    mutationFn: toggleMarketplaceConnection,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] })
-    },
-    onError: () => toast.error('Failed to toggle connection'),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteMarketplaceConnection,
-    onSuccess: () => {
-      toast.success('Disconnected')
-      queryClient.invalidateQueries({ queryKey: ['marketplace-connections'] })
-      setDeleteId(null)
-    },
-    onError: () => toast.error('Failed to disconnect'),
-  })
+  const { data, isLoading } = useMarketplaceConnections()
+  const createMutation = useCreateMarketplaceConnection()
+  const toggleMutation = useToggleMarketplaceConnection()
+  const deleteMutation = useDeleteMarketplaceConnection()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (editId) {
       return
     }
-    createMutation.mutate(form)
+    createMutation.mutate(form, {
+      onSuccess: () => {
+        toast.success('Marketplace connected')
+        setDialogOpen(false)
+        setForm({ ...emptyForm })
+      },
+      onError: () => toast.error('Failed to connect marketplace'),
+    })
   }
 
   const openCreate = () => {
@@ -142,7 +118,7 @@ export default function MarketplaceSettingsPage() {
                   role="switch"
                   aria-checked={connection.is_active}
                   disabled={toggleMutation.isPending}
-                  onClick={() => toggleMutation.mutate(connection.id)}
+                  onClick={() => toggleMutation.mutate(connection.id, { onError: () => toast.error('Failed to toggle connection') })}
                   className={cn(
                     'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none disabled:opacity-50',
                     connection.is_active ? 'bg-green-500' : 'bg-gray-300'
@@ -236,7 +212,10 @@ export default function MarketplaceSettingsPage() {
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              onClick={() => deleteId && deleteMutation.mutate(deleteId, {
+                onSuccess: () => { toast.success('Disconnected'); setDeleteId(null) },
+                onError: () => toast.error('Failed to disconnect'),
+              })}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? 'Disconnecting...' : 'Disconnect'}

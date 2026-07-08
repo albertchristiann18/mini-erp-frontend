@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useSalesOrders, useConfirmSalesOrder, useCancelSalesOrder } from '../../hooks/useSales'
+import { useSalesOrders, useConfirmSalesOrder, useCancelSalesOrder } from '../../hooks/api/useSales'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'

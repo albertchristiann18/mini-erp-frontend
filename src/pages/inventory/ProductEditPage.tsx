@@ -18,7 +18,7 @@ import {
   useAttachBusinessEntity,
   useDetachBusinessEntity,
   useBusinessEntities,
-} from '../../hooks/useInventory'
+} from '../../hooks/api/useInventory'
 import { toast } from '../../lib/toast'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'

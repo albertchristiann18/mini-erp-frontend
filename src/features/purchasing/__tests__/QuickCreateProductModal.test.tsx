@@ -5,7 +5,7 @@ import { QuickCreateProductModal } from '../QuickCreateProductModal'
 const mockCreateProduct = vi.fn()
 const mockUploadProductPhoto = vi.fn()
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useCreateProduct: () => ({ mutateAsync: mockCreateProduct, isPending: false }),
   useSuppliers: () => ({ data: { results: [] } }),
   useCategories: () => ({

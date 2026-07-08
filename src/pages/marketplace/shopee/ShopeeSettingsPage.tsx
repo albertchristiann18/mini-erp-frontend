@@ -1,6 +1,10 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { listShops, createShop, deleteShop, triggerSync } from '../../../api/shopee'
+import {
+  useShopeeShops,
+  useCreateShopeeShop,
+  useDeleteShopeeShop,
+  useTriggerShopeeSync,
+} from '../../../hooks/api/useMarketplace'
 import type { CreateShopPayload } from '../../../types/shopee'
 import { toast } from '../../../lib/toast'
 import { Button } from '../../../components/ui/button'
@@ -28,43 +32,15 @@ const emptyForm: CreateShopPayload = {
 }
 
 export default function ShopeeSettingsPage() {
-  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState<CreateShopPayload>({ ...emptyForm })
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['shopee-shops', page],
-    queryFn: () => listShops(page),
-  })
-
-  const createMutation = useMutation({
-    mutationFn: createShop,
-    onSuccess: () => {
-      toast.success('Shop created')
-      queryClient.invalidateQueries({ queryKey: ['shopee-shops'] })
-      setDialogOpen(false)
-      setForm({ ...emptyForm })
-    },
-    onError: () => toast.error('Failed to create shop'),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteShop,
-    onSuccess: () => {
-      toast.success('Shop deleted')
-      queryClient.invalidateQueries({ queryKey: ['shopee-shops'] })
-      setDeleteId(null)
-    },
-    onError: () => toast.error('Failed to delete shop'),
-  })
-
-  const syncMutation = useMutation({
-    mutationFn: triggerSync,
-    onSuccess: () => toast.success('Sync triggered'),
-    onError: () => toast.error('Failed to trigger sync'),
-  })
+  const { data, isLoading } = useShopeeShops(page)
+  const createMutation = useCreateShopeeShop()
+  const deleteMutation = useDeleteShopeeShop()
+  const syncMutation = useTriggerShopeeSync()
 
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1
 
@@ -78,6 +54,13 @@ export default function ShopeeSettingsPage() {
     createMutation.mutate({
       ...form,
       token_expires_at: form.token_expires_at || null,
+    }, {
+      onSuccess: () => {
+        toast.success('Shop created')
+        setDialogOpen(false)
+        setForm({ ...emptyForm })
+      },
+      onError: () => toast.error('Failed to create shop'),
     })
   }
 
@@ -134,7 +117,7 @@ export default function ShopeeSettingsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => syncMutation.mutate(shop.id)}
+                        onClick={() => syncMutation.mutate(shop.id, { onSuccess: () => toast.success('Sync triggered'), onError: () => toast.error('Failed to trigger sync') })}
                         disabled={syncMutation.isPending}
                       >
                         Sync Now
@@ -205,7 +188,10 @@ export default function ShopeeSettingsPage() {
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
+              onClick={() => deleteId && deleteMutation.mutate(deleteId, {
+                onSuccess: () => { toast.success('Shop deleted'); setDeleteId(null) },
+                onError: () => toast.error('Failed to delete shop'),
+              })}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}

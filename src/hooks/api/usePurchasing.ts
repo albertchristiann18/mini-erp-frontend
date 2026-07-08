@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getPurchaseOrders, getPurchaseOrder,
   createPurchaseOrder, updatePurchaseOrder, advancePOStatus, checkPOTransition, getReplenishment, getPurchaseOrderSummary,
-} from '../api/purchasing'
-import type { POStatus } from '../types/purchasing'
+} from '../../api/purchasing'
+import type { POStatus } from '../../types/purchasing'
 
 export const usePurchaseOrders = (status?: POStatus, page = 1) =>
   useQuery({

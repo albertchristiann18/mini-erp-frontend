@@ -7,7 +7,7 @@ import { CategoryFormModal } from '../CategoryFormModal'
 const mockCreateCategory = vi.fn()
 const mockUpdateCategory = vi.fn()
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useCreateCategory: () => ({ mutateAsync: mockCreateCategory, isPending: false }),
   useUpdateCategory: () => ({ mutateAsync: mockUpdateCategory, isPending: false }),
 }))

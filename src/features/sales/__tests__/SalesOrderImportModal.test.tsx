@@ -10,7 +10,7 @@ const { mockUseVariantSearch } = vi.hoisted(() => ({
   mockUseVariantSearch: vi.fn(() => ({ data: { results: [] as Array<unknown> }, isLoading: false })),
 }))
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: () => ({ data: { results: [{ id: 'w1', name: 'Warehouse 1' }] } }),
   useCompanyMarketplaces: () => ({ data: { results: [{ id: 'mp1', name: 'Shopee' }] } }),
   useVariantSearch: mockUseVariantSearch,

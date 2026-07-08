@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { listTikTokWebhookLogs } from '../../../api/tiktok'
+import { useTikTokWebhookLogs } from '../../../hooks/api/useMarketplace'
 import { Badge } from '../../../components/ui/badge'
 import { Pagination } from '../../../components/Pagination'
 import {
@@ -17,11 +16,7 @@ export default function TikTokWebhookLogPage() {
   const [page, setPage] = useState(1)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['tiktok-webhook-logs', page],
-    queryFn: () => listTikTokWebhookLogs(page),
-    refetchInterval: 30_000,
-  })
+  const { data, isLoading } = useTikTokWebhookLogs(page)
 
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1
 

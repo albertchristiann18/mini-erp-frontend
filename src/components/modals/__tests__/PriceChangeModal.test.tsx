@@ -6,7 +6,7 @@ import { PriceChangeModal } from '../PriceChangeModal'
 const mockMutateAsync = vi.hoisted(() => vi.fn())
 const mockToast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn() }))
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useUpdateVariantPrice: () => ({ mutateAsync: mockMutateAsync }),
 }))
 

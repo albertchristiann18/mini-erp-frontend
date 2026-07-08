@@ -7,7 +7,7 @@ import ReplenishmentPage from '../ReplenishmentPage'
 
 const mockMutateAsync = vi.fn()
 
-vi.mock('../../../hooks/usePurchasing', () => ({
+vi.mock('../../../hooks/api/usePurchasing', () => ({
   useReplenishment: () => ({
     data: {
       results: [
@@ -31,7 +31,7 @@ vi.mock('../../../hooks/usePurchasing', () => ({
   }),
 }))
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: () => ({
     data: { results: [{ id: 'w1', name: 'Warehouse A' }] },
     isLoading: false,

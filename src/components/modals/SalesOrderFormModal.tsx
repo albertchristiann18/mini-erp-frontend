@@ -7,8 +7,8 @@ import { FormField } from '../ui/form'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { useWarehouses, useProductVariants } from '../../hooks/useInventory'
-import { useCreateSalesOrder } from '../../hooks/useSales'
+import { useWarehouses, useProductVariants } from '../../hooks/api/useInventory'
+import { useCreateSalesOrder } from '../../hooks/api/useSales'
 import { toast } from '../../lib/toast'
 
 const itemSchema = z.object({

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
-import { useIncomeStatement, useBalanceSheet, useCashFlow } from '../../hooks/useFinance'
+import { useIncomeStatement, useBalanceSheet, useCashFlow } from '../../hooks/api/useFinance'
 import { formatIDR } from '../../lib/utils'
 
 const today = new Date().toISOString().split('T')[0]

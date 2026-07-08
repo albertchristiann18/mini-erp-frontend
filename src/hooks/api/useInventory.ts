@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { createCrudHooks } from './createCrudHooks'
 import {
   getCategories, createCategory, updateCategory, getProducts, createProduct, updateProduct,
   getProductVariants, getProductVariantStocks, getWarehouses, createWarehouse, updateWarehouse,
@@ -11,11 +12,11 @@ import {
   getBusinessEntities, createBusinessEntity,
   updateBusinessEntity, deleteBusinessEntity, getProductBusinessEntities,
   attachBusinessEntity, detachBusinessEntity,
-} from '../api/inventory'
-import type { SaveVariantsPayload } from '../api/inventory'
-import client from '../api/client'
-import { useAuth } from '../contexts/AuthContext'
-import type { Product } from '../types/inventory'
+} from '../../api/inventory'
+import type { SaveVariantsPayload } from '../../api/inventory'
+import client from '../../api/client'
+import { useAuth } from '../../contexts/AuthContext'
+import type { Product, Supplier, BusinessEntity, PaginatedResponse } from '../../types/inventory'
 
 export const useCategories = (params?: Record<string, string | number>) =>
   useQuery({
@@ -227,35 +228,17 @@ export const useUpdateVariantPrice = () => {
   })
 }
 
-export const useSuppliers = (params?: Record<string, string | number>) =>
-  useQuery({
-    queryKey: ['suppliers', params],
-    queryFn: () => getSuppliers(params).then(r => r.data),
-  })
-
-export const useCreateSupplier = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: unknown) => createSupplier(data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
-  })
-}
-
-export const useUpdateSupplier = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: unknown }) => updateSupplier(id, data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
-  })
-}
-
-export const useDeleteSupplier = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => deleteSupplier(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['suppliers'] }),
-  })
-}
+const supplierHooks = createCrudHooks<Supplier, PaginatedResponse<Supplier>, unknown, unknown>({
+  resource: 'suppliers',
+  list: (params) => getSuppliers(params).then(r => r.data),
+  create: (data) => createSupplier(data).then(r => r.data),
+  update: ({ id, data }) => updateSupplier(id, data).then(r => r.data),
+  remove: (id) => deleteSupplier(id),
+})
+export const useSuppliers = supplierHooks.useList
+export const useCreateSupplier = supplierHooks.useCreate
+export const useUpdateSupplier = supplierHooks.useUpdate
+export const useDeleteSupplier = supplierHooks.useDelete
 
 export const useProductSuppliers = (productId: string) =>
   useQuery({
@@ -323,37 +306,21 @@ export const useDeleteCompanyMarketplace = () => {
   })
 }
 
-export const useBusinessEntities = (params?: Record<string, string | number>) =>
-  useQuery({
-    queryKey: ['business-entities', params],
-    queryFn: () => getBusinessEntities(params).then(r => r.data),
-  })
-
-export const useCreateBusinessEntity = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (data: { name: string; marketplace_id: string; is_active?: boolean }) =>
-      createBusinessEntity(data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['business-entities'] }),
-  })
-}
-
-export const useUpdateBusinessEntity = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<{ name: string; marketplace_id: string; is_active: boolean }> }) =>
-      updateBusinessEntity(id, data).then(r => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['business-entities'] }),
-  })
-}
-
-export const useDeleteBusinessEntity = () => {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => deleteBusinessEntity(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['business-entities'] }),
-  })
-}
+const businessEntityHooks = createCrudHooks<
+  BusinessEntity, PaginatedResponse<BusinessEntity>,
+  { name: string; marketplace_id: string; is_active?: boolean },
+  Partial<{ name: string; marketplace_id: string; is_active: boolean }>
+>({
+  resource: 'business-entities',
+  list: (params) => getBusinessEntities(params).then(r => r.data),
+  create: (data) => createBusinessEntity(data).then(r => r.data),
+  update: ({ id, data }) => updateBusinessEntity(id, data).then(r => r.data),
+  remove: (id) => deleteBusinessEntity(id),
+})
+export const useBusinessEntities = businessEntityHooks.useList
+export const useCreateBusinessEntity = businessEntityHooks.useCreate
+export const useUpdateBusinessEntity = businessEntityHooks.useUpdate
+export const useDeleteBusinessEntity = businessEntityHooks.useDelete
 
 export const useProductBusinessEntities = (productId: string) =>
   useQuery({

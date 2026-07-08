@@ -17,14 +17,14 @@ vi.mock('react-router-dom', async () => {
 const mockUsePurchaseOrdersFiltered = vi.fn()
 const mockUsePurchaseOrderSummary = vi.fn()
 
-vi.mock('../../../hooks/usePurchasing', () => ({
+vi.mock('../../../hooks/api/usePurchasing', () => ({
   usePurchaseOrdersFiltered: (...args: unknown[]) => mockUsePurchaseOrdersFiltered(...args),
   usePurchaseOrderSummary: (...args: unknown[]) => mockUsePurchaseOrderSummary(...args),
   useCreatePurchaseOrder: () => ({ mutate: () => {}, isPending: false }),
   useReplenishment: () => ({ data: { results: [] } }),
 }))
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: () => ({ data: [] }),
   useProductVariants: () => ({ data: [] }),
 }))

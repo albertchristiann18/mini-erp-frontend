@@ -8,7 +8,7 @@ const mockCheckMutate = vi.fn()
 const mockUpdateMutateAsync = vi.fn()
 let mockCheckResult: { can_transition: boolean; target_status: POStatus; missing_fields: { field: string; label: string; section: string; message: string }[] }
 
-vi.mock("../../../hooks/usePurchasing", () => ({
+vi.mock("../../../hooks/api/usePurchasing", () => ({
   useCheckPOTransition: () => ({
     mutate: mockCheckMutate,
     data: mockCheckResult,

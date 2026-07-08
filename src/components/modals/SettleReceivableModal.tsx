@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { FormField } from '../ui/form'
 import { Input } from '../ui/input'
 import { Button } from '../ui/button'
-import { useSettleReceivable } from '../../hooks/useFinance'
+import { useSettleReceivable } from '../../hooks/api/useFinance'
 import { toast } from '../../lib/toast'
 import { formatIDR } from '../../lib/utils'
 

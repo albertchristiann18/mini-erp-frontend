@@ -13,7 +13,7 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-vi.mock('../../../hooks/usePurchasing', () => ({
+vi.mock('../../../hooks/api/usePurchasing', () => ({
   usePurchaseOrder: vi.fn(),
   useUpdatePurchaseOrder: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useCreatePurchaseOrder: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
@@ -23,7 +23,7 @@ vi.mock('../../../hooks/usePurchasing', () => ({
 
 const mockVariantSearchData: unknown = { results: [], count: 0, next: null, previous: null }
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: vi.fn(() => ({ data: { results: [] } })),
   useSuppliers: vi.fn(() => ({ data: { results: [] } })),
   useVariantSearch: vi.fn(() => ({ data: mockVariantSearchData, isLoading: false })),
@@ -74,7 +74,7 @@ vi.mock('../../../features/purchasing/components/SourcingImportWizard', () => ({
   SourcingImportWizard: () => null,
 }))
 
-import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../../hooks/usePurchasing'
+import { usePurchaseOrder, useUpdatePurchaseOrder } from '../../../hooks/api/usePurchasing'
 import { useParams } from 'react-router-dom'
 import { toast } from '../../../lib/toast'
 

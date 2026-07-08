@@ -1,4 +1,4 @@
-import { useDashboardKPIs } from '../../hooks/useFinance'
+import { useDashboardKPIs } from '../../hooks/api/useFinance'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { formatIDR } from '../../lib/utils'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'

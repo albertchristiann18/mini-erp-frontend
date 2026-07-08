@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWarehouses, useCompanyMarketplaces } from '../../hooks/useInventory'
+import { useWarehouses, useCompanyMarketplaces } from '../../hooks/api/useInventory'
 import { marketplaceReconcileStock } from '../../api/inventory'
 import type { ReconcileResult } from '../../api/inventory'
 import { Button } from '../../components/ui/button'

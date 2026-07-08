@@ -16,7 +16,7 @@ const mockUseAuth = vi.fn()
 const mockUseUpdateProductSupplier = vi.fn()
 const mockMutateAsync = vi.fn()
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useProduct: (...args: unknown[]) => mockUseProduct(...args),
   useSaveVariants: (...args: unknown[]) => mockUseSaveVariants(...args),
   useProductSuppliers: (...args: unknown[]) => mockUseProductSuppliers(...args),

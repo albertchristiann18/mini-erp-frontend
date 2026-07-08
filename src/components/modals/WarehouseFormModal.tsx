@@ -6,7 +6,7 @@ import { FormField } from '../ui/form'
 import { Input } from '../ui/input'
 import { Textarea } from '../ui/textarea'
 import { Button } from '../ui/button'
-import { useCreateWarehouse, useUpdateWarehouse } from '../../hooks/useInventory'
+import { useCreateWarehouse, useUpdateWarehouse } from '../../hooks/api/useInventory'
 import { toast } from '../../lib/toast'
 import type { Warehouse } from '../../types/inventory'
 

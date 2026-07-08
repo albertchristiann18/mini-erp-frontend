@@ -6,9 +6,9 @@ import {
   getAccountsReceivable, settleReceivable,
   getDashboardKPIs, getIncomeStatement, getBalanceSheet, getCashFlow,
   getCashTransactions, createCashTransaction, updateCashTransaction, deleteCashTransaction,
-} from '../api/finance'
-import type { CashTransactionCreate } from '../types/finance'
-import { useAuth } from '../contexts/AuthContext'
+} from '../../api/finance'
+import type { CashTransactionCreate } from '../../types/finance'
+import { useAuth } from '../../contexts/AuthContext'
 
 const DEFAULT_COMPANY = import.meta.env.VITE_DEFAULT_COMPANY_ID || ''
 

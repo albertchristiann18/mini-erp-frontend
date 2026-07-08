@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect, beforeAll } from 'vitest'
 import StockPage from '../StockPage'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/useInventory', () => ({
   useProductVariantStocks: vi.fn(),
   useWarehouses: vi.fn(),
   useAdjustStock: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: vi.fn(),
 }))
 
-import { useProductVariantStocks, useWarehouses, useAdjustStock, useProductVariants, useAllVariants, useBulkUpdateInventory } from '../../../hooks/useInventory'
+import { useProductVariantStocks, useWarehouses, useAdjustStock, useProductVariants, useAllVariants, useBulkUpdateInventory } from '../../../hooks/api/useInventory'
 import { useAuth } from '../../../contexts/AuthContext'
 
 beforeAll(() => {
