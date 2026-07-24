@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { normalizeError } from '../lib/errors'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
@@ -61,12 +62,13 @@ client.interceptors.response.use(
         processQueue(refreshError, null)
         localStorage.removeItem('tokens')
         window.location.href = '/login'
-        return Promise.reject(refreshError)
+        return Promise.reject(normalizeError(refreshError))
       } finally {
         isRefreshing = false
       }
     }
-    return Promise.reject(error)
+    // Normalize all API errors to ApiError shape
+    return Promise.reject(normalizeError(error))
   }
 )
 

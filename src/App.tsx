@@ -10,7 +10,11 @@ import LoginPage from './pages/auth/LoginPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 0, gcTime: 1000 * 60 * 5 },
+    // Default staleTime: 60s — balances freshness with request volume.
+    // Override per-hook for specific tiers:
+    //   volatile (stock, dashboard aggregates): staleTime: 0 or a short interval
+    //   reference (categories, warehouses, suppliers): staleTime: 1000 * 60 * 5 (5min)
+    queries: { staleTime: 1000 * 60, gcTime: 1000 * 60 * 5 },
   },
 })
 
