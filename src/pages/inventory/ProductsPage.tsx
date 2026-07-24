@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
 import { BulkProductModal } from './BulkProductModal'
+import { Loading } from '../../components/ui/queryPrimitives'
 import { Plus, Upload, Pencil, Eye, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import type { Product } from '../../types/inventory'
 
@@ -101,7 +102,7 @@ export default function ProductsPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5}><Loading /></TableCell></TableRow>
             ) : data?.results.map(p => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.name}</TableCell>

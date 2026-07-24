@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWarehouses, useBulkUpdateInventory } from '../../hooks/api/useInventory'
-import { getProductVariantStocks } from '../../api/inventory'
+import { useWarehouses, useBulkUpdateInventory, useSearchVariantStocks } from '../../hooks/api/useInventory'
 import type { ProductVariantStock } from '../../types/inventory'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
@@ -37,9 +36,10 @@ export default function BulkStockUpdatePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<ProductVariantStock[]>([])
   const [hasSearched, setHasSearched] = useState(false)
-  const [isSearching, setIsSearching] = useState(false)
   const [rows, setRows] = useState<BulkRow[]>([])
   const [result, setResult] = useState<{ successful: number; failed: number } | null>(null)
+  const searchMutation = useSearchVariantStocks()
+  const isSearching = searchMutation.isPending
 
   const handleSearch = async () => {
     const q = searchQuery.trim()
@@ -48,15 +48,12 @@ export default function BulkStockUpdatePage() {
       setHasSearched(false)
       return
     }
-    setIsSearching(true)
     try {
-      const res = await getProductVariantStocks({ search: q, page_size: 50 }).then(r => r.data)
+      const res = await searchMutation.mutateAsync({ search: q, page_size: 50 })
       setSearchResults(res.results)
       setHasSearched(true)
     } catch {
       toast.error('Search failed')
-    } finally {
-      setIsSearching(false)
     }
   }
 

@@ -100,5 +100,5 @@ it('test_loading_state', () => {
 
   renderPage()
 
-  expect(screen.getByText('Loading...')).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument()
 })

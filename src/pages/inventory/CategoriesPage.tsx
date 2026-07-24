@@ -7,7 +7,8 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
-import { CategoryFormModal } from './CategoryFormModal'
+import { CategoryFormModal } from '../../components/ui/CategoryFormModal'
+import { Loading } from '../../components/ui/queryPrimitives'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { toast } from '../../lib/toast'
 import type { Category } from '../../types/inventory'
@@ -67,7 +68,7 @@ export default function CategoriesPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5}><Loading /></TableCell></TableRow>
             ) : data?.results.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No categories found</TableCell></TableRow>
             ) : data?.results.map(c => (

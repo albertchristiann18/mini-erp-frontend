@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useQueryClient } from '@tanstack/react-query'
 import {
   useProduct,
   useCreateProduct,
@@ -36,7 +35,7 @@ import { PhotoUploadGrid } from './PhotoUploadGrid'
 import { ArrowLeft, X, Plus } from 'lucide-react'
 import type { Product, ProductPhoto, VariantDimension, DimensionImage } from '../../types/inventory'
 import type { SaveVariantsPayload, SaveVariantItem } from '../../api/inventory'
-import { uploadVariantPhoto, uploadDimensionImage, deleteDimensionImage, saveVariants as saveVariantsApi } from '../../api/inventory'
+import { useSaveAnyVariants, useUploadAnyVariantPhoto, useUploadDimensionImage, useDeleteDimensionImage } from '../../hooks/api/useInventory'
 import { VariasiSetupSection } from './VariasiSetupSection'
 import { DaftarVariasiTable } from './DaftarVariasiTable'
 import type { VariantRow } from './types'
@@ -145,7 +144,10 @@ export default function ProductEditPage() {
   const createMutation = useCreateProduct()
   const updateMutation = useUpdateProduct()
   const saveMutation = useSaveVariants(id ?? '')
-  const qc = useQueryClient()
+  const saveAnyVariantsMutation = useSaveAnyVariants()
+  const uploadAnyVariantPhotoMutation = useUploadAnyVariantPhoto()
+  const uploadDimensionImageMutation = useUploadDimensionImage(id ?? '')
+  const deleteDimensionImageMutation = useDeleteDimensionImage(id ?? '')
 
   const {
     register,
@@ -382,8 +384,8 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
   const handleDimensionImageUpload = async (dimKey: string, dimValue: string, file: File) => {
     if (!id) return
     try {
-      const result = await uploadDimensionImage(id, dimKey, dimValue, file)
-      const photoUrl = result.data.photo_url ?? ''
+      const result = await uploadDimensionImageMutation.mutateAsync({ dimKey, dimValue, photo: file })
+      const photoUrl = result.photo_url ?? ''
       setDimensionImages(prev => {
         const filtered = prev.filter(di => !(di.dim_key === dimKey && di.dim_value === dimValue))
         return [...filtered, { dim_key: dimKey, dim_value: dimValue, photo_url: photoUrl }]
@@ -396,7 +398,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
   const handleDimensionImageDelete = async (dimKey: string, dimValue: string) => {
     if (!id) return
     try {
-      await deleteDimensionImage(id, dimKey, dimValue)
+      await deleteDimensionImageMutation.mutateAsync({ dimKey, dimValue })
       setDimensionImages(prev => prev.filter(di => !(di.dim_key === dimKey && di.dim_value === dimValue)))
     } catch {
       toast.error('Gagal menghapus foto variasi')
@@ -469,7 +471,7 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       if (pendingDimImageDeletions.length > 0 && id) {
         await Promise.allSettled(
           pendingDimImageDeletions.map(({ dimKey, dimValue }) =>
-            deleteDimensionImage(id, dimKey, dimValue)
+            deleteDimensionImageMutation.mutateAsync({ dimKey, dimValue })
           )
         )
         setPendingDimImageDeletions([])
@@ -491,16 +493,16 @@ const availableBEs = (allBEData?.results ?? []).filter(be => be.is_active)
       }
 
       if (!isEditing) {
-        await saveVariantsApi(productId, variantsPayload)
-        qc.invalidateQueries({ queryKey: ['product', productId] })
-        qc.invalidateQueries({ queryKey: ['products'] })
+        await saveAnyVariantsMutation.mutateAsync({ productId, data: variantsPayload })
       } else {
         await saveMutation.mutateAsync(variantsPayload)
       }
 
       const activeRowsWithPhotos = rows.filter(r => !r.removed && r.id && r.pendingPhoto)
       await Promise.allSettled(
-        activeRowsWithPhotos.map(r => uploadVariantPhoto(productId, r.id!, r.pendingPhoto!).catch(() => {}))
+        activeRowsWithPhotos.map(r =>
+          uploadAnyVariantPhotoMutation.mutateAsync({ productId, variantId: r.id!, image: r.pendingPhoto! }).catch(() => {})
+        )
       )
 
       if (dimStructureChanged) {

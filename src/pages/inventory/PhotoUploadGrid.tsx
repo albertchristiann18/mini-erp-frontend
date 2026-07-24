@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { X, ImagePlus } from 'lucide-react'
 import type { ProductPhoto } from '../../types/inventory'
-import { uploadProductPhoto, deleteProductPhoto, reorderProductPhotos } from '../../api/inventory'
+import { useUploadProductPhoto, useDeleteProductPhoto, useReorderProductPhotos } from '../../hooks/api/useInventory'
 import { toast } from '../../lib/toast'
 
 interface Props {
@@ -16,6 +16,10 @@ export function PhotoUploadGrid({ productId, photos, pendingFiles, onPhotosChang
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const uploadMutation = useUploadProductPhoto(productId ?? '')
+  const deleteMutation = useDeleteProductPhoto(productId ?? '')
+  const reorderMutation = useReorderProductPhotos(productId ?? '')
 
   const allItems = productId ? photos : pendingFiles.map((f, i) => ({
     id: `pending-${i}`,
@@ -39,8 +43,8 @@ export function PhotoUploadGrid({ productId, photos, pendingFiles, onPhotosChang
     try {
       const uploaded: ProductPhoto[] = []
       for (const file of toAdd) {
-        const r = await uploadProductPhoto(productId, file)
-        uploaded.push(r.data)
+        const result = await uploadMutation.mutateAsync(file)
+        uploaded.push(result)
       }
       onPhotosChange([...photos, ...uploaded])
     } catch {
@@ -59,7 +63,7 @@ export function PhotoUploadGrid({ productId, photos, pendingFiles, onPhotosChang
     }
     const photo = photos[index]
     try {
-      await deleteProductPhoto(productId, photo.id)
+      await deleteMutation.mutateAsync(photo.id)
       onPhotosChange(photos.filter((_, i) => i !== index))
     } catch {
       toast.error('Failed to delete photo')
@@ -86,7 +90,7 @@ export function PhotoUploadGrid({ productId, photos, pendingFiles, onPhotosChang
     }
     const newOrder = reordered.map(item => item.id)
     try {
-      await reorderProductPhotos(productId, newOrder)
+      await reorderMutation.mutateAsync(newOrder)
       onPhotosChange(reordered.map((item, i) => ({ ...item, order: i, is_primary: i === 0 })))
     } catch {
       toast.error('Failed to reorder photos')

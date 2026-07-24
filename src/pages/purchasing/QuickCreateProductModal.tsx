@@ -173,7 +173,7 @@ export function QuickCreateProductModal({ open, onClose, onCreated, supplierId }
       if (productPhoto) {
         try {
           const r = await uploadProductPhoto(productId, productPhoto)
-          finalPhotoUrl = r.data.image_url
+          finalPhotoUrl = r.image_url
         } catch {
           toast.error('Product created but photo upload failed — add photo from Products page')
         }

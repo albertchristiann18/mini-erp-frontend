@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { useStockClosingReport, useWarehouses } from '../../hooks/api/useInventory'
+import { Loading } from '../../components/ui/queryPrimitives'
 import type { StockMovement } from '../../types/inventory'
 
 interface ClosingRow {
@@ -146,8 +147,8 @@ export default function StockClosingPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                  Loading...
+                <TableCell colSpan={6}>
+                  <Loading />
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (

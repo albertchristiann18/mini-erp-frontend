@@ -33,30 +33,26 @@ const mockWarehouses = {
 }
 
 const mockPreviewResult = {
-  data: {
-    reconciled: [
-      { sku: 'SKU001', variant_id: 'v1', before: 10, after: 15, delta: 5 },
-      { sku: 'SKU002', variant_id: 'v2', before: 20, after: 10, delta: -10 },
-    ],
-    skipped: [{ sku: 'SKU003', qty: 5 }],
-    not_found: ['SKU999', 'SKU888'],
-    errors: [],
-    summary: { total: 5, reconciled: 2, skipped: 1, not_found: 2 },
-    dry_run: true,
-  },
+  reconciled: [
+    { sku: 'SKU001', variant_id: 'v1', before: 10, after: 15, delta: 5 },
+    { sku: 'SKU002', variant_id: 'v2', before: 20, after: 10, delta: -10 },
+  ],
+  skipped: [{ sku: 'SKU003', qty: 5 }],
+  not_found: ['SKU999', 'SKU888'],
+  errors: [],
+  summary: { total: 5, reconciled: 2, skipped: 1, not_found: 2 },
+  dry_run: true,
 }
 
 const mockConfirmResult = {
-  data: {
-    reconciled: [
-      { sku: 'SKU001', variant_id: 'v1', before: 10, after: 15, delta: 5 },
-    ],
-    skipped: [{ sku: 'SKU003', qty: 5 }],
-    not_found: ['SKU999'],
-    errors: [],
-    summary: { total: 4, reconciled: 1, skipped: 1, not_found: 1 },
-    dry_run: false,
-  },
+  reconciled: [
+    { sku: 'SKU001', variant_id: 'v1', before: 10, after: 15, delta: 5 },
+  ],
+  skipped: [{ sku: 'SKU003', qty: 5 }],
+  not_found: ['SKU999'],
+  errors: [],
+  summary: { total: 4, reconciled: 1, skipped: 1, not_found: 1 },
+  dry_run: false,
 }
 
 function renderPage() {

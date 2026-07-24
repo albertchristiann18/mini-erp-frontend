@@ -32,7 +32,7 @@ export default function MarketplaceReconcilePage() {
     setIsLoading(true)
     try {
       const res = await marketplaceReconcileStock(fd)
-      setPreviewData(res.data)
+      setPreviewData(res)
       setStep('preview')
     } catch (err) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to parse file'
@@ -52,7 +52,7 @@ export default function MarketplaceReconcilePage() {
     setIsLoading(true)
     try {
       const res = await marketplaceReconcileStock(fd)
-      setResultData(res.data)
+      setResultData(res)
       setStep('result')
     } catch {
       toast.error('Failed to apply reconciliation')

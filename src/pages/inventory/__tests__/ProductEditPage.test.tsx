@@ -11,6 +11,8 @@ vi.mock('../../../hooks/api/useInventory', () => ({
   useCreateProduct: vi.fn(),
   useUpdateProduct: vi.fn(),
   useSaveVariants: vi.fn(),
+  useSaveAnyVariants: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })),
+  useUploadAnyVariantPhoto: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })),
   useProductSuppliers: vi.fn(),
   useCreateProductSupplier: vi.fn(),
   useDeleteProductSupplier: vi.fn(),
@@ -23,6 +25,9 @@ vi.mock('../../../hooks/api/useInventory', () => ({
   useDeleteVariantPhoto: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useUploadDimensionImage: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useDeleteDimensionImage: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useUploadProductPhoto: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useDeleteProductPhoto: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useReorderProductPhotos: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -33,10 +38,6 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-vi.mock('../../../api/inventory', () => ({
-  saveVariants: vi.fn().mockResolvedValue({ data: {} }),
-}))
-
 vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -44,9 +45,9 @@ vi.mock('../../../lib/toast', () => ({
 import {
   useProduct, useCategories, useCreateProduct, useUpdateProduct, useSaveVariants,
   useProductSuppliers, useCreateProductSupplier, useDeleteProductSupplier, useSuppliers,
+  useSaveAnyVariants,
 } from '../../../hooks/api/useInventory'
 import { useParams } from 'react-router-dom'
-import { saveVariants } from '../../../api/inventory'
 import { toast } from '../../../lib/toast'
 import { initializeRows } from '../ProductEditPage'
 
@@ -195,14 +196,16 @@ it('removing a chip with stock shows error toast and keeps the row', async () =>
   expect(screen.getByText('Daftar Variasi (1)')).toBeInTheDocument()
 })
 
-it('submit calls createMutation then saveVariants on create flow', async () => {
+it('submit calls createMutation then useSaveAnyVariants on create flow', async () => {
   const createMutateAsync = vi.fn().mockResolvedValue({ id: 'new-id' })
+  const saveAnyMutateAsync = vi.fn().mockResolvedValue({})
   vi.mocked(useParams).mockReturnValue({})
   vi.mocked(useProduct).mockReturnValue(hookResult(undefined))
   vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
   vi.mocked(useCreateProduct).mockReturnValue(mutationMock({ mutateAsync: createMutateAsync }))
   vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
   vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+  vi.mocked(useSaveAnyVariants).mockReturnValue(mutationMock({ mutateAsync: saveAnyMutateAsync }))
 
   renderPage()
 
@@ -228,7 +231,9 @@ it('submit calls createMutation then saveVariants on create flow', async () => {
   await waitFor(() => {
     expect(createMutateAsync).toHaveBeenCalled()
   })
-  expect(saveVariants).toHaveBeenCalled()
+  await waitFor(() => {
+    expect(saveAnyMutateAsync).toHaveBeenCalled()
+  })
 })
 
 it('does NOT render old Supplier Link form row in the basic info card', () => {

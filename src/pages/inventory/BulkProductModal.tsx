@@ -29,8 +29,8 @@ export function BulkProductModal({ open, onClose }: Props) {
         return
       }
       const res = await bulkMutation.mutateAsync(data)
-      setResult({ created: res.data?.created ?? 0, errors: res.data?.errors ?? [] })
-      toast.success(`Created ${res.data?.created ?? 0} products`)
+      setResult({ created: res.created ?? 0, errors: res.errors ?? [] })
+      toast.success(`Created ${res.created ?? 0} products`)
     } catch {
       toast.error('Invalid JSON or failed to create')
     }
