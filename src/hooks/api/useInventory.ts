@@ -366,6 +366,16 @@ export const useUploadVariantPhoto = (productId: string) => {
   })
 }
 
+/**
+ * Variant of useUploadVariantPhoto where productId is provided per-call,
+ * for pages that upload photos across many products (e.g. PO detail item rows).
+ */
+export const useUploadAnyVariantPhoto = () =>
+  useMutation({
+    mutationFn: ({ productId, variantId, image }: { productId: string; variantId: string; image: File }) =>
+      uploadVariantPhoto(productId, variantId, image).then(r => r.data),
+  })
+
 export const useDeleteVariantPhoto = (productId: string) => {
   const qc = useQueryClient()
   return useMutation({

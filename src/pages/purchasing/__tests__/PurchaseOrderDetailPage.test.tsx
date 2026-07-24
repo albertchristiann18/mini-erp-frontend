@@ -27,6 +27,10 @@ vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: vi.fn(() => ({ data: { results: [] } })),
   useSuppliers: vi.fn(() => ({ data: { results: [] } })),
   useVariantSearch: vi.fn(() => ({ data: mockVariantSearchData, isLoading: false })),
+  useUploadAnyVariantPhoto: vi.fn(() => ({
+    mutateAsync: vi.fn().mockResolvedValue({ photo_url: 'https://example.com/new-photo.jpg' }),
+    isPending: false,
+  })),
 }))
 
 let mockIsStaff = false
@@ -462,7 +466,7 @@ it('shows calculated recommended qty when avg_sales > 0', async () => {
   })
 })
 
-it('shows infinity symbol when avg_sales is 0', async () => {
+it('shows finite Rec/DOI/DOI+ when avg_sales is 0 (floored to 1/avgWindow)', async () => {
   const poWithItems = {
     ...basePo,
     order_details: [
@@ -498,10 +502,13 @@ it('shows infinity symbol when avg_sales is 0', async () => {
 
   renderPage()
 
-  // When avg=0: Rec. shows ∞, DOI shows ∞, DOI+ shows ∞ in the per-variant row
-  // Group header shows '—' for all three
   await waitFor(() => {
-    expect(screen.getAllByText('\u221E')).toHaveLength(3)
+    // avg=0 is floored to 1/30 (default avgWindow, hasData=true from non-null avg_sales)
+    // soh=20, incoming=0, ordered_qty=5
+    // Rec. = max(0, ceil(1/30 * 90 - 20 - 0)) = 0; DOI = 600d; DOI+ = 750d
+    expect(screen.getAllByText('600d').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('750d').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('\u221E')).not.toBeInTheDocument()
   })
 })
 
@@ -1537,4 +1544,44 @@ it('zero_commission_pct_shows_Rp_0_not_dash', async () => {
   })
 
   expect(screen.queryByText(/99\.999/)).not.toBeInTheDocument()
+})
+
+it('creating_mode_renders_order_items_table_and_added_items_appear', async () => {
+  vi.mocked(useParams).mockReturnValue({ id: 'new' })
+  // usePurchaseOrder is not called in creating mode; return idle result
+  vi.mocked(usePurchaseOrder).mockReturnValue({ data: undefined, isLoading: false } as never)
+
+  renderPage()
+
+  // The "Order Items" section heading must be present in creating mode
+  await waitFor(() => {
+    expect(screen.getByText('Order Items')).toBeInTheDocument()
+  })
+
+  // The table header "Variant" column must render (proves table is mounted)
+  expect(screen.getByText('Variant')).toBeInTheDocument()
+
+  // Open AddItemModal and add one item
+  const addItemBtn = screen.getByRole('button', { name: /add item/i })
+  await userEvent.click(addItemBtn)
+
+  expect(await screen.findByRole('dialog', { name: /add item/i })).toBeInTheDocument()
+
+  // Select a variant via the mocked VariantSearchSelect (click fires onSelect)
+  const variantSearchSelect = screen.getByTestId('variant-search-select')
+  await userEvent.click(variantSearchSelect)
+
+  // Confirm the modal — one item selected
+  const confirmBtn = await screen.findByRole('button', { name: /add 1 item/i })
+  await userEvent.click(confirmBtn)
+
+  // Modal dismissed
+  await waitFor(() => {
+    expect(screen.queryByRole('dialog', { name: /add item/i })).not.toBeInTheDocument()
+  })
+
+  // The added item ("Product A" product name or "Red Variant") must now appear in the table
+  await waitFor(() => {
+    expect(screen.getByText('Product A')).toBeInTheDocument()
+  })
 })
