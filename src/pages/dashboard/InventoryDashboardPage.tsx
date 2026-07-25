@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Input } from '../../components/ui/input'
 import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
+import { Loading, ErrorState, Empty } from '../../components/ui/queryPrimitives'
 import { useInventorySummary, useAvgSales } from '../../hooks/api/useInventory'
 import { Pagination } from '../../components/Pagination'
 
@@ -32,7 +33,7 @@ export default function InventoryDashboardPage() {
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 5
 
-  const { data: summaryData, isLoading } = useInventorySummary()
+  const { data: summaryData, isLoading, isError, error, refetch } = useInventorySummary()
   const allVariantIds = useMemo(
     () => summaryData?.products.flatMap(p => p.variants.map(v => v.variant_id)) ?? [],
     [summaryData]
@@ -204,9 +205,10 @@ export default function InventoryDashboardPage() {
           )}
         </tbody>
       </table>
-      {isLoading && <div className="p-8 text-center text-sm text-muted-foreground">Loading...</div>}
-      {!isLoading && filteredProducts.length === 0 && (
-        <div className="p-8 text-center text-sm text-muted-foreground">No products found</div>
+      {isLoading && <Loading />}
+      {isError && <ErrorState error={error} onRetry={refetch} />}
+      {!isLoading && !isError && filteredProducts.length === 0 && (
+        <Empty message="No products found" />
       )}
     </div>
       <Pagination

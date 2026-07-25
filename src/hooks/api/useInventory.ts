@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import type { ApiError } from '../../lib/errors'
 import { createCrudHooks } from './createCrudHooks'
 import {
   getCategories, createCategory, updateCategory, deleteCategory,
@@ -17,7 +18,7 @@ import {
 import type { SaveVariantsPayload, BulkUpdateResult, BulkCreateResult } from '../../api/inventory'
 import { http } from '../../lib/http'
 import { useAuth } from '../../contexts/AuthContext'
-import type { Product, Supplier, BusinessEntity, Category, Warehouse, PaginatedResponse } from '../../types/inventory'
+import type { Product, Supplier, BusinessEntity, Category, Warehouse, PaginatedResponse, InventorySummaryResponse } from '../../types/inventory'
 import {
   categoryKeys, warehouseKeys, supplierKeys, masterCategoryKeys, companyMarketplaceKeys,
   businessEntityKeys, productKeys, productVariantKeys, stockMovementKeys, inventorySummaryKeys,
@@ -232,7 +233,7 @@ export const useAdjustStock = () => {
 // ─── Inventory Summary & Avg Sales ────────────────────────────────────────────
 
 export const useInventorySummary = () =>
-  useQuery({
+  useQuery<InventorySummaryResponse, ApiError>({
     queryKey: inventorySummaryKeys.all(),
     queryFn: () => getInventorySummary(),
     staleTime: STALE_VOLATILE,

@@ -1,4 +1,5 @@
 import { useForm } from 'react-hook-form'
+import type { UseFormReturn, FieldValues } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../../contexts/AuthContext'
@@ -6,8 +7,15 @@ import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { Label } from '../../components/ui/label'
 import { toast } from '../../lib/toast'
-import * as authApi from '../../api/auth'
-import type { AxiosError } from 'axios'
+import { useUpdateProfile } from '../../hooks/api/useProfile'
+import { applyApiErrors } from '../../lib/formHelpers'
+import type { ApiError } from '../../lib/errors'
+
+function reportMutationError<T extends FieldValues>(form: UseFormReturn<T>, err: unknown) {
+  const error = err as ApiError
+  applyApiErrors(form, error)
+  if (!error.fieldErrors) toast.error(error.message)
+}
 
 const profileSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -27,6 +35,7 @@ type PasswordFormValues = z.infer<typeof passwordSchema>
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth()
+  const { mutateAsync, isPending } = useUpdateProfile()
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -40,33 +49,24 @@ export default function ProfilePage() {
 
   const handleProfileSubmit = async (values: ProfileFormValues) => {
     try {
-      await authApi.updateProfile({ username: values.username, email: values.email })
+      await mutateAsync({ username: values.username, email: values.email })
       await refreshUser()
       toast.success('Profile updated')
     } catch (err) {
-      const axiosErr = err as AxiosError<Record<string, string[]>>
-      const data = axiosErr.response?.data
-      if (data) {
-        if (data.username) profileForm.setError('username', { message: data.username[0] })
-        if (data.email) profileForm.setError('email', { message: data.email[0] })
-      }
+      reportMutationError(profileForm, err)
     }
   }
 
   const handlePasswordSubmit = async (values: PasswordFormValues) => {
     try {
-      await authApi.updateProfile({
+      await mutateAsync({
         current_password: values.current_password,
         new_password: values.new_password,
       })
       toast.success('Password changed')
       passwordForm.reset({ current_password: '', new_password: '', confirm_password: '' })
     } catch (err) {
-      const axiosErr = err as AxiosError<Record<string, string[]>>
-      const data = axiosErr.response?.data
-      if (data?.current_password) {
-        passwordForm.setError('current_password', { message: data.current_password[0] })
-      }
+      reportMutationError(passwordForm, err)
     }
   }
 
@@ -108,8 +108,8 @@ export default function ProfilePage() {
             <p className="text-xs text-red-500">{profileForm.formState.errors.email.message}</p>
           )}
         </div>
-        <Button type="submit" disabled={profileForm.formState.isSubmitting}>
-          {profileForm.formState.isSubmitting ? 'Saving...' : 'Save changes'}
+        <Button type="submit" disabled={profileForm.formState.isSubmitting || isPending}>
+          {profileForm.formState.isSubmitting || isPending ? 'Saving...' : 'Save changes'}
         </Button>
       </form>
 
@@ -136,8 +136,8 @@ export default function ProfilePage() {
             <p className="text-xs text-red-500">{passwordForm.formState.errors.confirm_password.message}</p>
           )}
         </div>
-        <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
-          {passwordForm.formState.isSubmitting ? 'Changing...' : 'Change password'}
+        <Button type="submit" disabled={passwordForm.formState.isSubmitting || isPending}>
+          {passwordForm.formState.isSubmitting || isPending ? 'Changing...' : 'Change password'}
         </Button>
       </form>
     </div>

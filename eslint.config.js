@@ -293,4 +293,74 @@ export default defineConfig([
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
+  // ── Profile domain sealed (ticket #11) ────────────────────────────────────
+  // pages↛api and max-lines sealed for profile production files.
+  // Profile's hook lives in shared hooks/api/useProfile.ts (global rules apply).
+  // __tests__ excluded via ignores.
+  {
+    files: ['src/pages/profile/**/*.{ts,tsx}'],
+    ignores: ['**/__tests__/**'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for profile: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for profile
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  // ── Dashboard domain sealed (ticket #11) ──────────────────────────────────
+  // pages↛api and max-lines sealed for dashboard production files.
+  // Dashboard data comes from shared hooks/api/useFinance + useInventory.
+  // __tests__ excluded via ignores.
+  {
+    files: ['src/pages/dashboard/**/*.{ts,tsx}'],
+    ignores: ['**/__tests__/**'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for dashboard: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for dashboard
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
+  },
 ])
