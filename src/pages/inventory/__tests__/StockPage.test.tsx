@@ -64,7 +64,7 @@ function renderPage() {
   )
 }
 
-const hookResult = (data: unknown) => ({ data, isLoading: false, refetch: vi.fn() }) as never
+const hookResult = (data: unknown) => ({ data, isLoading: false, isError: false, error: null, refetch: vi.fn() }) as never
 
 it('renders "Bulk Update" button (not "Bulk Import")', () => {
   vi.mocked(useAuth).mockReturnValue(mockAuth as never)
@@ -338,6 +338,27 @@ describe('inline +/−/= buttons', () => {
     renderPage()
     expect(screen.queryByRole('button', { name: /stage/i })).not.toBeInTheDocument()
   })
+})
+
+it('shows error state with message and retry button when stock fetch fails', async () => {
+  const refetchMock = vi.fn()
+  vi.mocked(useAuth).mockReturnValue(mockAuth as never)
+  vi.mocked(useProductVariantStocks).mockReturnValue(
+    ({ data: undefined, isLoading: false, isError: true, error: { status: 500, message: 'Failed to load stock' }, refetch: refetchMock }) as never,
+  )
+  vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
+  vi.mocked(useAdjustStock).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useProductVariants).mockReturnValue(hookResult(mockProductVariants))
+  vi.mocked(useAllVariants).mockReturnValue(hookResult(mockProductVariants))
+  vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  renderPage()
+
+  expect(screen.getByRole('alert')).toBeInTheDocument()
+  expect(screen.getByText('Failed to load stock')).toBeInTheDocument()
+  const retryBtn = screen.getByRole('button', { name: /retry/i })
+  expect(retryBtn).toBeInTheDocument()
+  await userEvent.click(retryBtn)
+  expect(refetchMock).toHaveBeenCalled()
 })
 
 it('has "All Warehouses" as the first SelectItem in the warehouse dropdown', async () => {
