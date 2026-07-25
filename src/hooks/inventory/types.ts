@@ -1,3 +1,9 @@
+/**
+ * Shared types for the inventory hooks layer.
+ * Lives in hooks/inventory/ so hook files can import without crossing the
+ * shared↛pages boundary (pages/inventory/types was the old location).
+ */
+
 export type VariantRow = {
   id?: string
   variantValues: Record<string, string>

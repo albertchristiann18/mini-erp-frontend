@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input'
 import { Badge } from '../../components/ui/badge'
 import { cn } from '../../lib/utils'
 import type { DimensionImage } from '../../types/inventory'
-import type { VariantRow } from './types'
+import type { VariantRow } from '../../hooks/inventory/types'
 
 function Cell({ children, className }: { children?: React.ReactNode; className?: string }) {
   return <td className={cn('px-3 py-2 text-sm align-middle', className)}>{children}</td>

@@ -49,7 +49,7 @@ import {
 } from '../../../hooks/api/useInventory'
 import { useParams } from 'react-router-dom'
 import { toast } from '../../../lib/toast'
-import { initializeRows } from '../ProductEditPage'
+import { initializeRows } from '../../../hooks/inventory/productEditHelpers'
 
 const baseProduct = {
   id: '123',
@@ -362,6 +362,31 @@ it('variant photo cell shows ImagePlus placeholder when no photo', () => {
   renderPage()
 
   expect(screen.getByDisplayValue('SKU-RED')).toBeInTheDocument()
+})
+
+it('shows error state with message and retry button when product fetch fails in edit mode', async () => {
+  const refetchMock = vi.fn()
+  vi.mocked(useParams).mockReturnValue({ id: '123' })
+  vi.mocked(useProduct).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    error: { status: 500, message: 'Failed to load product' },
+    refetch: refetchMock,
+  } as never)
+  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
+  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+
+  renderPage()
+
+  expect(screen.getByRole('alert')).toBeInTheDocument()
+  expect(screen.getByText('Failed to load product')).toBeInTheDocument()
+  const retryBtn = screen.getByRole('button', { name: /retry/i })
+  expect(retryBtn).toBeInTheDocument()
+  await userEvent.click(retryBtn)
+  expect(refetchMock).toHaveBeenCalled()
 })
 
 it('onSubmit sends dim1_key and dim1_options in product PATCH', async () => {
