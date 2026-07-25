@@ -8,10 +8,12 @@ import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
 import { PlatformBadge } from '../../components/ui/PlatformBadge'
 import { formatIDR, formatDate } from '../../lib/utils'
+import { Loading, ErrorState, Empty } from '../../components/ui/queryPrimitives'
 import { useSalesOrdersFiltered } from '../../hooks/api/useSales'
 import { useAvgSales, useAllVariants } from '../../hooks/api/useInventory'
 import type { SOStatus } from '../../types/sales'
 import type { BadgeProps } from '../../components/ui/badge'
+import type { ApiError } from '../../lib/errors'
 
 const statusVariant: Record<SOStatus, BadgeProps['variant']> = {
   PENDING: 'secondary', CONFIRMED: 'info', SHIPPING: 'warning',
@@ -39,7 +41,7 @@ export default function SalesDashboardPage() {
   const listParams: Record<string, string | number> = { page, page_size: 20, date_from: dateFrom, date_to: dateTo }
   if (statusFilter !== 'ALL') listParams.status = statusFilter
   if (platformFilter !== 'ALL') listParams.source_platform = platformFilter
-  const { data: listData, isLoading: listLoading } = useSalesOrdersFiltered(listParams)
+  const { data: listData, isLoading: listLoading, isError: listError, error: listErrorVal, refetch: listRefetch } = useSalesOrdersFiltered(listParams)
   const totalPages = listData ? Math.ceil(listData.count / 20) : 1
 
   const { data: variantsData } = useAllVariants()
@@ -47,7 +49,7 @@ export default function SalesDashboardPage() {
     () => (variantsData?.results ?? []).map(v => v.id),
     [variantsData]
   )
-  const { data: avgSalesData, isLoading: avgLoading } = useAvgSales(variantIds, avgDays)
+  const { data: avgSalesData, isLoading: avgLoading, isError: avgError, error: avgErrorVal, refetch: avgRefetch } = useAvgSales(variantIds, avgDays)
 
   const totalRevenue = useMemo(
     () => allOrders.reduce((sum, o) => sum + o.net_revenue, 0),
@@ -76,6 +78,79 @@ export default function SalesDashboardPage() {
     if (!avgSalesData) return []
     return [...avgSalesData.results].sort((a, b) => b.avg_sales_per_day - a.avg_sales_per_day)
   }, [avgSalesData])
+
+  function renderSkuTableBody() {
+    if (avgLoading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={4}><Loading /></TableCell>
+        </TableRow>
+      )
+    }
+    if (avgError) {
+      return (
+        <TableRow>
+          <TableCell colSpan={4}>
+            <ErrorState error={avgErrorVal as unknown as ApiError} onRetry={avgRefetch} />
+          </TableCell>
+        </TableRow>
+      )
+    }
+    if (skuRows.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={4}><Empty message="No SKU data available." /></TableCell>
+        </TableRow>
+      )
+    }
+    return skuRows.map(row => (
+      <TableRow key={row.variant_id}>
+        <TableCell className="font-mono text-xs">{row.sku_variant_code}</TableCell>
+        <TableCell>{row.variant_name}</TableCell>
+        <TableCell className="text-right">{row.total_qty_sold}</TableCell>
+        <TableCell className="text-right font-medium">{row.avg_sales_per_day.toFixed(2)}</TableCell>
+      </TableRow>
+    ))
+  }
+
+  function renderOrdersTableBody() {
+    if (listLoading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={7}><Loading /></TableCell>
+        </TableRow>
+      )
+    }
+    if (listError) {
+      return (
+        <TableRow>
+          <TableCell colSpan={7}>
+            <ErrorState error={listErrorVal as unknown as ApiError} onRetry={listRefetch} />
+          </TableCell>
+        </TableRow>
+      )
+    }
+    if (!listData?.results.length) {
+      return (
+        <TableRow>
+          <TableCell colSpan={7}><Empty message="No orders found." /></TableCell>
+        </TableRow>
+      )
+    }
+    return listData.results.map(so => (
+      <TableRow key={so.id}>
+        <TableCell className="font-mono text-xs">{so.order_number}</TableCell>
+        <TableCell className="text-muted-foreground text-xs">{formatDate(so.order_date)}</TableCell>
+        <TableCell><Badge variant={statusVariant[so.status]}>{so.status}</Badge></TableCell>
+        <TableCell><PlatformBadge platform={so.source_platform} /></TableCell>
+        <TableCell className="text-right">{formatIDR(so.net_revenue)}</TableCell>
+        <TableCell className="text-right text-muted-foreground">{formatIDR(so.total_cogs)}</TableCell>
+        <TableCell className={`text-right font-medium ${so.gross_profit < 0 ? 'text-destructive' : ''}`}>
+          {formatIDR(so.gross_profit)}
+        </TableCell>
+      </TableRow>
+    ))
+  }
 
   return (
     <div className="space-y-6">
@@ -135,18 +210,7 @@ export default function SalesDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {avgLoading ? (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                ) : skuRows.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No data</TableCell></TableRow>
-                ) : skuRows.map(row => (
-                  <TableRow key={row.variant_id}>
-                    <TableCell className="font-mono text-xs">{row.sku_variant_code}</TableCell>
-                    <TableCell>{row.variant_name}</TableCell>
-                    <TableCell className="text-right">{row.total_qty_sold}</TableCell>
-                    <TableCell className="text-right font-medium">{row.avg_sales_per_day.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
+                {renderSkuTableBody()}
               </TableBody>
             </Table>
           </div>
@@ -188,21 +252,7 @@ export default function SalesDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {listLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-                ) : listData?.results.map(so => (
-                  <TableRow key={so.id}>
-                    <TableCell className="font-mono text-xs">{so.order_number}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{formatDate(so.order_date)}</TableCell>
-                    <TableCell><Badge variant={statusVariant[so.status]}>{so.status}</Badge></TableCell>
-                    <TableCell><PlatformBadge platform={so.source_platform} /></TableCell>
-                    <TableCell className="text-right">{formatIDR(so.net_revenue)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{formatIDR(so.total_cogs)}</TableCell>
-                    <TableCell className={`text-right font-medium ${so.gross_profit < 0 ? 'text-destructive' : ''}`}>
-                      {formatIDR(so.gross_profit)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {renderOrdersTableBody()}
               </TableBody>
             </Table>
           </div>

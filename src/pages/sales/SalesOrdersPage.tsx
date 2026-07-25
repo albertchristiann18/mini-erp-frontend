@@ -11,8 +11,10 @@ import { PlatformBadge } from '../../components/ui/PlatformBadge'
 import { formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import { Plus } from 'lucide-react'
+import { Loading, ErrorState, Empty } from '../../components/ui/queryPrimitives'
 import type { SOStatus } from '../../types/sales'
 import type { BadgeProps } from '../../components/ui/badge'
+import type { ApiError } from '../../lib/errors'
 
 const statusVariant: Record<SOStatus, BadgeProps['variant']> = {
   PENDING: 'secondary',
@@ -29,7 +31,7 @@ export default function SalesOrdersPage() {
   const [status, setStatus] = useState<SOStatus | 'ALL'>('ALL')
   const [page, setPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
-  const { data, isLoading } = useSalesOrders(status === 'ALL' ? undefined : status, page)
+  const { data, isLoading, isError, error, refetch } = useSalesOrders(status === 'ALL' ? undefined : status, page)
   const confirmMutation = useConfirmSalesOrder()
   const cancelMutation = useCancelSalesOrder()
   const totalPages = data ? Math.ceil(data.count / 20) : 1
@@ -50,6 +52,65 @@ export default function SalesOrdersPage() {
     } catch {
       toast.error('Failed to cancel order')
     }
+  }
+
+  function renderTableBody() {
+    if (isLoading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={8}><Loading /></TableCell>
+        </TableRow>
+      )
+    }
+    if (isError) {
+      return (
+        <TableRow>
+          <TableCell colSpan={8}>
+            <ErrorState error={error as unknown as ApiError} onRetry={refetch} />
+          </TableCell>
+        </TableRow>
+      )
+    }
+    if (!data?.results.length) {
+      return (
+        <TableRow>
+          <TableCell colSpan={8}><Empty message="No sales orders found." /></TableCell>
+        </TableRow>
+      )
+    }
+    return data.results.map(so => (
+      <TableRow key={so.id}>
+        <TableCell className="font-mono text-xs">{so.order_number}</TableCell>
+        <TableCell><PlatformBadge platform={so.source_platform ?? 'MANUAL'} /></TableCell>
+        <TableCell>—</TableCell>
+        <TableCell><Badge variant={statusVariant[so.status]}>{so.status}</Badge></TableCell>
+        <TableCell className="text-right">{formatIDR(so.net_revenue)}</TableCell>
+        <TableCell className="text-right">{formatIDR(so.gross_profit)}</TableCell>
+        <TableCell className="text-muted-foreground text-xs">{formatDate(so.cdate)}</TableCell>
+        {user?.is_staff && (
+          <TableCell>
+            <div className="flex items-center gap-1">
+              {so.status === 'PENDING' && (
+                <Button size="sm" variant="outline" className="text-xs h-7 px-2"
+                  onClick={() => handleConfirm(so.id)}
+                  disabled={confirmMutation.isPending}
+                >
+                  Confirm
+                </Button>
+              )}
+              {!['COMPLETED', 'CANCELLED', 'RETURNED'].includes(so.status) && (
+                <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-red-500 hover:text-red-600"
+                  onClick={() => handleCancel(so.id)}
+                  disabled={cancelMutation.isPending}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </TableCell>
+        )}
+      </TableRow>
+    ))
   }
 
   return (
@@ -91,41 +152,7 @@ export default function SalesOrdersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-            ) : data?.results.map(so => (
-              <TableRow key={so.id}>
-                <TableCell className="font-mono text-xs">{so.order_number}</TableCell>
-                <TableCell><PlatformBadge platform={so.source_platform ?? 'MANUAL'} /></TableCell>
-                <TableCell>—</TableCell>
-                <TableCell><Badge variant={statusVariant[so.status]}>{so.status}</Badge></TableCell>
-                <TableCell className="text-right">{formatIDR(so.net_revenue)}</TableCell>
-                <TableCell className="text-right">{formatIDR(so.gross_profit)}</TableCell>
-                <TableCell className="text-muted-foreground text-xs">{formatDate(so.cdate)}</TableCell>
-                {user?.is_staff && (
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      {so.status === 'PENDING' && (
-                        <Button size="sm" variant="outline" className="text-xs h-7 px-2"
-                          onClick={() => handleConfirm(so.id)}
-                          disabled={confirmMutation.isPending}
-                        >
-                          Confirm
-                        </Button>
-                      )}
-                      {!['COMPLETED', 'CANCELLED', 'RETURNED'].includes(so.status) && (
-                        <Button size="sm" variant="ghost" className="text-xs h-7 px-2 text-red-500 hover:text-red-600"
-                          onClick={() => handleCancel(so.id)}
-                          disabled={cancelMutation.isPending}
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
+            {renderTableBody()}
           </TableBody>
         </Table>
       </div>
