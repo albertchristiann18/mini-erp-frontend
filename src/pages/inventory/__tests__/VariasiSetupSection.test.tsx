@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, it, expect, describe, beforeEach } from 'vitest'
-import { VariasiSetupSection } from '../VariasiSetupSection'
+import { VariasiSetupSection } from '../VariasiSetup'
 
 vi.mock('@dnd-kit/core', () => ({
   DndContext: ({ children }: { children: React.ReactNode }) => <>{children}</>,
