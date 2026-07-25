@@ -102,7 +102,7 @@ export default defineConfig([
     },
   },
   // Boundaries: 3-tier model — WARN-level rules
-  // shared↛pages (~1 violation today) and pages↛api (~11 violations today).
+  // shared↛pages (0 violations today) and pages↛api (non-inventory domains still have violations).
   // Land at warn now; flip to error per-domain as Tracks 1/3 clean each domain.
   // Uses boundaries/element-types (same engine as /dependencies, different rule name)
   // so both blocks can coexist at different severities on the same file pattern.
@@ -124,14 +124,14 @@ export default defineConfig([
         {
           default: 'allow',
           policies: [
-            // shared → domain: warn (~1 violation: components/ui/CategorySelect imports pages/)
+            // shared → domain: warn (CategorySelect violation fixed in #3; 0 violations today)
             {
               from: { element: { type: 'shared' } },
               disallow: {
                 to: { element: { type: 'domain' } },
               },
             },
-            // domain → api: warn (~11 violations: pages importing api/ directly)
+            // domain → api: warn (non-inventory domains still have violations)
             {
               from: { element: { type: 'domain' } },
               disallow: {
@@ -143,6 +143,76 @@ export default defineConfig([
       ],
       // max-lines: warn at 200 lines (will be tightened per-domain in later tickets)
       'max-lines': ['warn', { max: 200, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  // ── Inventory domain sealed (ticket #9) ────────────────────────────────────
+  // shared↛pages at error — 0 violations globally; safe to lock for all files.
+  // Later tickets will ratchet other domains; this rule is already clean codebase-wide.
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // shared↛pages sealed: shared tier importing a page is now an error everywhere
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'shared' } },
+              disallow: {
+                to: { element: { type: 'domain' } },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  },
+  // pages↛api and max-lines sealed for inventory production files only.
+  // __tests__ are excluded: test files legitimately exceed 300 lines and the
+  // boundary rule already exempts them via boundaries/ignore above.
+  {
+    files: [
+      'src/pages/inventory/**/*.{ts,tsx}',
+      'src/hooks/inventory/**/*.{ts,tsx}',
+      'src/api/inventory.ts',
+      'src/types/inventory.ts',
+    ],
+    ignores: ['**/__tests__/**'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for inventory: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for inventory (warn at 200 globally; error at 300 per-domain)
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
 ])
