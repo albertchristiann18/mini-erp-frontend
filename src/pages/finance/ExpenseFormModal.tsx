@@ -9,7 +9,9 @@ import { Button } from '../../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { useExpenseCategories, useCreateExpense, useUpdateExpense } from '../../hooks/api/useFinance'
 import { toast } from '../../lib/toast'
+import { applyApiErrors } from '../../lib/formHelpers'
 import type { Expense } from '../../types/finance'
+import type { ApiError } from '../../lib/errors'
 
 const schema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -32,7 +34,7 @@ export function ExpenseFormModal({ open, onClose, expense }: Props) {
   const createMutation = useCreateExpense()
   const updateMutation = useUpdateExpense()
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: expense ? {
       category: expense.category,
@@ -47,6 +49,8 @@ export function ExpenseFormModal({ open, onClose, expense }: Props) {
     },
   })
 
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form
+
   const handleClose = () => { reset(); onClose() }
 
   const onSubmit = async (values: FormValues) => {
@@ -59,8 +63,11 @@ export function ExpenseFormModal({ open, onClose, expense }: Props) {
         toast.success('Expense created')
       }
       handleClose()
-    } catch {
-      toast.error('Failed to save expense')
+    } catch (err) {
+      applyApiErrors(form, err as ApiError)
+      if (!(err as ApiError).fieldErrors) {
+        toast.error('Failed to save expense')
+      }
     }
   }
 

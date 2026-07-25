@@ -7,7 +7,9 @@ import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { useSettleReceivable } from '../../hooks/api/useFinance'
 import { toast } from '../../lib/toast'
+import { applyApiErrors } from '../../lib/formHelpers'
 import { formatIDR } from '../../lib/utils'
+import type { ApiError } from '../../lib/errors'
 
 interface Props {
   open: boolean
@@ -28,10 +30,12 @@ export function SettleReceivableModal({ open, onClose, arId, expectedAmount, set
   })
   type FormValues = z.infer<typeof schema>
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { settled_amount: remaining },
   })
+
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = form
 
   const handleClose = () => { reset(); onClose() }
 
@@ -40,8 +44,11 @@ export function SettleReceivableModal({ open, onClose, arId, expectedAmount, set
       await mutation.mutateAsync({ id: arId, data: values })
       toast.success('Receivable settled')
       handleClose()
-    } catch {
-      toast.error('Failed to settle receivable')
+    } catch (err) {
+      applyApiErrors(form, err as ApiError)
+      if (!(err as ApiError).fieldErrors) {
+        toast.error('Failed to settle receivable')
+      }
     }
   }
 

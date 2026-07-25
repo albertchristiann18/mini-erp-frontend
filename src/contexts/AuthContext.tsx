@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const stored: AuthTokens = JSON.parse(raw)
       setTokens(stored)
       authApi.getMe()
-        .then((r) => setUser(r.data))
+        .then(setUser)
         .catch(() => {
           localStorage.removeItem('tokens')
           setTokens(null)
@@ -44,10 +44,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = useCallback(async (username: string, password: string) => {
-    const { data: newTokens } = await authApi.login(username, password)
+    const newTokens = await authApi.login(username, password)
     localStorage.setItem('tokens', JSON.stringify(newTokens))
     setTokens(newTokens)
-    const { data: me } = await authApi.getMe()
+    const me = await authApi.getMe()
     setUser(me)
   }, [])
 
@@ -59,8 +59,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient])
 
   const refreshUser = useCallback(async () => {
-    const { data } = await authApi.getMe()
-    setUser(data)
+    const me = await authApi.getMe()
+    setUser(me)
   }, [])
 
   return (

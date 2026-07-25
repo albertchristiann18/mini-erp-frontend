@@ -8,10 +8,12 @@ import { Badge } from '../../components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { Label } from '../../components/ui/label'
 import { toast } from '../../lib/toast'
+import { Loading, ErrorState } from '../../components/ui/queryPrimitives'
 import {
   useCashTransactions, useCreateCashTransaction, useUpdateCashTransaction, useDeleteCashTransaction,
 } from '../../hooks/api/useFinance'
 import type { CashTransaction, CashTransactionCreate, TransactionCategory } from '../../types/finance'
+import type { ApiError } from '../../lib/errors'
 
 const CATEGORY_LABELS: Record<string, string> = {
   SALES_SETTLEMENT: 'Sales Settlement',
@@ -79,7 +81,7 @@ export default function CashTransactionsPage() {
   if (typeFilter !== 'ALL') params.transaction_type = typeFilter
   if (categoryFilter !== 'ALL') params.category = categoryFilter
 
-  const { data, isLoading } = useCashTransactions(params)
+  const { data, isLoading, isError, error, refetch } = useCashTransactions(params)
   const createTx = useCreateCashTransaction()
   const updateTx = useUpdateCashTransaction()
   const deleteTx = useDeleteCashTransaction()
@@ -187,7 +189,9 @@ export default function CashTransactionsPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6}><Loading /></TableCell></TableRow>
+            ) : isError ? (
+              <TableRow><TableCell colSpan={6}><ErrorState error={error as unknown as ApiError} onRetry={refetch} /></TableCell></TableRow>
             ) : transactions.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">No transactions found</TableCell></TableRow>
             ) : transactions.map(tx => (

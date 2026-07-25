@@ -215,4 +215,82 @@ export default defineConfig([
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
+  // ── Auth domain sealed (ticket #10) ───────────────────────────────────────
+  // pages↛api and max-lines sealed for auth production files.
+  // __tests__ excluded via ignores.
+  {
+    files: [
+      'src/pages/auth/**/*.{ts,tsx}',
+      'src/api/auth.ts',
+      'src/types/auth.ts',
+    ],
+    ignores: ['**/__tests__/**'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for auth: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for auth
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  // ── Finance domain sealed (ticket #10) ────────────────────────────────────
+  // pages↛api and max-lines sealed for finance production files.
+  // __tests__ excluded via ignores.
+  {
+    files: [
+      'src/pages/finance/**/*.{ts,tsx}',
+      'src/hooks/finance/**/*.{ts,tsx}',
+      'src/api/finance.ts',
+      'src/types/finance.ts',
+      'src/lib/financeKeys.ts',
+    ],
+    ignores: ['**/__tests__/**'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for finance: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for finance
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
+  },
 ])

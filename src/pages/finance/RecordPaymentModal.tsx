@@ -9,7 +9,9 @@ import { Button } from '../../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { useRecordPayment } from '../../hooks/api/useFinance'
 import { toast } from '../../lib/toast'
+import { applyApiErrors } from '../../lib/formHelpers'
 import { formatIDR } from '../../lib/utils'
+import type { ApiError } from '../../lib/errors'
 
 const schema = z.object({
   amount: z.number().min(1, 'Amount must be > 0'),
@@ -29,13 +31,15 @@ interface Props {
 export function RecordPaymentModal({ open, onClose, apId, remainingAmount }: Props) {
   const mutation = useRecordPayment()
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       payment_method: 'TRANSFER',
       payment_date: new Date().toISOString().split('T')[0],
     },
   })
+
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = form
 
   const handleClose = () => { reset(); onClose() }
 
@@ -48,8 +52,11 @@ export function RecordPaymentModal({ open, onClose, apId, remainingAmount }: Pro
       await mutation.mutateAsync({ id: apId, data: values })
       toast.success('Payment recorded')
       handleClose()
-    } catch {
-      toast.error('Failed to record payment')
+    } catch (err) {
+      applyApiErrors(form, err as ApiError)
+      if (!(err as ApiError).fieldErrors) {
+        toast.error('Failed to record payment')
+      }
     }
   }
 
