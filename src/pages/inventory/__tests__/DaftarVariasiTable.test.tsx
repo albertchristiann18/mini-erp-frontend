@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi, it, expect, describe, beforeEach } from 'vitest'
-import { DaftarVariasiTable } from '../DaftarVariasiTable'
+import { DaftarVariasiTable } from '../DaftarVariasi'
 
 function makeRow(overrides = {}) {
   return {
