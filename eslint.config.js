@@ -363,4 +363,48 @@ export default defineConfig([
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
+  // ── Marketplace domain sealed (ticket #15) ────────────────────────────────
+  // pages↛api and max-lines sealed for marketplace production files.
+  // hooks/api/useMarketplace.ts lives in shared hooks/api/ — global rules apply.
+  // __tests__ excluded via ignores.
+  {
+    files: [
+      'src/pages/marketplace/**/*.{ts,tsx}',
+      'src/api/marketplace.ts',
+      'src/api/shopee.ts',
+      'src/api/tiktok.ts',
+      'src/types/marketplace.ts',
+      'src/types/shopee.ts',
+      'src/types/tiktok.ts',
+      'src/lib/marketplaceKeys.ts',
+    ],
+    ignores: ['**/__tests__/**'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for marketplace: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for marketplace
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
+  },
 ])

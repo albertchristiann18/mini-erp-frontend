@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type UseMutationResult, type UseQueryResult } from '@tanstack/react-query'
 import { createQueryKeys, type QueryKeyFactory } from '../../lib/queryKeys'
+import type { ApiError } from '../../lib/errors'
 
 export interface CrudHooksConfig<TItem, TList, TCreateInput, TUpdateInput, TListParams = Record<string, string | number> | undefined> {
   resource: string
@@ -24,8 +25,8 @@ export function createCrudHooks<TItem, TList, TCreateInput, TUpdateInput, TListP
   // invalidation both derive their keys from here.
   const keys: QueryKeyFactory = config.keys ?? createQueryKeys(config.resource)
 
-  const useList = (params?: TListParams): UseQueryResult<TList> =>
-    useQuery({
+  const useList = (params?: TListParams): UseQueryResult<TList, ApiError> =>
+    useQuery<TList, ApiError>({
       queryKey: keys.list(params as Record<string, unknown> | undefined),
       queryFn: () => config.list(params as TListParams),
     })

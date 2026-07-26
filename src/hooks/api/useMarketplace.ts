@@ -11,20 +11,22 @@ import type { PaginatedResponse as MarketplacePaginatedResponse } from '../../ap
 import type { MarketplaceConnection, MarketplaceConnectionFormData } from '../../types/marketplace'
 import { listShops, createShop, updateShop, deleteShop, triggerSync, listWebhookLogs } from '../../api/shopee'
 import { listTikTokShops, createTikTokShop, updateTikTokShop, deleteTikTokShop, refreshTikTokToken, listTikTokWebhookLogs } from '../../api/tiktok'
-import type { PaginatedResponse, ShopeeShop, CreateShopPayload } from '../../types/shopee'
-import type { TikTokShop, TikTokShopFormData } from '../../types/tiktok'
+import type { PaginatedResponse, ShopeeShop, ShopeeWebhookLog, CreateShopPayload } from '../../types/shopee'
+import type { TikTokShop, TikTokWebhookLog, TikTokShopFormData } from '../../types/tiktok'
+import { marketplaceConnectionKeys, shopeeShopKeys, shopeeWebhookLogKeys, tikTokShopKeys, tikTokWebhookLogKeys } from '../../lib/marketplaceKeys'
+import { marketplaceReconcileStock } from '../../api/inventory'
+import type { ApiError } from '../../lib/errors'
+
+export type { ReconcileResult } from '../../api/inventory'
 
 // ── Marketplace Connections CRUD ──────────────────────────────────────────
-// Note: api/marketplace.ts functions already resolve to unwrapped data — no .then(r => r.data) needed.
-// Note: useMarketplaceConnections() produces queryKey ['marketplace-connections', undefined] vs.
-// the previous inline ['marketplace-connections'] — functionally identical since prefix-matching
-// still invalidates both, and no test pins the literal array.
 
 const marketplaceConnectionHooks = createCrudHooks<
   MarketplaceConnection, MarketplacePaginatedResponse<MarketplaceConnection>,
   MarketplaceConnectionFormData, Partial<MarketplaceConnectionFormData>, number | undefined
 >({
   resource: 'marketplace-connections',
+  keys: marketplaceConnectionKeys,
   list: (page) => getMarketplaceConnections(page ?? 1),
   create: (data) => createMarketplaceConnection(data),
   update: ({ id, data }) => updateMarketplaceConnection(id, data),
@@ -39,6 +41,7 @@ export const useDeleteMarketplaceConnection = marketplaceConnectionHooks.useDele
 
 const shopeeShopHooks = createCrudHooks<ShopeeShop, PaginatedResponse<ShopeeShop>, CreateShopPayload, Partial<CreateShopPayload>, number>({
   resource: 'shopee-shops',
+  keys: shopeeShopKeys,
   list: (page) => listShops(page ?? 1),
   create: (data) => createShop(data),
   update: ({ id, data }) => updateShop(id, data),
@@ -53,6 +56,7 @@ export const useDeleteShopeeShop = shopeeShopHooks.useDelete
 
 const tikTokShopHooks = createCrudHooks<TikTokShop, PaginatedResponse<TikTokShop>, TikTokShopFormData, Partial<TikTokShopFormData>, number>({
   resource: 'tiktok-shops',
+  keys: tikTokShopKeys,
   list: (page) => listTikTokShops(page ?? 1),
   create: (data) => createTikTokShop(data),
   update: ({ id, data }) => updateTikTokShop(id, data),
@@ -69,8 +73,7 @@ export const useToggleMarketplaceConnection = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => toggleMarketplaceConnection(id),
-    // Block body, no return — same fire-and-forget requirement as createCrudHooks.
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['marketplace-connections'] }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: marketplaceConnectionKeys.all() }) },
   })
 }
 
@@ -79,9 +82,10 @@ export const useTriggerShopeeSync = () =>
 
 export const useShopeeWebhookLogs = (page: number, filter: string) => {
   const processed = filter === 'all' ? undefined : filter === 'processed'
-  return useQuery({
-    queryKey: ['shopee-webhook-logs', page, filter],
+  return useQuery<PaginatedResponse<ShopeeWebhookLog>, ApiError>({
+    queryKey: shopeeWebhookLogKeys.list({ page, filter }),
     queryFn: () => listWebhookLogs(page, processed),
+    staleTime: 0,
   })
 }
 
@@ -89,13 +93,19 @@ export const useRefreshTikTokToken = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => refreshTikTokToken(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tiktok-shops'] }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: tikTokShopKeys.all() }) },
   })
 }
 
 export const useTikTokWebhookLogs = (page: number) =>
-  useQuery({
-    queryKey: ['tiktok-webhook-logs', page],
+  useQuery<PaginatedResponse<TikTokWebhookLog>, ApiError>({
+    queryKey: tikTokWebhookLogKeys.list({ page }),
     queryFn: () => listTikTokWebhookLogs(page),
+    staleTime: 0,
     refetchInterval: 30_000,
+  })
+
+export const useMarketplaceReconcileStock = () =>
+  useMutation({
+    mutationFn: (formData: FormData) => marketplaceReconcileStock(formData),
   })

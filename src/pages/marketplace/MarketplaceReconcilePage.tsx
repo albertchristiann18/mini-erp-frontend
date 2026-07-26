@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWarehouses, useCompanyMarketplaces } from '../../hooks/api/useInventory'
-import { marketplaceReconcileStock } from '../../api/inventory'
-import type { ReconcileResult } from '../../api/inventory'
+import { useMarketplaceReconcileStock } from '../../hooks/api/useMarketplace'
+import type { ReconcileResult } from '../../hooks/api/useMarketplace'
+import type { ApiError } from '../../lib/errors'
 import { Button } from '../../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { toast } from '../../lib/toast'
@@ -12,6 +13,7 @@ export default function MarketplaceReconcilePage() {
   const navigate = useNavigate()
   const { data: warehousesData } = useWarehouses()
   const { data: marketplacesData } = useCompanyMarketplaces()
+  const reconcileMutation = useMarketplaceReconcileStock()
 
   const [step, setStep] = useState<'upload' | 'preview' | 'result'>('upload')
   const [file, setFile] = useState<File | null>(null)
@@ -31,12 +33,11 @@ export default function MarketplaceReconcilePage() {
     fd.append('dry_run', 'true')
     setIsLoading(true)
     try {
-      const res = await marketplaceReconcileStock(fd)
+      const res = await reconcileMutation.mutateAsync(fd)
       setPreviewData(res)
       setStep('preview')
     } catch (err) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Failed to parse file'
-      toast.error(msg)
+      toast.error((err as ApiError).message ?? 'Failed to parse file')
     } finally {
       setIsLoading(false)
     }
@@ -51,7 +52,7 @@ export default function MarketplaceReconcilePage() {
     fd.append('dry_run', 'false')
     setIsLoading(true)
     try {
-      const res = await marketplaceReconcileStock(fd)
+      const res = await reconcileMutation.mutateAsync(fd)
       setResultData(res)
       setStep('result')
     } catch {

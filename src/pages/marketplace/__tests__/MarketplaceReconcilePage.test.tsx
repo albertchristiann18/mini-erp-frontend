@@ -10,12 +10,12 @@ vi.mock('../../../hooks/api/useInventory', () => ({
   useCompanyMarketplaces: vi.fn(),
 }))
 
-vi.mock('../../../api/inventory', () => ({
-  marketplaceReconcileStock: vi.fn(),
+vi.mock('../../../hooks/api/useMarketplace', () => ({
+  useMarketplaceReconcileStock: vi.fn(),
 }))
 
 import { useWarehouses, useCompanyMarketplaces } from '../../../hooks/api/useInventory'
-import { marketplaceReconcileStock } from '../../../api/inventory'
+import { useMarketplaceReconcileStock } from '../../../hooks/api/useMarketplace'
 
 const mockMarketplaces = {
   results: [
@@ -89,6 +89,7 @@ function goToPreview() {
 it('renders step 1 with marketplace select, warehouse select, file input, preview button', () => {
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useCompanyMarketplaces).mockReturnValue(hookResult(mockMarketplaces))
+  vi.mocked(useMarketplaceReconcileStock).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
   renderPage()
 
   expect(screen.getByText('Marketplace (optional)')).toBeInTheDocument()
@@ -100,6 +101,7 @@ it('renders step 1 with marketplace select, warehouse select, file input, previe
 it('preview button disabled when no file or no warehouse selected', () => {
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useCompanyMarketplaces).mockReturnValue(hookResult(mockMarketplaces))
+  vi.mocked(useMarketplaceReconcileStock).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
   renderPage()
 
   const previewBtn = screen.getByRole('button', { name: /preview changes/i })
@@ -109,7 +111,7 @@ it('preview button disabled when no file or no warehouse selected', () => {
 it('after preview shows step 2 with reconciled count', async () => {
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useCompanyMarketplaces).mockReturnValue(hookResult(mockMarketplaces))
-  vi.mocked(marketplaceReconcileStock).mockResolvedValue(mockPreviewResult as never)
+  vi.mocked(useMarketplaceReconcileStock).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(mockPreviewResult), isPending: false } as never)
   renderPage()
 
   goToPreview()
@@ -123,7 +125,7 @@ it('after preview shows step 2 with reconciled count', async () => {
 it('Back from preview returns to step 1', async () => {
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useCompanyMarketplaces).mockReturnValue(hookResult(mockMarketplaces))
-  vi.mocked(marketplaceReconcileStock).mockResolvedValue(mockPreviewResult as never)
+  vi.mocked(useMarketplaceReconcileStock).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(mockPreviewResult), isPending: false } as never)
   renderPage()
 
   goToPreview()
@@ -138,10 +140,12 @@ it('Back from preview returns to step 1', async () => {
 })
 
 it('Confirm & Apply submits with dry_run=false and moves to step 3', async () => {
+  const mutateAsync = vi.fn()
+    .mockResolvedValueOnce(mockPreviewResult)
+    .mockResolvedValueOnce(mockConfirmResult)
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useCompanyMarketplaces).mockReturnValue(hookResult(mockMarketplaces))
-  vi.mocked(marketplaceReconcileStock).mockResolvedValueOnce(mockPreviewResult as never)
-  vi.mocked(marketplaceReconcileStock).mockResolvedValueOnce(mockConfirmResult as never)
+  vi.mocked(useMarketplaceReconcileStock).mockReturnValue({ mutateAsync, isPending: false } as never)
   renderPage()
 
   goToPreview()
@@ -157,10 +161,12 @@ it('Confirm & Apply submits with dry_run=false and moves to step 3', async () =>
 })
 
 it('step 3 shows reconciliation complete message', async () => {
+  const mutateAsync = vi.fn()
+    .mockResolvedValueOnce(mockPreviewResult)
+    .mockResolvedValueOnce(mockConfirmResult)
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useCompanyMarketplaces).mockReturnValue(hookResult(mockMarketplaces))
-  vi.mocked(marketplaceReconcileStock).mockResolvedValueOnce(mockPreviewResult as never)
-  vi.mocked(marketplaceReconcileStock).mockResolvedValueOnce(mockConfirmResult as never)
+  vi.mocked(useMarketplaceReconcileStock).mockReturnValue({ mutateAsync, isPending: false } as never)
   renderPage()
 
   goToPreview()

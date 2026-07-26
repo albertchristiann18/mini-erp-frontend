@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCompanyMarketplaces, useCreateCompanyMarketplace, useUpdateCompanyMarketplace, useDeleteCompanyMarketplace } from '../../hooks/api/useInventory'
@@ -6,10 +9,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
+import { FormField } from '../../components/ui/form'
 import { Pagination } from '../../components/Pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
+import { Loading, ErrorState, Empty } from '../../components/ui/queryPrimitives'
 import { toast } from '../../lib/toast'
+import { applyApiErrors, useResetOnOpen } from '../../lib/formHelpers'
 import type { CompanyMarketplace } from '../../types/inventory'
+import type { ApiError } from '../../lib/errors'
+
+const schema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  is_active: z.boolean(),
+})
+type FormValues = z.infer<typeof schema>
 
 export default function MarketplacesPage() {
   const { user } = useAuth()
@@ -18,48 +31,52 @@ export default function MarketplacesPage() {
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<CompanyMarketplace | undefined>()
-  const [formName, setFormName] = useState('')
-  const [formActive, setFormActive] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<CompanyMarketplace | undefined>()
 
   const params: Record<string, string | number> = { page, page_size: 20 }
   if (search) params.search = search
-  const { data, isLoading } = useCompanyMarketplaces(params)
+  const { data, isLoading, isError, error, refetch } = useCompanyMarketplaces(params)
   const createMutation = useCreateCompanyMarketplace()
   const updateMutation = useUpdateCompanyMarketplace()
   const deleteMutation = useDeleteCompanyMarketplace()
   const totalPages = data ? Math.ceil(data.count / 20) : 1
 
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues: { name: '', is_active: true },
+  })
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = form
+  const isMutating = createMutation.isPending || updateMutation.isPending
+
+  useResetOnOpen(form, showModal, editing
+    ? { name: editing.name, is_active: editing.is_active }
+    : { name: '', is_active: true })
+
   const openCreate = () => {
     setEditing(undefined)
-    setFormName('')
-    setFormActive(true)
     setShowModal(true)
   }
 
   const openEdit = (m: CompanyMarketplace) => {
     setEditing(m)
-    setFormName(m.name)
-    setFormActive(m.is_active)
     setShowModal(true)
   }
 
-  const handleSave = async () => {
-    if (!formName.trim()) return
+  const onSubmit = async (values: FormValues) => {
     try {
       if (editing) {
-        await updateMutation.mutateAsync({
-          id: editing.id,
-          data: { name: formName.trim(), is_active: formActive },
-        })
+        await updateMutation.mutateAsync({ id: editing.id, data: values })
         toast.success('Marketplace updated')
       } else {
-        await createMutation.mutateAsync({ name: formName.trim(), is_active: formActive })
+        await createMutation.mutateAsync(values)
         toast.success('Marketplace created')
       }
       setShowModal(false)
-    } catch {
-      toast.error('Failed to save marketplace')
+    } catch (err) {
+      applyApiErrors(form, err as ApiError)
+      if (!(err as ApiError).fieldErrors) {
+        toast.error('Failed to save marketplace')
+      }
     }
   }
 
@@ -69,13 +86,80 @@ export default function MarketplacesPage() {
       toast.success('Marketplace deleted')
       setDeleteConfirm(undefined)
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status
+      const status = (err as ApiError).status
       if (status === 409) {
         toast.error('Cannot delete — business entities are using this marketplace')
       } else {
         toast.error('Failed to delete marketplace')
       }
     }
+  }
+
+  function renderTableBody() {
+    if (isLoading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={3}><Loading /></TableCell>
+        </TableRow>
+      )
+    }
+    if (isError) {
+      return (
+        <TableRow>
+          <TableCell colSpan={3}>
+            <ErrorState error={error as ApiError} onRetry={refetch} />
+          </TableCell>
+        </TableRow>
+      )
+    }
+    if (!data?.results.length) {
+      return (
+        <TableRow>
+          <TableCell colSpan={3}><Empty message="No marketplaces yet" /></TableCell>
+        </TableRow>
+      )
+    }
+    return data.results.map(m => (
+      <TableRow key={m.id}>
+        <TableCell className="font-medium">{m.name}</TableCell>
+        <TableCell>
+          <Badge variant={m.is_active ? 'success' : 'secondary'}>
+            {m.is_active ? 'Active' : 'Inactive'}
+          </Badge>
+        </TableCell>
+        {user?.is_staff && (
+          <TableCell>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={() => openEdit(m)}>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setDeleteConfirm(m)}
+              >
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={async () => {
+                  try {
+                    await updateMutation.mutateAsync({ id: m.id, data: { is_active: !m.is_active } })
+                    toast.success(m.is_active ? 'Marketplace deactivated' : 'Marketplace activated')
+                  } catch {
+                    toast.error('Failed to update marketplace')
+                  }
+                }}
+              >
+                {m.is_active ? 'Deactivate' : 'Activate'}
+              </Button>
+            </div>
+          </TableCell>
+        )}
+      </TableRow>
+    ))
   }
 
   return (
@@ -112,79 +196,39 @@ export default function MarketplacesPage() {
               {user?.is_staff && <TableHead className="w-32" />}
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
-            ) : data?.results.length === 0 ? (
-              <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No marketplaces yet</TableCell></TableRow>
-            ) : data?.results.map(m => (
-              <TableRow key={m.id}>
-                <TableCell className="font-medium">{m.name}</TableCell>
-                <TableCell>
-                  <Badge variant={m.is_active ? 'success' : 'secondary'}>
-                    {m.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </TableCell>
-                {user?.is_staff && (
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(m)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteConfirm(m)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs"
-                        onClick={async () => {
-                          try {
-                            await updateMutation.mutateAsync({ id: m.id, data: { is_active: !m.is_active } })
-                            toast.success(m.is_active ? 'Marketplace deactivated' : 'Marketplace activated')
-                          } catch {
-                            toast.error('Failed to update marketplace')
-                          }
-                        }}
-                      >
-                        {m.is_active ? 'Deactivate' : 'Activate'}
-                      </Button>
-                    </div>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </TableBody>
+          <TableBody>{renderTableBody()}</TableBody>
         </Table>
       </div>
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
+
       <Dialog open={showModal} onOpenChange={(o) => { if (!o) setShowModal(false) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Marketplace' : 'New Marketplace'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Name <span className="text-destructive">*</span></label>
-              <Input value={formName} onChange={e => setFormName(e.target.value)} placeholder="Marketplace name" />
-            </div>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <FormField label="Name" error={errors.name?.message} required>
+              <Input {...register('name')} placeholder="Marketplace name" />
+            </FormField>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={formActive} onChange={e => setFormActive(e.target.checked)} className="rounded" />
+              <input
+                type="checkbox"
+                checked={watch('is_active')}
+                onChange={e => setValue('is_active', e.target.checked)}
+                className="rounded"
+              />
               Active
             </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!formName.trim() || createMutation.isPending || updateMutation.isPending}>
-              {createMutation.isPending || updateMutation.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+              <Button type="submit" disabled={isSubmitting || isMutating}>
+                {isSubmitting || isMutating ? 'Saving...' : editing ? 'Update' : 'Create'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
+
       <Dialog open={!!deleteConfirm} onOpenChange={(o) => { if (!o) setDeleteConfirm(undefined) }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete Marketplace</DialogTitle></DialogHeader>

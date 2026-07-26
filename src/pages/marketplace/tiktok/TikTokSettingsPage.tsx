@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import {
   useTikTokShops,
   useCreateTikTokShop,
@@ -6,23 +9,48 @@ import {
   useDeleteTikTokShop,
   useRefreshTikTokToken,
 } from '../../../hooks/api/useMarketplace'
-import type { TikTokShopFormData } from '../../../types/tiktok'
 import { toast } from '../../../lib/toast'
+import { applyApiErrors, useResetOnOpen } from '../../../lib/formHelpers'
 import { Button } from '../../../components/ui/button'
 import { Badge } from '../../../components/ui/badge'
 import { Input } from '../../../components/ui/input'
 import { FormField } from '../../../components/ui/form'
 import { Pagination } from '../../../components/Pagination'
+import { Loading, ErrorState, Empty } from '../../../components/ui/queryPrimitives'
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from '../../../components/ui/table'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '../../../components/ui/dialog'
+import type { TikTokShop } from '../../../types/tiktok'
+import type { ApiError } from '../../../lib/errors'
 
 const PAGE_SIZE = 20
 
-const emptyForm: TikTokShopFormData = {
+const createSchema = z.object({
+  company: z.string().min(1, 'Company is required'),
+  shop_id: z.string().min(1, 'Shop ID is required'),
+  shop_name: z.string().min(1, 'Shop name is required'),
+  app_key: z.string().min(1, 'App key is required'),
+  app_secret: z.string().min(1, 'App secret is required'),
+  warehouse: z.string().optional(),
+})
+
+const editSchema = z.object({
+  company: z.string().min(1, 'Company is required'),
+  shop_id: z.string().min(1, 'Shop ID is required'),
+  shop_name: z.string().min(1, 'Shop name is required'),
+  app_key: z.string().min(1, 'App key is required'),
+  app_secret: z.string().optional(),
+  warehouse: z.string().optional(),
+})
+
+type CreateFormValues = z.infer<typeof createSchema>
+type EditFormValues = z.infer<typeof editSchema>
+type FormValues = CreateFormValues | EditFormValues
+
+const defaultValues: CreateFormValues = {
   company: '',
   shop_id: '',
   shop_name: '',
@@ -34,11 +62,12 @@ const emptyForm: TikTokShopFormData = {
 export default function TikTokSettingsPage() {
   const [page, setPage] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)
+  const [editingShop, setEditingShop] = useState<TikTokShop | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [form, setForm] = useState<TikTokShopFormData>({ ...emptyForm })
 
-  const { data, isLoading } = useTikTokShops(page)
+  const editId = editingShop?.id ?? null
+
+  const { data, isLoading, isError, error, refetch } = useTikTokShops(page)
   const createMutation = useCreateTikTokShop()
   const updateMutation = useUpdateTikTokShop()
   const deleteMutation = useDeleteTikTokShop()
@@ -46,59 +75,127 @@ export default function TikTokSettingsPage() {
 
   const totalPages = data ? Math.ceil(data.count / PAGE_SIZE) : 1
 
+  const form = useForm<FormValues>({
+    resolver: zodResolver(editId ? editSchema : createSchema),
+    defaultValues,
+  })
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = form
+
+  useResetOnOpen(form, dialogOpen, editingShop
+    ? {
+        company: editingShop.company,
+        shop_id: editingShop.shop_id,
+        shop_name: editingShop.shop_name,
+        app_key: editingShop.app_key,
+        app_secret: '',
+        warehouse: editingShop.warehouse ?? '',
+      }
+    : defaultValues)
+
   const isTokenValid = (expiresAt: string | null) => {
     if (!expiresAt) return true
     return new Date(expiresAt) > new Date()
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (editId) {
-      updateMutation.mutate({ id: editId, data: form }, {
-        onSuccess: () => {
-          toast.success('Shop updated')
-          setDialogOpen(false)
-          setEditId(null)
-          setForm({ ...emptyForm })
-        },
-        onError: () => toast.error('Failed to update shop'),
-      })
-    } else {
-      createMutation.mutate(form, {
-        onSuccess: () => {
-          toast.success('Shop created')
-          setDialogOpen(false)
-          setForm({ ...emptyForm })
-        },
-        onError: () => toast.error('Failed to create shop'),
-      })
-    }
-  }
-
-  const handleEdit = (shop: { id: string; company: string; shop_id: string; shop_name: string; app_key: string; warehouse: string | null }) => {
-    setEditId(shop.id)
-    setForm({
-      company: shop.company,
-      shop_id: shop.shop_id,
-      shop_name: shop.shop_name,
-      app_key: shop.app_key,
-      app_secret: '',
-      warehouse: shop.warehouse ?? '',
-    })
+  const handleEdit = (shop: TikTokShop) => {
+    setEditingShop(shop)
     setDialogOpen(true)
   }
 
-  const updateField = <K extends keyof TikTokShopFormData>(key: K, value: TikTokShopFormData[K]) => {
-    setForm(prev => ({ ...prev, [key]: value }))
+  const onSubmit = async (values: FormValues) => {
+    try {
+      if (editId) {
+        await updateMutation.mutateAsync({ id: editId, data: values })
+        toast.success('Shop updated')
+        setDialogOpen(false)
+        setEditingShop(null)
+      } else {
+        await createMutation.mutateAsync(values as CreateFormValues)
+        toast.success('Shop created')
+        setDialogOpen(false)
+      }
+    } catch (err) {
+      applyApiErrors(form, err as ApiError)
+      if (!(err as ApiError).fieldErrors) {
+        toast.error(editId ? 'Failed to update shop' : 'Failed to create shop')
+      }
+    }
   }
 
-  const isMutating = createMutation.isPending || updateMutation.isPending
+  function renderTableBody() {
+    if (isLoading) {
+      return (
+        <TableRow>
+          <TableCell colSpan={6}><Loading /></TableCell>
+        </TableRow>
+      )
+    }
+    if (isError) {
+      return (
+        <TableRow>
+          <TableCell colSpan={6}>
+            <ErrorState error={error as ApiError} onRetry={refetch} />
+          </TableCell>
+        </TableRow>
+      )
+    }
+    if (!data?.results.length) {
+      return (
+        <TableRow>
+          <TableCell colSpan={6}><Empty message="No shops connected" /></TableCell>
+        </TableRow>
+      )
+    }
+    return data.results.map(shop => (
+      <TableRow key={shop.id}>
+        <TableCell className="font-medium">{shop.shop_name}</TableCell>
+        <TableCell className="font-mono text-xs">{shop.shop_id}</TableCell>
+        <TableCell className="font-mono text-xs">{shop.app_key}</TableCell>
+        <TableCell>
+          <Badge variant={shop.is_active ? 'success' : 'secondary'}>
+            {shop.is_active ? 'Active' : 'Inactive'}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <Badge variant={isTokenValid(shop.token_expires_at) ? 'success' : 'destructive'}>
+            {isTokenValid(shop.token_expires_at) ? 'Valid' : 'Expired'}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refreshMutation.mutate(shop.id, { onSuccess: () => toast.success('Token refreshed'), onError: () => toast.error('Failed to refresh token') })}
+              disabled={refreshMutation.isPending}
+            >
+              Refresh Token
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleEdit(shop)}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteId(shop.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ))
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">TikTok Shop Settings</h1>
-        <Button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setDialogOpen(true) }}>Add Shop</Button>
+        <Button onClick={() => { setEditingShop(null); setDialogOpen(true) }}>Add Shop</Button>
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -113,61 +210,7 @@ export default function TikTokSettingsPage() {
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">Loading...</TableCell>
-              </TableRow>
-            ) : !data?.results.length ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">No shops connected</TableCell>
-              </TableRow>
-            ) : (
-              data.results.map(shop => (
-                <TableRow key={shop.id}>
-                  <TableCell className="font-medium">{shop.shop_name}</TableCell>
-                  <TableCell className="font-mono text-xs">{shop.shop_id}</TableCell>
-                  <TableCell className="font-mono text-xs">{shop.app_key}</TableCell>
-                  <TableCell>
-                    <Badge variant={shop.is_active ? 'success' : 'secondary'}>
-                      {shop.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={isTokenValid(shop.token_expires_at) ? 'success' : 'destructive'}>
-                      {isTokenValid(shop.token_expires_at) ? 'Valid' : 'Expired'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refreshMutation.mutate(shop.id, { onSuccess: () => toast.success('Token refreshed'), onError: () => toast.error('Failed to refresh token') })}
-                        disabled={refreshMutation.isPending}
-                      >
-                        Refresh Token
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(shop)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setDeleteId(shop.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
+          <TableBody>{renderTableBody()}</TableBody>
         </Table>
         <div className="px-4 pb-3">
           <Pagination page={page} totalPages={totalPages} onPageChange={setPage} isLoading={isLoading} />
@@ -179,29 +222,33 @@ export default function TikTokSettingsPage() {
           <DialogHeader>
             <DialogTitle>{editId ? 'Edit TikTok Shop' : 'Add TikTok Shop'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <FormField label="Company" required>
-              <Input value={form.company} onChange={e => updateField('company', e.target.value)} required />
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <FormField label="Company" error={errors.company?.message} required>
+              <Input {...register('company')} />
             </FormField>
-            <FormField label="Shop ID" required>
-              <Input value={form.shop_id} onChange={e => updateField('shop_id', e.target.value)} required />
+            <FormField label="Shop ID" error={errors.shop_id?.message} required>
+              <Input {...register('shop_id')} />
             </FormField>
-            <FormField label="Shop Name" required>
-              <Input value={form.shop_name} onChange={e => updateField('shop_name', e.target.value)} required />
+            <FormField label="Shop Name" error={errors.shop_name?.message} required>
+              <Input {...register('shop_name')} />
             </FormField>
-            <FormField label="App Key" required>
-              <Input value={form.app_key} onChange={e => updateField('app_key', e.target.value)} required />
+            <FormField label="App Key" error={errors.app_key?.message} required>
+              <Input {...register('app_key')} />
             </FormField>
-            <FormField label="App Secret" required={!editId}>
-              <Input type="password" value={form.app_secret} onChange={e => updateField('app_secret', e.target.value)} required={!editId} placeholder={editId ? 'Leave blank to keep current' : ''} />
+            <FormField label="App Secret" error={errors.app_secret?.message} required={!editId}>
+              <Input
+                type="password"
+                {...register('app_secret')}
+                placeholder={editId ? 'Leave blank to keep current' : ''}
+              />
             </FormField>
-            <FormField label="Warehouse">
-              <Input value={form.warehouse ?? ''} onChange={e => updateField('warehouse', e.target.value)} />
+            <FormField label="Warehouse" error={errors.warehouse?.message}>
+              <Input {...register('warehouse')} />
             </FormField>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={isMutating}>
-                {isMutating ? (editId ? 'Updating...' : 'Creating...') : (editId ? 'Update' : 'Create')}
+              <Button type="submit" disabled={isSubmitting || createMutation.isPending || updateMutation.isPending}>
+                {isSubmitting || createMutation.isPending || updateMutation.isPending ? (editId ? 'Updating...' : 'Creating...') : (editId ? 'Update' : 'Create')}
               </Button>
             </DialogFooter>
           </form>

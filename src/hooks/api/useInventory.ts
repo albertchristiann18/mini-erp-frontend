@@ -337,7 +337,7 @@ const companyMarketplaceHooks = createCrudHooks<
 
 // staleTime override on useCompanyMarketplaces (reference tier, 5 min)
 export const useCompanyMarketplaces = (params?: Record<string, string | number>) =>
-  useQuery({
+  useQuery<PaginatedResponse<import('../../types/inventory').CompanyMarketplace>, ApiError>({
     queryKey: companyMarketplaceKeys.list(params),
     queryFn: () => getCompanyMarketplaces({ page_size: 100, ...params }),
     staleTime: STALE_REFERENCE_SLOW,

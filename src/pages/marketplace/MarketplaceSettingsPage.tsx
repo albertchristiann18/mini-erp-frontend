@@ -1,59 +1,76 @@
 import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import {
   useMarketplaceConnections,
   useCreateMarketplaceConnection,
   useToggleMarketplaceConnection,
   useDeleteMarketplaceConnection,
 } from '../../hooks/api/useMarketplace'
-import type { MarketplaceConnectionFormData, MarketplacePlatform } from '../../types/marketplace'
+import type { MarketplacePlatform } from '../../types/marketplace'
 import { toast } from '../../lib/toast'
 import { cn } from '../../lib/utils'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { FormField } from '../../components/ui/form'
+import { Loading, ErrorState, Empty } from '../../components/ui/queryPrimitives'
+import { applyApiErrors, useResetOnOpen } from '../../lib/formHelpers'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '../../components/ui/dialog'
 import { Pencil, Trash2 } from 'lucide-react'
+import type { ApiError } from '../../lib/errors'
 
-const emptyForm: MarketplaceConnectionFormData = {
-  platform: 'SHOPEE',
-  display_name: '',
-}
+const schema = z.object({
+  platform: z.enum(['SHOPEE', 'TIKTOK']),
+  display_name: z.string().min(1, 'Display name is required'),
+})
+type FormValues = z.infer<typeof schema>
+
+const defaultValues: FormValues = { platform: 'SHOPEE', display_name: '' }
 
 export default function MarketplaceSettingsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [form, setForm] = useState<MarketplaceConnectionFormData>({ ...emptyForm })
 
-  const { data, isLoading } = useMarketplaceConnections()
+  const { data, isLoading, isError, error, refetch } = useMarketplaceConnections()
   const createMutation = useCreateMarketplaceConnection()
   const toggleMutation = useToggleMarketplaceConnection()
   const deleteMutation = useDeleteMarketplaceConnection()
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (editId) {
-      return
-    }
-    createMutation.mutate(form, {
-      onSuccess: () => {
-        toast.success('Marketplace connected')
-        setDialogOpen(false)
-        setForm({ ...emptyForm })
-      },
-      onError: () => toast.error('Failed to connect marketplace'),
-    })
-  }
+  const form = useForm<FormValues>({
+    resolver: zodResolver(schema),
+    defaultValues,
+  })
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = form
+
+  useResetOnOpen(form, dialogOpen, editId
+    ? { platform: watch('platform'), display_name: watch('display_name') }
+    : defaultValues)
 
   const openCreate = () => {
     setEditId(null)
-    setForm({ ...emptyForm })
     setDialogOpen(true)
   }
 
   const connections = data?.results ?? []
+
+  const onSubmit = async (values: FormValues) => {
+    // Edit path: currently no update endpoint used — same as original (edit UI was no-op)
+    if (editId) return
+    try {
+      await createMutation.mutateAsync(values)
+      toast.success('Marketplace connected')
+      setDialogOpen(false)
+    } catch (err) {
+      applyApiErrors(form, err as ApiError)
+      if (!(err as ApiError).fieldErrors) {
+        toast.error('Failed to connect marketplace')
+      }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -63,15 +80,11 @@ export default function MarketplaceSettingsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-          Loading...
-        </div>
+        <Loading />
+      ) : isError ? (
+        <ErrorState error={error as ApiError} onRetry={refetch} />
       ) : connections.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-muted-foreground">
-            No marketplaces connected yet. Click &quot;Connect Marketplace&quot; to get started.
-          </p>
-        </div>
+        <Empty message='No marketplaces connected yet. Click "Connect Marketplace" to get started.' />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {connections.map(connection => (
@@ -93,7 +106,8 @@ export default function MarketplaceSettingsPage() {
                     className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
                     onClick={() => {
                       setEditId(connection.id)
-                      setForm({ platform: connection.platform, display_name: connection.display_name })
+                      setValue('platform', connection.platform)
+                      setValue('display_name', connection.display_name)
                       setDialogOpen(true)
                     }}
                   >
@@ -150,7 +164,7 @@ export default function MarketplaceSettingsPage() {
           <DialogHeader>
             <DialogTitle>{editId ? 'Edit Connection' : 'Connect Marketplace'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {!editId && (
               <div>
                 <label className="mb-2 block text-sm font-medium text-foreground">Platform</label>
@@ -159,10 +173,10 @@ export default function MarketplaceSettingsPage() {
                     <button
                       key={platform}
                       type="button"
-                      onClick={() => setForm(f => ({ ...f, platform }))}
+                      onClick={() => setValue('platform', platform)}
                       className={cn(
                         'flex flex-col items-center justify-center rounded-lg border-2 p-4 transition-colors',
-                        form.platform === platform
+                        watch('platform') === platform
                           ? platform === 'SHOPEE'
                             ? 'border-orange-500 bg-orange-50 dark:bg-orange-500/10'
                             : 'border-gray-900 bg-gray-50 dark:border-gray-400 dark:bg-gray-500/10'
@@ -182,18 +196,16 @@ export default function MarketplaceSettingsPage() {
                 </div>
               </div>
             )}
-            <FormField label="Display Name" required>
+            <FormField label="Display Name" error={errors.display_name?.message} required>
               <Input
-                value={form.display_name}
-                onChange={e => setForm(f => ({ ...f, display_name: e.target.value }))}
+                {...register('display_name')}
                 placeholder="e.g. Brand A Shopee Official"
-                required
               />
             </FormField>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? 'Connecting...' : editId ? 'Save' : 'Connect'}
+              <Button type="submit" disabled={isSubmitting || createMutation.isPending}>
+                {isSubmitting || createMutation.isPending ? 'Connecting...' : editId ? 'Save' : 'Connect'}
               </Button>
             </DialogFooter>
           </form>
