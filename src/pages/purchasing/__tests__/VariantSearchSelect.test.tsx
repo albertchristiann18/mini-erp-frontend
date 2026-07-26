@@ -10,7 +10,7 @@ vi.mock('../../../hooks/api/useInventory', () => ({
   useVariantSearch: (...args: unknown[]) => mockUseVariantSearch(...args),
 }))
 
-vi.mock('../QuickCreateProductModal', () => ({
+vi.mock('../QuickCreateProduct', () => ({
   QuickCreateProductModal: () => null,
 }))
 

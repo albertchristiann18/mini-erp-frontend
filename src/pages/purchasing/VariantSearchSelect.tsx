@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { cn } from '../../lib/utils'
 import { useVariantSearch } from '../../hooks/api/useInventory'
-import { QuickCreateProductModal } from './QuickCreateProductModal'
+import { QuickCreateProductModal } from './QuickCreateProduct'
 
 interface Props {
   value: string

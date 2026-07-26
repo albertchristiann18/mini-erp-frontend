@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { vi, it, expect, beforeEach } from 'vitest'
-import { QuickCreateProductModal } from '../QuickCreateProductModal'
+import { QuickCreateProductModal } from '../QuickCreateProduct'
 
 const mockCreateProduct = vi.fn()
 const mockUploadProductPhoto = vi.fn()
@@ -8,6 +8,7 @@ const mockUploadProductPhoto = vi.fn()
 vi.mock('../../../hooks/api/useInventory', () => ({
   useCreateProduct: () => ({ mutateAsync: mockCreateProduct, isPending: false }),
   useSuppliers: () => ({ data: { results: [] } }),
+  useUploadAnyProductPhoto: () => ({ mutateAsync: mockUploadProductPhoto }),
   useCategories: () => ({
     data: {
       results: [
@@ -25,10 +26,6 @@ vi.mock('../../../contexts/AuthContext', () => ({
 
 vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
-}))
-
-vi.mock('../../../api/inventory', () => ({
-  uploadProductPhoto: (...args: unknown[]) => mockUploadProductPhoto(...args),
 }))
 
 vi.mock('../../../components/ui/CategorySelect', () => ({

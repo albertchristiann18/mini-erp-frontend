@@ -478,6 +478,12 @@ export const useUploadProductPhoto = (productId: string) => {
   })
 }
 
+export const useUploadAnyProductPhoto = () =>
+  useMutation({
+    mutationFn: ({ productId, image }: { productId: string; image: File }) =>
+      uploadProductPhoto(productId, image),
+  })
+
 export const useDeleteProductPhoto = (productId: string) => {
   const qc = useQueryClient()
   return useMutation({
