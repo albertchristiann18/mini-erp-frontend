@@ -407,4 +407,46 @@ export default defineConfig([
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
+  // ── Sales domain sealed (ticket #14) ─────────────────────────────────────
+  // pages↛api and max-lines sealed for sales production files.
+  // hooks/sales/** is included for max-lines only; hooks are shared-tier so the
+  // pages↛api policy does not fire for them (from.type === 'domain' guard).
+  // __tests__ excluded via ignores.
+  {
+    files: [
+      'src/pages/sales/**/*.{ts,tsx}',
+      'src/hooks/sales/**/*.{ts,tsx}',
+      'src/api/sales.ts',
+      'src/types/sales.ts',
+      'src/lib/salesKeys.ts',
+    ],
+    ignores: ['**/__tests__/**'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for sales: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for sales
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
+  },
 ])
