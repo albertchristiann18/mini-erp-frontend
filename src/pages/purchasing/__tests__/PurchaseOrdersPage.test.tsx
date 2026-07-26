@@ -103,14 +103,21 @@ beforeEach(() => {
 })
 
 it('renders page size selector with default "10 / page"', async () => {
-  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
   mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
   renderPage()
   expect(await screen.findByText('10 / page')).toBeInTheDocument()
 })
 
+it('shows error state when purchase orders fetch fails', async () => {
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: { status: 500, message: 'Server error' }, refetch: vi.fn() })
+  mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
+  renderPage()
+  expect(await screen.findByText('Server error')).toBeInTheDocument()
+})
+
 it('renders summary card when summary data has upcoming_count > 0', async () => {
-  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
   mockUsePurchaseOrderSummary.mockReturnValue({
     data: {
       upcoming_count: 3,
@@ -126,7 +133,7 @@ it('renders summary card when summary data has upcoming_count > 0', async () => 
 })
 
 it('summary card is hidden when upcoming_count == 0', async () => {
-  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
   mockUsePurchaseOrderSummary.mockReturnValue({
     data: {
       upcoming_count: 0,
@@ -140,7 +147,7 @@ it('summary card is hidden when upcoming_count == 0', async () => {
 })
 
 it('clicking Invoice Date column header toggles ordering', async () => {
-  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
   mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
   renderPage()
 
@@ -154,14 +161,14 @@ it('clicking Invoice Date column header toggles ordering', async () => {
 })
 
 it('renders Created Date column header', async () => {
-  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
   mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
   renderPage()
   expect(await screen.findByText('Created Date')).toBeInTheDocument()
 })
 
 it('clicking a table row navigates to the PO detail page', async () => {
-  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
   mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
   renderPage()
 
@@ -176,7 +183,7 @@ it('clicking a table row navigates to the PO detail page', async () => {
 })
 
 it('loads data immediately on mount without requiring a search trigger', async () => {
-  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false })
+  mockUsePurchaseOrdersFiltered.mockReturnValue({ data: makeData(), isLoading: false, isError: false, error: null, refetch: vi.fn() })
   mockUsePurchaseOrderSummary.mockReturnValue({ data: undefined })
   renderPage()
   expect(mockUsePurchaseOrdersFiltered).toHaveBeenCalledWith(

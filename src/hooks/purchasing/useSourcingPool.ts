@@ -8,13 +8,14 @@ import {
   importAndAdd,
   resolveSourcingConflicts,
 } from '../../api/purchasing'
+import { colorAbbreviationKeys, purchaseOrderKeys } from '../../lib/purchasingKeys'
 import type { ImportAndAddRequest, ResolveSourcingConflictsRequest } from '../../types/purchasing'
 
 export const useDownloadSourcingPoolTemplate = () =>
   useMutation({
     mutationFn: async () => {
-      const response = await downloadSourcingPoolTemplate()
-      const url = window.URL.createObjectURL(new Blob([response.data as BlobPart]))
+      const blob = await downloadSourcingPoolTemplate()
+      const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       link.setAttribute('download', 'sourcing_template.xlsx')
@@ -27,13 +28,13 @@ export const useDownloadSourcingPoolTemplate = () =>
 
 export const usePreviewSourcingPool = () =>
   useMutation({
-    mutationFn: (file: File) => previewSourcingPoolUpload(file).then((r) => r.data),
+    mutationFn: (file: File) => previewSourcingPoolUpload(file),
   })
 
 export const useColorAbbreviations = () =>
   useQuery({
-    queryKey: ['color-abbreviations'],
-    queryFn: () => getColorAbbreviations().then((r) => r.data),
+    queryKey: colorAbbreviationKeys.all(),
+    queryFn: () => getColorAbbreviations(),
     staleTime: 60_000,
   })
 
@@ -41,9 +42,9 @@ export const useUpsertColorAbbreviation = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (data: { color_name: string; abbreviation: string }) =>
-      upsertColorAbbreviation(data).then((r) => r.data),
+      upsertColorAbbreviation(data),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['color-abbreviations'] })
+      void qc.invalidateQueries({ queryKey: colorAbbreviationKeys.all() })
     },
   })
 }
@@ -53,7 +54,7 @@ export const useDeleteColorAbbreviation = () => {
   return useMutation({
     mutationFn: (color_name: string) => deleteColorAbbreviation(color_name),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['color-abbreviations'] })
+      void qc.invalidateQueries({ queryKey: colorAbbreviationKeys.all() })
     },
   })
 }
@@ -62,9 +63,9 @@ export const useImportAndAdd = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ poId, data }: { poId: string; data: ImportAndAddRequest }) =>
-      importAndAdd(poId, data).then((r) => r.data),
+      importAndAdd(poId, data),
     onSuccess: (_result, variables) => {
-      void qc.invalidateQueries({ queryKey: ['purchase-order', variables.poId] })
+      void qc.invalidateQueries({ queryKey: purchaseOrderKeys.detail(variables.poId) })
     },
   })
 }
@@ -73,9 +74,9 @@ export const useResolveSourcingConflicts = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ poId, data }: { poId: string; data: ResolveSourcingConflictsRequest }) =>
-      resolveSourcingConflicts(poId, data).then((r) => r.data),
+      resolveSourcingConflicts(poId, data),
     onSuccess: (_result, variables) => {
-      void qc.invalidateQueries({ queryKey: ['purchase-order', variables.poId] })
+      void qc.invalidateQueries({ queryKey: purchaseOrderKeys.detail(variables.poId) })
     },
   })
 }

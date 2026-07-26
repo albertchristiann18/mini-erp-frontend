@@ -1,12 +1,13 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { vi, it, expect } from 'vitest'
+import { vi, it, expect, beforeEach } from 'vitest'
 import SuppliersPage from '../SuppliersPage'
 
 const mockMutateAsync = vi.fn()
 const mockUpdateMutateAsync = vi.fn()
 const mockDeleteMutateAsync = vi.fn()
+const mockUseSuppliersImpl = vi.fn()
 
 const mockSuppliersData: { count: number; results: Record<string, unknown>[] } = {
   count: 2,
@@ -17,11 +18,15 @@ const mockSuppliersData: { count: number; results: Record<string, unknown>[] } =
 }
 
 vi.mock('../../../hooks/api/useInventory', () => ({
-  useSuppliers: () => ({ data: mockSuppliersData, isLoading: false }),
+  useSuppliers: (...args: unknown[]) => mockUseSuppliersImpl(...args),
   useCreateSupplier: () => ({ mutateAsync: mockMutateAsync, isPending: false }),
   useUpdateSupplier: () => ({ mutateAsync: mockUpdateMutateAsync, isPending: false }),
   useDeleteSupplier: () => ({ mutateAsync: mockDeleteMutateAsync, isPending: false }),
 }))
+
+beforeEach(() => {
+  mockUseSuppliersImpl.mockReturnValue({ data: mockSuppliersData, isLoading: false, isError: false, error: null, refetch: vi.fn() })
+})
 
 vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -153,4 +158,10 @@ it('test_delete_supplier_confirms_and_calls_mutate', async () => {
   await waitFor(() => {
     expect(mockDeleteMutateAsync).toHaveBeenCalledWith('s1')
   })
+})
+
+it('shows error state when suppliers fetch fails', async () => {
+  mockUseSuppliersImpl.mockReturnValue({ data: undefined, isLoading: false, isError: true, error: { status: 500, message: 'Server error' }, refetch: vi.fn() })
+  renderPage()
+  expect(await screen.findByText('Server error')).toBeInTheDocument()
 })

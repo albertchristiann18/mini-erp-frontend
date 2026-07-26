@@ -1,15 +1,15 @@
-import client from './client'
+import { http } from '../lib/http'
 import type { PurchaseOrder, PurchaseOrderSummary, ReplenishmentItem, TransitionCheckResult, SourcingPoolPreviewResult, ColorAbbreviation, ImportAndAddRequest, ImportAndAddResult, ResolveSourcingConflictsRequest, ResolveSourcingConflictsResult } from '../types/purchasing'
 import type { PaginatedResponse } from '../types/inventory'
 
 export const getPurchaseOrders = (params?: Record<string, string | number>) =>
-  client.get<PaginatedResponse<PurchaseOrder>>('/purchase-order/', { params })
+  http.get<PaginatedResponse<PurchaseOrder>>('/purchase-order/', { params })
 
 export const getPurchaseOrder = (id: string) =>
-  client.get<PurchaseOrder>(`/purchase-order/${id}/`)
+  http.get<PurchaseOrder>(`/purchase-order/${id}/`)
 
 export const createPurchaseOrder = (data: unknown) =>
-  client.post<{ id: string }>('/purchase-order/', data)
+  http.post<{ id: string }>('/purchase-order/', data)
 
 export const updatePurchaseOrder = (id: string, data: Record<string, unknown>) => {
   const hasFile = Object.values(data).some(v => v instanceof File)
@@ -21,49 +21,49 @@ export const updatePurchaseOrder = (id: string, data: Record<string, unknown>) =
       else if (Array.isArray(value) || typeof value === 'object') form.append(key, JSON.stringify(value))
       else form.append(key, String(value))
     }
-    return client.patch(`/purchase-order/${id}/`, form, {
+    return http.patch<unknown>(`/purchase-order/${id}/`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   }
-  return client.patch(`/purchase-order/${id}/`, data)
+  return http.patch<unknown>(`/purchase-order/${id}/`, data)
 }
 
 export const advancePOStatus = (id: string, status: string) =>
-  client.post(`/purchase-order/${id}/advance_status/`, { status })
+  http.post<unknown>(`/purchase-order/${id}/advance_status/`, { status })
 
 export const checkPOTransition = (id: string, targetStatus: string) =>
-  client.post<TransitionCheckResult>(`/purchase-order/${id}/check_transition/`, {
+  http.post<TransitionCheckResult>(`/purchase-order/${id}/check_transition/`, {
     status: targetStatus,
   })
 
 export const getReplenishment = (params?: { warehouse_id?: string }) =>
-  client.get<{ results: ReplenishmentItem[] }>('/replenishment/', { params })
+  http.get<{ results: ReplenishmentItem[] }>('/replenishment/', { params })
 
 export const getPurchaseOrderSummary = (params?: Record<string, string>) =>
-  client.get<PurchaseOrderSummary>('/purchase-order/summary/', { params })
+  http.get<PurchaseOrderSummary>('/purchase-order/summary/', { params })
 
 export const downloadSourcingPoolTemplate = () =>
-  client.get('/sourcing-pool/template/', { responseType: 'blob' })
+  http.get<Blob>('/sourcing-pool/template/', { responseType: 'blob' })
 
 export const previewSourcingPoolUpload = (file: File) => {
   const form = new FormData()
   form.append('file', file)
-  return client.post<SourcingPoolPreviewResult>('/sourcing-pool/preview/', form, {
+  return http.post<SourcingPoolPreviewResult>('/sourcing-pool/preview/', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
 
 export const getColorAbbreviations = () =>
-  client.get<ColorAbbreviation[]>('/sourcing-pool/color-abbreviations/')
+  http.get<ColorAbbreviation[]>('/sourcing-pool/color-abbreviations/')
 
 export const upsertColorAbbreviation = (data: { color_name: string; abbreviation: string }) =>
-  client.post<ColorAbbreviation>('/sourcing-pool/color-abbreviations/', data)
+  http.post<ColorAbbreviation>('/sourcing-pool/color-abbreviations/', data)
 
 export const deleteColorAbbreviation = (color_name: string) =>
-  client.delete('/sourcing-pool/color-abbreviations/', { data: { color_name } })
+  http.delete('/sourcing-pool/color-abbreviations/', { data: { color_name } })
 
 export const importAndAdd = (poId: string, data: ImportAndAddRequest) =>
-  client.post<ImportAndAddResult>(`/purchase-order/${poId}/import-and-add/`, data)
+  http.post<ImportAndAddResult>(`/purchase-order/${poId}/import-and-add/`, data)
 
 export const resolveSourcingConflicts = (poId: string, data: ResolveSourcingConflictsRequest) =>
-  client.post<ResolveSourcingConflictsResult>(`/purchase-order/${poId}/resolve-sourcing-conflicts/`, data)
+  http.post<ResolveSourcingConflictsResult>(`/purchase-order/${poId}/resolve-sourcing-conflicts/`, data)

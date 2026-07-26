@@ -3,27 +3,32 @@ import {
   getPurchaseOrders, getPurchaseOrder,
   createPurchaseOrder, updatePurchaseOrder, advancePOStatus, checkPOTransition, getReplenishment, getPurchaseOrderSummary,
 } from '../../api/purchasing'
+import {
+  purchaseOrderKeys,
+  replenishmentKeys,
+  purchaseOrderSummaryKeys,
+} from '../../lib/purchasingKeys'
 import type { POStatus } from '../../types/purchasing'
 
 export const usePurchaseOrders = (status?: POStatus, page = 1) =>
   useQuery({
-    queryKey: ['purchase-orders', status, page],
-    queryFn: () => getPurchaseOrders({ ...(status ? { status } : {}), page, page_size: 20 }).then(r => r.data),
+    queryKey: purchaseOrderKeys.list({ status, page }),
+    queryFn: () => getPurchaseOrders({ ...(status ? { status } : {}), page, page_size: 20 }),
   })
 
 export const usePurchaseOrder = (id: string) =>
   useQuery({
-    queryKey: ['purchase-order', id],
-    queryFn: () => getPurchaseOrder(id).then(r => r.data),
+    queryKey: purchaseOrderKeys.detail(id),
+    queryFn: () => getPurchaseOrder(id),
     enabled: !!id,
   })
 
 export const useCreatePurchaseOrder = (onCreated?: (id: string) => void) => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: unknown) => createPurchaseOrder(data).then(r => r.data),
+    mutationFn: (data: unknown) => createPurchaseOrder(data),
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      void qc.invalidateQueries({ queryKey: purchaseOrderKeys.lists() })
       onCreated?.(data.id)
     },
   })
@@ -32,7 +37,7 @@ export const useCreatePurchaseOrder = (onCreated?: (id: string) => void) => {
 export const useCheckPOTransition = () =>
   useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      checkPOTransition(id, status).then(r => r.data),
+      checkPOTransition(id, status),
   })
 
 export const useAdvancePOStatus = () => {
@@ -40,8 +45,8 @@ export const useAdvancePOStatus = () => {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => advancePOStatus(id, status),
     onSuccess: (_: unknown, variables: { id: string; status: string }) => {
-      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
-      qc.invalidateQueries({ queryKey: ['purchase-order', variables.id] })
+      void qc.invalidateQueries({ queryKey: purchaseOrderKeys.lists() })
+      void qc.invalidateQueries({ queryKey: purchaseOrderKeys.detail(variables.id) })
     },
   })
 }
@@ -52,27 +57,28 @@ export const useUpdatePurchaseOrder = () => {
     mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
       updatePurchaseOrder(id, data),
     onSuccess: (_: unknown, variables: { id: string; data: Record<string, unknown> }) => {
-      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
-      qc.invalidateQueries({ queryKey: ['purchase-order', variables.id] })
+      void qc.invalidateQueries({ queryKey: purchaseOrderKeys.lists() })
+      void qc.invalidateQueries({ queryKey: purchaseOrderKeys.detail(variables.id) })
     },
   })
 }
 
 export const usePurchaseOrdersFiltered = (params: Record<string, string | number>, options?: { enabled?: boolean }) =>
   useQuery({
-    queryKey: ['purchase-orders', params],
-    queryFn: () => getPurchaseOrders(params).then(r => r.data),
+    queryKey: purchaseOrderKeys.list(params),
+    queryFn: () => getPurchaseOrders(params),
     enabled: options?.enabled ?? true,
   })
 
 export const useReplenishment = (warehouseId?: string) =>
   useQuery({
-    queryKey: ['replenishment', warehouseId],
-    queryFn: () => getReplenishment(warehouseId ? { warehouse_id: warehouseId } : undefined).then(r => r.data),
+    queryKey: replenishmentKeys.list({ warehouseId }),
+    queryFn: () => getReplenishment(warehouseId ? { warehouse_id: warehouseId } : undefined),
   })
 
 export const usePurchaseOrderSummary = (params?: Record<string, string>) =>
   useQuery({
-    queryKey: ['purchase-order-summary', params],
-    queryFn: () => getPurchaseOrderSummary(params).then(r => r.data),
+    queryKey: purchaseOrderSummaryKeys.list(params),
+    queryFn: () => getPurchaseOrderSummary(params),
   })
+

@@ -6,30 +6,36 @@ import { vi, it, expect } from 'vitest'
 import ReplenishmentPage from '../ReplenishmentPage'
 
 const mockMutateAsync = vi.fn()
+const mockUseReplenishmentImpl = vi.fn()
 
 vi.mock('../../../hooks/api/usePurchasing', () => ({
-  useReplenishment: () => ({
-    data: {
-      results: [
-        {
-          variant_id: 'v1',
-          sku_variant_code: 'SKU-RED-M',
-          variant_name: 'Red / M',
-          product_name: 'T-Shirt',
-          stock_on_hand: 20,
-          incoming_qty: 5,
-          avg_sales_7d: 3.0,
-          avg_sales_30d: 2.5,
-        },
-      ],
-    },
-    isLoading: false,
-  }),
+  useReplenishment: (...args: unknown[]) => mockUseReplenishmentImpl(...args),
   useCreatePurchaseOrder: () => ({
     mutateAsync: mockMutateAsync,
     isPending: false,
   }),
 }))
+
+mockUseReplenishmentImpl.mockReturnValue({
+  data: {
+    results: [
+      {
+        variant_id: 'v1',
+        sku_variant_code: 'SKU-RED-M',
+        variant_name: 'Red / M',
+        product_name: 'T-Shirt',
+        stock_on_hand: 20,
+        incoming_qty: 5,
+        avg_sales_7d: 3.0,
+        avg_sales_30d: 2.5,
+      },
+    ],
+  },
+  isLoading: false,
+  isError: false,
+  error: null,
+  refetch: vi.fn(),
+})
 
 vi.mock('../../../hooks/api/useInventory', () => ({
   useWarehouses: () => ({
@@ -85,4 +91,10 @@ it('button becomes enabled after setting order qty', async () => {
   await user.clear(orderQtyInput)
   await user.type(orderQtyInput, '10')
   expect(screen.getByRole('button', { name: 'Create Draft PO' })).toBeEnabled()
+})
+
+it('shows error state when replenishment fetch fails', async () => {
+  mockUseReplenishmentImpl.mockReturnValueOnce({ data: undefined, isLoading: false, isError: true, error: { status: 500, message: 'Server error' }, refetch: vi.fn() })
+  renderPage()
+  expect(await screen.findByText('Server error')).toBeInTheDocument()
 })

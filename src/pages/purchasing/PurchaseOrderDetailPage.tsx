@@ -14,11 +14,13 @@ import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Textarea } from '../../components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
+import { Loading, ErrorState, Empty } from '../../components/ui/queryPrimitives'
 import { ArrowLeft, FileDown, Pencil, Save, Plus, Upload, X as XIcon } from 'lucide-react'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { toast } from '../../lib/toast'
 import type { POStatus, ReplenishmentItem } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
+import type { ApiError } from '../../lib/errors'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -39,7 +41,7 @@ export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const isCreating = id === 'new'
-  const { data: po, isLoading } = usePurchaseOrder(isCreating ? '' : id!)
+  const { data: po, isLoading, isError, error, refetch } = usePurchaseOrder(isCreating ? '' : id!)
   const { user } = useAuth()
   const createMutation = useCreatePurchaseOrder()
   const updateMutation = useUpdatePurchaseOrder()
@@ -78,8 +80,9 @@ export default function PurchaseOrderDetailPage() {
     finally { setUploadingVariantPhoto(prev => ({ ...prev, [variantId]: false })) }
   }
 
-  if (!isCreating && isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>
-  if (!isCreating && !po) return <div className="p-8 text-center text-muted-foreground">Purchase order not found</div>
+  if (!isCreating && isLoading) return <Loading />
+  if (!isCreating && isError) return <ErrorState error={error as unknown as ApiError} onRetry={refetch} />
+  if (!isCreating && !po) return <Empty message="Purchase order not found." />
 
   const canAddDeleteItems = isCreating || po?.status === 'DRAFT' || po?.status === 'ORDERED'
   const isEditable = (field: string) => isCreating || (po?.editable_fields?.header?.includes(field) ?? false)

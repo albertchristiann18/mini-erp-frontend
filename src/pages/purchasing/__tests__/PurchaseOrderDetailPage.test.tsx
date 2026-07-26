@@ -136,7 +136,7 @@ const basePo = {
 }
 
 function hookResult(data: unknown) {
-  return { data, isLoading: false } as never
+  return { data, isLoading: false, isError: false, error: null, refetch: vi.fn() } as never
 }
 
 function renderPage() {
@@ -1584,4 +1584,13 @@ it('creating_mode_renders_order_items_table_and_added_items_appear', async () =>
   await waitFor(() => {
     expect(screen.getByText('Product A')).toBeInTheDocument()
   })
+})
+
+it('shows error state when PO fetch fails', async () => {
+  vi.mocked(usePurchaseOrder).mockReturnValue({ data: undefined, isLoading: false, isError: true, error: { status: 500, message: 'Server error' }, refetch: vi.fn() } as never)
+  vi.mocked(useParams).mockReturnValue({ id: 'po-1' })
+
+  renderPage()
+
+  expect(await screen.findByText('Server error')).toBeInTheDocument()
 })
