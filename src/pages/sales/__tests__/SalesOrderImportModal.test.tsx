@@ -347,7 +347,7 @@ it('preview API error shows toast.error with backend error message', async () =>
   const toastErrorSpy = vi.spyOn(toast, 'error')
 
   mockPreviewMutate.mockImplementation((_vars, { onError }: { onError: (err: unknown) => void }) => {
-    onError({ response: { data: { error: 'Invalid file format' } } })
+    onError({ status: 422, message: 'Invalid file format' })
   })
 
   render(<SalesOrderImportModal open onClose={() => {}} onImportSuccess={() => {}} />)
@@ -374,7 +374,7 @@ it('confirm API error shows toast.error with backend error message', async () =>
     onSuccess(basePreview)
   })
   mockConfirmMutate.mockImplementation((_vars, { onError }: { onError: (err: unknown) => void }) => {
-    onError({ response: { data: { error: 'Import failed due to inventory conflict' } } })
+    onError({ status: 500, message: 'Import failed due to inventory conflict' })
   })
 
   render(<SalesOrderImportModal open onClose={() => {}} onImportSuccess={() => {}} />)
