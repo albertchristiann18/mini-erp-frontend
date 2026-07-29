@@ -1,76 +1,10 @@
-import { useState } from 'react'
-import { Document, Page, View, Text, Image, Link, StyleSheet, PDFViewer, pdf } from '@react-pdf/renderer'
-import type { PurchaseOrder } from '../../types/purchasing'
-import type { SubGroup } from './purchaseOrderPDFUtils'
-import { groupBySubGroup } from './purchaseOrderPDFUtils'
+import { Document, Page, View, Text, Image, Link } from '@react-pdf/renderer'
+import type { PurchaseOrder } from '../../../types/purchasing'
+import type { SubGroup } from '../purchaseOrderPDFUtils'
+import styles from './pdfStyles'
+import { fmtNum, fmtDate } from './pdfFormat'
 
-function fmtNum(val: string | number | null | undefined, decimals = 2): string {
-  if (val == null || val === '') return '—'
-  return Number(val).toFixed(decimals)
-}
-
-function fmtDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-const styles = StyleSheet.create({
-  page: { padding: 28, fontSize: 8, fontFamily: 'Helvetica', backgroundColor: '#ffffff' },
-  header: { marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#e5e7eb' },
-  headerTitle: { fontSize: 13, fontWeight: 'bold', marginBottom: 6 },
-  headerRow: { flexDirection: 'row', gap: 20, marginBottom: 2 },
-  headerLabel: { color: '#6b7280' },
-  headerValue: { fontWeight: 'bold' },
-  productSectionHeader: {
-    paddingTop: 10,
-    paddingBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    marginBottom: 4,
-  },
-  subGroupBlock: {
-    flexDirection: 'row' as const,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    paddingBottom: 10,
-    paddingTop: 6,
-    gap: 10,
-  },
-  subGroupLabel: {
-    fontSize: 9,
-    fontWeight: 'bold' as const,
-    marginBottom: 4,
-    color: '#374151',
-  },
-  imageBox: { width: 64, height: 64, flexShrink: 0 },
-  productImage: { width: 64, height: 64, objectFit: 'cover', borderRadius: 2 },
-  imagePlaceholder: { width: 64, height: 64, backgroundColor: '#f3f4f6', borderRadius: 2 },
-  productContent: { flex: 1 },
-  productName: { fontSize: 9, fontWeight: 'bold', marginBottom: 2 },
-  productLink: { fontSize: 7, color: '#2563eb', marginBottom: 6, textDecoration: 'none' },
-  table: { marginTop: 4 },
-  tableRow: { flexDirection: 'row', paddingVertical: 2 },
-  tableHeaderRow: { flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: '#d1d5db', backgroundColor: '#f9fafb' },
-  subtotalRow: { borderTopWidth: 1, borderTopColor: '#d1d5db', paddingTop: 4, marginTop: 2 },
-  colVariant: { flex: 3, paddingHorizontal: 2 },
-  colQty: { width: 32, textAlign: 'right', paddingHorizontal: 2 },
-  colPrice: { width: 48, textAlign: 'right', paddingHorizontal: 2 },
-  colTotal: { width: 56, textAlign: 'right', paddingHorizontal: 2, fontWeight: 'bold' },
-  headerText: { color: '#6b7280', fontSize: 7 },
-  subtotalText: { fontWeight: 'bold', fontSize: 8 },
-  footer: {
-    marginTop: 16,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 24,
-  },
-  footerLabel: { color: '#6b7280' },
-  footerValue: { fontWeight: 'bold', fontSize: 9 },
-})
-
-interface DocProps {
+interface PODocumentProps {
   po: PurchaseOrder
   subGroups: SubGroup[]
   grandTotalQty: number
@@ -79,7 +13,7 @@ interface DocProps {
   imageMap: Record<string, string>
 }
 
-function PODocument({ po, subGroups, grandTotalQty, grandTotalForeign, currencySymbol, imageMap }: DocProps) {
+export function PODocument({ po, subGroups, grandTotalQty, grandTotalForeign, currencySymbol, imageMap }: PODocumentProps) {
   const productOrder: string[] = []
   const productMeta: Record<string, { product_name: string; product_supplier_link: string | null }> = {}
   const subGroupsByProduct: Record<string, SubGroup[]> = {}
@@ -212,97 +146,5 @@ function PODocument({ po, subGroups, grandTotalQty, grandTotalForeign, currencyS
         </View>
       </Page>
     </Document>
-  )
-}
-
-function getCurrencySymbol(currency: string | null | undefined): string {
-  const map: Record<string, string> = {
-    CNY: '¥', RMB: '¥', USD: '$', EUR: '€', SGD: 'S$', IDR: 'Rp',
-  }
-  return map[(currency ?? '').toUpperCase()] ?? (currency ?? '¥')
-}
-
-interface Props {
-  po: PurchaseOrder
-  subGroups?: SubGroup[]
-  imageMap?: Record<string, string>
-  onDownload?: () => void
-}
-
-export default function PurchaseOrderExportPDF({
-  po,
-  subGroups: subGroupsProp,
-  imageMap: imageMapProp,
-  onDownload,
-}: Props) {
-  const subGroups = subGroupsProp ?? groupBySubGroup(po.order_details ?? [])
-  const imageMap = imageMapProp ?? {}
-  const currencySymbol = getCurrencySymbol(po.currency)
-  const grandTotalQty = subGroups.reduce(
-    (s, sg) => s + sg.items.reduce((si, i) => si + i.ordered_qty, 0),
-    0,
-  )
-  const grandTotalForeign = subGroups.reduce(
-    (s, sg) =>
-      s + sg.items.reduce(
-        (si, i) => si + Number(i.discounted_total_price_foreign ?? i.total_price_foreign ?? 0),
-        0,
-      ),
-    0,
-  )
-
-  const [isDownloading, setIsDownloading] = useState(false)
-
-  const handleDownload = async () => {
-    setIsDownloading(true)
-    try {
-      const blob = await pdf(
-        <PODocument
-          po={po}
-          subGroups={subGroups}
-          grandTotalQty={grandTotalQty}
-          grandTotalForeign={grandTotalForeign}
-          currencySymbol={currencySymbol}
-          imageMap={imageMapProp ?? {}}
-        />,
-      ).toBlob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `PO-${po.purchase_order_number}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-      onDownload?.()
-    } finally {
-      setIsDownloading(false)
-    }
-  }
-
-  const downloadDisabled = isDownloading || subGroups.length === 0
-
-  return (
-    <div className="flex flex-col h-full">
-      <PDFViewer width="100%" height="100%" showToolbar>
-        <PODocument
-          po={po}
-          subGroups={subGroups}
-          grandTotalQty={grandTotalQty}
-          grandTotalForeign={grandTotalForeign}
-          currencySymbol={currencySymbol}
-          imageMap={imageMap}
-        />
-      </PDFViewer>
-      <div className="flex justify-end px-6 py-3 border-t bg-background">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleDownload}
-          disabled={downloadDisabled}
-          aria-disabled={downloadDisabled}
-        >
-          {isDownloading ? 'Downloading...' : 'Download PDF'}
-        </button>
-      </div>
-    </div>
   )
 }
