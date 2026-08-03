@@ -1,4 +1,4 @@
-import apiClient from './client'
+import { http } from '../lib/http'
 import type { MarketplaceConnection, MarketplaceConnectionFormData } from '../types/marketplace'
 
 export interface PaginatedResponse<T> {
@@ -8,17 +8,17 @@ export interface PaginatedResponse<T> {
   results: T[]
 }
 
-export const getMarketplaceConnections = (page = 1) =>
-  apiClient.get<PaginatedResponse<MarketplaceConnection>>('/marketplace-connections/', { params: { page } }).then(r => r.data)
+export const getMarketplaceConnections = (page = 1): Promise<PaginatedResponse<MarketplaceConnection>> =>
+  http.get<PaginatedResponse<MarketplaceConnection>>('/marketplace-connections/', { params: { page } })
 
-export const createMarketplaceConnection = (data: MarketplaceConnectionFormData) =>
-  apiClient.post<MarketplaceConnection>('/marketplace-connections/', data).then(r => r.data)
+export const createMarketplaceConnection = (data: MarketplaceConnectionFormData): Promise<MarketplaceConnection> =>
+  http.post<MarketplaceConnection>('/marketplace-connections/', data)
 
-export const updateMarketplaceConnection = (id: string, data: Partial<MarketplaceConnectionFormData>) =>
-  apiClient.patch<MarketplaceConnection>(`/marketplace-connections/${id}/`, data).then(r => r.data)
+export const updateMarketplaceConnection = (id: string, data: Partial<MarketplaceConnectionFormData>): Promise<MarketplaceConnection> =>
+  http.patch<MarketplaceConnection>(`/marketplace-connections/${id}/`, data)
 
-export const deleteMarketplaceConnection = (id: string) =>
-  apiClient.delete(`/marketplace-connections/${id}/`).then(r => r.data)
+export const deleteMarketplaceConnection = (id: string): Promise<unknown> =>
+  http.delete(`/marketplace-connections/${id}/`)
 
-export const toggleMarketplaceConnection = (id: string) =>
-  apiClient.post<MarketplaceConnection>(`/marketplace-connections/${id}/toggle_active/`).then(r => r.data)
+export const toggleMarketplaceConnection = (id: string): Promise<MarketplaceConnection> =>
+  http.post<MarketplaceConnection>(`/marketplace-connections/${id}/toggle_active/`)

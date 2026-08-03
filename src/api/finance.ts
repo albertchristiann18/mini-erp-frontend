@@ -1,4 +1,4 @@
-import client from './client'
+import { http } from '../lib/http'
 import type {
   AccountsPayable, AccountsReceivable, Expense, ExpenseCategory,
   DashboardKPIs, IncomeStatement, BalanceSheet, CashFlow, ExpenseSummary,
@@ -6,56 +6,56 @@ import type {
 } from '../types/finance'
 import type { PaginatedResponse } from '../types/inventory'
 
-export const getExpenses = (params?: Record<string, string | number>) =>
-  client.get<PaginatedResponse<Expense>>('/expenses/', { params })
+export const getExpenses = (params?: Record<string, string | number>): Promise<PaginatedResponse<Expense>> =>
+  http.get<PaginatedResponse<Expense>>('/expenses/', { params })
 
-export const createExpense = (data: unknown) =>
-  client.post<Expense>('/expenses/', data)
+export const createExpense = (data: unknown): Promise<Expense> =>
+  http.post<Expense>('/expenses/', data)
 
-export const updateExpense = (id: string, data: unknown) =>
-  client.patch<Expense>(`/expenses/${id}/`, data)
+export const updateExpense = (id: string, data: unknown): Promise<Expense> =>
+  http.patch<Expense>(`/expenses/${id}/`, data)
 
-export const deleteExpense = (id: string) =>
-  client.delete(`/expenses/${id}/`)
+export const deleteExpense = (id: string): Promise<unknown> =>
+  http.delete(`/expenses/${id}/`)
 
-export const getExpenseCategories = () =>
-  client.get<PaginatedResponse<ExpenseCategory>>('/expense-categories/')
+export const getExpenseCategories = (): Promise<PaginatedResponse<ExpenseCategory>> =>
+  http.get<PaginatedResponse<ExpenseCategory>>('/expense-categories/')
 
-export const getExpenseSummary = (params: { start_date: string; end_date: string; company_id: string }) =>
-  client.get<ExpenseSummary[]>('/expenses/summary/', { params })
+export const getExpenseSummary = (params: { start_date: string; end_date: string; company_id: string }): Promise<ExpenseSummary[]> =>
+  http.get<ExpenseSummary[]>('/expenses/summary/', { params })
 
-export const getAccountsPayable = (params?: Record<string, string | number>) =>
-  client.get<PaginatedResponse<AccountsPayable>>('/accounts-payable/', { params })
+export const getAccountsPayable = (params?: Record<string, string | number>): Promise<PaginatedResponse<AccountsPayable>> =>
+  http.get<PaginatedResponse<AccountsPayable>>('/accounts-payable/', { params })
 
-export const recordPayment = (id: string, data: { amount: number; payment_method: string; payment_date: string; note?: string }) =>
-  client.post(`/accounts-payable/${id}/record-payment/`, data)
+export const recordPayment = (id: string, data: { amount: number; payment_method: string; payment_date: string; note?: string }): Promise<unknown> =>
+  http.post(`/accounts-payable/${id}/record-payment/`, data)
 
-export const getAccountsReceivable = (params?: Record<string, string | number>) =>
-  client.get<PaginatedResponse<AccountsReceivable>>('/accounts-receivable/', { params })
+export const getAccountsReceivable = (params?: Record<string, string | number>): Promise<PaginatedResponse<AccountsReceivable>> =>
+  http.get<PaginatedResponse<AccountsReceivable>>('/accounts-receivable/', { params })
 
-export const settleReceivable = (id: string, data: { settled_amount: number }) =>
-  client.post(`/accounts-receivable/${id}/settle/`, data)
+export const settleReceivable = (id: string, data: { settled_amount: number }): Promise<unknown> =>
+  http.post(`/accounts-receivable/${id}/settle/`, data)
 
-export const getDashboardKPIs = (params: { company_id: string; start_date: string; end_date: string }) =>
-  client.get<DashboardKPIs>('/reports/dashboard/', { params })
+export const getDashboardKPIs = (params: { company_id: string; start_date: string; end_date: string }): Promise<DashboardKPIs> =>
+  http.get<DashboardKPIs>('/reports/dashboard/', { params })
 
-export const getIncomeStatement = (params: { company_id: string; start_date: string; end_date: string }) =>
-  client.get<IncomeStatement>('/reports/income-statement/', { params })
+export const getIncomeStatement = (params: { company_id: string; start_date: string; end_date: string }): Promise<IncomeStatement> =>
+  http.get<IncomeStatement>('/reports/income-statement/', { params })
 
-export const getBalanceSheet = (params: { company_id: string; as_of_date: string }) =>
-  client.get<BalanceSheet>('/reports/balance-sheet/', { params })
+export const getBalanceSheet = (params: { company_id: string; as_of_date: string }): Promise<BalanceSheet> =>
+  http.get<BalanceSheet>('/reports/balance-sheet/', { params })
 
-export const getCashFlow = (params: { company_id: string; start_date: string; end_date: string }) =>
-  client.get<CashFlow>('/reports/cash-flow/', { params })
+export const getCashFlow = (params: { company_id: string; start_date: string; end_date: string }): Promise<CashFlow> =>
+  http.get<CashFlow>('/reports/cash-flow/', { params })
 
-export const getCashTransactions = (params?: Record<string, string | number>) =>
-  client.get<PaginatedResponse<CashTransaction>>('/cash-transactions/', { params })
+export const getCashTransactions = (params?: Record<string, string | number>): Promise<PaginatedResponse<CashTransaction>> =>
+  http.get<PaginatedResponse<CashTransaction>>('/cash-transactions/', { params })
 
-export const createCashTransaction = (data: CashTransactionCreate) =>
-  client.post<CashTransaction>('/cash-transactions/', data)
+export const createCashTransaction = (data: CashTransactionCreate): Promise<CashTransaction> =>
+  http.post<CashTransaction>('/cash-transactions/', data)
 
-export const updateCashTransaction = (id: string, data: Partial<CashTransactionCreate>) =>
-  client.patch<CashTransaction>(`/cash-transactions/${id}/`, data)
+export const updateCashTransaction = (id: string, data: Partial<CashTransactionCreate>): Promise<CashTransaction> =>
+  http.patch<CashTransaction>(`/cash-transactions/${id}/`, data)
 
-export const deleteCashTransaction = (id: string) =>
-  client.delete(`/cash-transactions/${id}/`)
+export const deleteCashTransaction = (id: string): Promise<unknown> =>
+  http.delete(`/cash-transactions/${id}/`)

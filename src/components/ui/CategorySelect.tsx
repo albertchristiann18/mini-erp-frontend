@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Plus, ChevronDown } from 'lucide-react'
 import { Input } from './input'
-import { useCategories } from '../../hooks/useInventory'
-import { CategoryFormModal } from '../modals/CategoryFormModal'
+import { useCategories } from '../../hooks/api/inventory'
+import { CategoryFormModal } from './CategoryFormModal'
 import type { Category } from '../../types/inventory'
 
 interface Props {

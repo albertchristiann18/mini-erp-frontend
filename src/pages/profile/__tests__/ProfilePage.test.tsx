@@ -8,8 +8,8 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: vi.fn(),
 }))
 
-vi.mock('../../../api/auth', () => ({
-  updateProfile: vi.fn(),
+vi.mock('../../../hooks/api/useProfile', () => ({
+  useUpdateProfile: vi.fn(),
 }))
 
 vi.mock('../../../lib/toast', () => ({
@@ -17,7 +17,7 @@ vi.mock('../../../lib/toast', () => ({
 }))
 
 import { useAuth } from '../../../contexts/AuthContext'
-import * as authApi from '../../../api/auth'
+import { useUpdateProfile } from '../../../hooks/api/useProfile'
 import { toast } from '../../../lib/toast'
 
 beforeEach(() => {
@@ -35,8 +35,9 @@ const mockUser = {
 }
 
 const mockRefreshUser = vi.fn()
+const mockMutateAsync = vi.fn()
 
-function setupMocks() {
+function setupMocks(mutateAsyncImpl?: () => Promise<unknown>) {
   vi.mocked(useAuth).mockReturnValue({
     user: mockUser,
     tokens: null,
@@ -44,6 +45,25 @@ function setupMocks() {
     login: vi.fn(),
     logout: vi.fn(),
     refreshUser: mockRefreshUser,
+  } as never)
+
+  vi.mocked(useUpdateProfile).mockReturnValue({
+    mutateAsync: mutateAsyncImpl ?? mockMutateAsync.mockResolvedValue({}),
+    isPending: false,
+    isError: false,
+    error: null,
+    isSuccess: false,
+    data: undefined,
+    reset: vi.fn(),
+    variables: undefined,
+    status: 'idle',
+    mutate: vi.fn(),
+    context: undefined,
+    failureCount: 0,
+    failureReason: null,
+    isIdle: true,
+    isPaused: false,
+    submittedAt: 0,
   } as never)
 }
 
@@ -69,7 +89,28 @@ it('renders username and email pre-filled from AuthContext user', () => {
 })
 
 it('submit personal info form calls updateProfile with correct payload', async () => {
-  setupMocks()
+  const mutateAsync = vi.fn().mockResolvedValue({ username: 'newusername', email: 'test@example.com' })
+  setupMocks(() => mutateAsync())
+
+  vi.mocked(useUpdateProfile).mockReturnValue({
+    mutateAsync,
+    isPending: false,
+    isError: false,
+    error: null,
+    isSuccess: false,
+    data: undefined,
+    reset: vi.fn(),
+    variables: undefined,
+    status: 'idle',
+    mutate: vi.fn(),
+    context: undefined,
+    failureCount: 0,
+    failureReason: null,
+    isIdle: true,
+    isPaused: false,
+    submittedAt: 0,
+  } as never)
+
   renderPage()
 
   const usernameInput = screen.getByDisplayValue('testuser')
@@ -80,7 +121,7 @@ it('submit personal info form calls updateProfile with correct payload', async (
   await userEvent.click(submitBtn)
 
   await waitFor(() => {
-    expect(authApi.updateProfile).toHaveBeenCalledWith({
+    expect(mutateAsync).toHaveBeenCalledWith({
       username: 'newusername',
       email: 'test@example.com',
     })
@@ -90,7 +131,27 @@ it('submit personal info form calls updateProfile with correct payload', async (
 })
 
 it('password mismatch shows validation error without calling API', async () => {
+  const mutateAsync = vi.fn()
   setupMocks()
+  vi.mocked(useUpdateProfile).mockReturnValue({
+    mutateAsync,
+    isPending: false,
+    isError: false,
+    error: null,
+    isSuccess: false,
+    data: undefined,
+    reset: vi.fn(),
+    variables: undefined,
+    status: 'idle',
+    mutate: vi.fn(),
+    context: undefined,
+    failureCount: 0,
+    failureReason: null,
+    isIdle: true,
+    isPaused: false,
+    submittedAt: 0,
+  } as never)
+
   renderPage()
 
   const currentPw = screen.getByLabelText(/^current password$/i)
@@ -107,17 +168,44 @@ it('password mismatch shows validation error without calling API', async () => {
   await waitFor(() => {
     expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
   })
-  expect(authApi.updateProfile).not.toHaveBeenCalled()
+  expect(mutateAsync).not.toHaveBeenCalled()
 })
 
 it('wrong current password shows error on current_password field', async () => {
-  setupMocks()
   const apiError = {
-    response: {
-      data: { current_password: ['Wrong password.'] },
-    },
+    status: 400,
+    message: 'Validation failed.',
+    fieldErrors: { current_password: 'Wrong password.' },
   }
-  vi.mocked(authApi.updateProfile).mockRejectedValueOnce(apiError)
+  const mutateAsync = vi.fn().mockRejectedValueOnce(apiError)
+
+  vi.mocked(useAuth).mockReturnValue({
+    user: mockUser,
+    tokens: null,
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    refreshUser: mockRefreshUser,
+  } as never)
+
+  vi.mocked(useUpdateProfile).mockReturnValue({
+    mutateAsync,
+    isPending: false,
+    isError: false,
+    error: null,
+    isSuccess: false,
+    data: undefined,
+    reset: vi.fn(),
+    variables: undefined,
+    status: 'idle',
+    mutate: vi.fn(),
+    context: undefined,
+    failureCount: 0,
+    failureReason: null,
+    isIdle: true,
+    isPaused: false,
+    submittedAt: 0,
+  } as never)
 
   renderPage()
 
@@ -135,4 +223,41 @@ it('wrong current password shows error on current_password field', async () => {
   await waitFor(() => {
     expect(screen.getByText('Wrong password.')).toBeInTheDocument()
   })
+})
+
+it('disables submit button while mutation is in flight (isPending)', () => {
+  vi.mocked(useAuth).mockReturnValue({
+    user: mockUser,
+    tokens: null,
+    isLoading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+    refreshUser: mockRefreshUser,
+  } as never)
+
+  vi.mocked(useUpdateProfile).mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: true,
+    isError: false,
+    error: null,
+    isSuccess: false,
+    data: undefined,
+    reset: vi.fn(),
+    variables: undefined,
+    status: 'pending',
+    mutate: vi.fn(),
+    context: undefined,
+    failureCount: 0,
+    failureReason: null,
+    isIdle: false,
+    isPaused: false,
+    submittedAt: 0,
+  } as never)
+
+  renderPage()
+
+  const saveBtn = screen.getByRole('button', { name: /saving\.\.\./i })
+  const changeBtn = screen.getByRole('button', { name: /changing\.\.\./i })
+  expect(saveBtn).toBeDisabled()
+  expect(changeBtn).toBeDisabled()
 })

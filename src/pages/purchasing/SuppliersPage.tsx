@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useSuppliers, useUpdateSupplier, useDeleteSupplier } from '../../hooks/useInventory'
+import { useSuppliers, useUpdateSupplier, useDeleteSupplier } from '../../hooks/api/inventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
-import { SupplierFormModal } from '../../components/modals/SupplierFormModal'
+import { SupplierFormModal } from './SupplierFormModal'
+import { Loading, ErrorState } from '../../components/ui/queryPrimitives'
 import { toast } from '../../lib/toast'
 import type { Supplier } from '../../types/inventory'
+import type { ApiError } from '../../lib/errors'
 
 export default function SuppliersPage() {
   const { user } = useAuth()
@@ -23,7 +25,7 @@ export default function SuppliersPage() {
 
   const params: Record<string, string | number> = { page, page_size: 20 }
   if (search) params.search = search
-  const { data, isLoading } = useSuppliers(params)
+  const { data, isLoading, isError, error, refetch } = useSuppliers(params)
   const updateMutation = useUpdateSupplier()
   const deleteMutation = useDeleteSupplier()
   const totalPages = data ? Math.ceil(data.count / 20) : 1
@@ -68,7 +70,9 @@ export default function SuppliersPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7}><Loading /></TableCell></TableRow>
+            ) : isError ? (
+              <TableRow><TableCell colSpan={7}><ErrorState error={error as unknown as ApiError} onRetry={refetch} /></TableCell></TableRow>
             ) : data?.results.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No suppliers found</TableCell></TableRow>
             ) : data?.results.map(s => (

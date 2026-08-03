@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useReplenishment, useCreatePurchaseOrder } from '../../hooks/usePurchasing'
-import { useWarehouses } from '../../hooks/useInventory'
+import { useReplenishment, useCreatePurchaseOrder } from '../../hooks/api/usePurchasing'
+import { useWarehouses } from '../../hooks/api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
+import { Loading, ErrorState } from '../../components/ui/queryPrimitives'
 import { toast } from 'sonner'
+import type { ApiError } from '../../lib/errors'
 
 type PlanRow = {
   variant_id: string
@@ -35,7 +37,7 @@ export default function ReplenishmentPage() {
   const { user } = useAuth()
   const { data: warehousesData } = useWarehouses()
   const warehouses = warehousesData?.results ?? []
-  const { data: replenishData, isLoading } = useReplenishment(warehouseId !== 'all' ? warehouseId : undefined)
+  const { data: replenishData, isLoading, isError, error, refetch } = useReplenishment(warehouseId !== 'all' ? warehouseId : undefined)
   const items = replenishData?.results ?? []
   const createPO = useCreatePurchaseOrder()
   const navigate = useNavigate()
@@ -161,7 +163,11 @@ export default function ReplenishmentPage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">Loading...</TableCell>
+                <TableCell colSpan={10}><Loading /></TableCell>
+              </TableRow>
+            ) : isError ? (
+              <TableRow>
+                <TableCell colSpan={10}><ErrorState error={error as unknown as ApiError} onRetry={refetch} /></TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>

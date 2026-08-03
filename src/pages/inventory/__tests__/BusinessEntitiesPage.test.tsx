@@ -10,7 +10,7 @@ const mockUseCreateBusinessEntity = vi.fn()
 const mockUseUpdateBusinessEntity = vi.fn()
 const mockUseAuth = vi.fn()
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useBusinessEntities: (...args: unknown[]) => mockUseBusinessEntities(...args),
   useCompanyMarketplaces: (...args: unknown[]) => mockUseCompanyMarketplaces(...args),
   useCreateBusinessEntity: (...args: unknown[]) => mockUseCreateBusinessEntity(...args),
@@ -100,5 +100,5 @@ it('test_loading_state', () => {
 
   renderPage()
 
-  expect(screen.getByText('Loading...')).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument()
 })

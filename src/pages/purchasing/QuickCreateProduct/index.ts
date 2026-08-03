@@ -1,0 +1,1 @@
+export { QuickCreateProductModal } from './QuickCreateProductModal'

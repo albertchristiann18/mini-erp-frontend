@@ -12,7 +12,7 @@ const mockUseAuth = vi.fn()
 
 const mockDeleteMutateAsync = vi.fn()
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useCategories: (...args: unknown[]) => mockUseCategories(...args),
   useUpdateCategory: (...args: unknown[]) => mockUseUpdateCategory(...args),
   useCreateCategory: (...args: unknown[]) => mockUseCreateCategory(...args),

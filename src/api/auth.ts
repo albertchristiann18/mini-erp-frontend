@@ -1,13 +1,14 @@
-import client from './client'
+import { http } from '../lib/http'
 import type { AuthUser, AuthTokens } from '../types/auth'
 
-export const login = (username: string, password: string) =>
-  client.post<AuthTokens>('/api/token/', { username, password })
+export const login = (username: string, password: string): Promise<AuthTokens> =>
+  http.post<AuthTokens>('/api/token/', { username, password })
 
-export const refreshToken = (refresh: string) =>
-  client.post<AuthTokens>('/api/token/refresh/', { refresh })
+export const refreshToken = (refresh: string): Promise<AuthTokens> =>
+  http.post<AuthTokens>('/api/token/refresh/', { refresh })
 
-export const getMe = () => client.get<AuthUser>('/api/profile/')
+export const getMe = (): Promise<AuthUser> =>
+  http.get<AuthUser>('/api/profile/')
 
 export interface UpdateProfilePayload {
   username?: string
@@ -16,5 +17,5 @@ export interface UpdateProfilePayload {
   new_password?: string
 }
 
-export const updateProfile = (payload: UpdateProfilePayload) =>
-  client.patch<AuthUser>('/api/profile/', payload)
+export const updateProfile = (payload: UpdateProfilePayload): Promise<AuthUser> =>
+  http.patch<AuthUser>('/api/profile/', payload)

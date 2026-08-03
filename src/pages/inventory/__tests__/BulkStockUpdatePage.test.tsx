@@ -5,17 +5,13 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect } from 'vitest'
 import BulkStockUpdatePage from '../BulkStockUpdatePage'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useWarehouses: vi.fn(),
   useBulkUpdateInventory: vi.fn(),
+  useSearchVariantStocks: vi.fn(),
 }))
 
-vi.mock('../../../api/inventory', () => ({
-  getProductVariantStocks: vi.fn(),
-}))
-
-import { useWarehouses, useBulkUpdateInventory } from '../../../hooks/useInventory'
-import { getProductVariantStocks } from '../../../api/inventory'
+import { useWarehouses, useBulkUpdateInventory, useSearchVariantStocks } from '../../../hooks/api/inventory'
 
 const mockVariants = {
   results: [
@@ -46,18 +42,22 @@ function renderPage() {
 }
 
 const hookResult = (data: unknown) => ({ data, isLoading: false }) as never
+const searchMutationResult = (mutateAsync: unknown) =>
+  ({ mutateAsync, isPending: false }) as never
 
 it('renders "Back to Stock" button', () => {
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(vi.fn()))
   renderPage()
   expect(screen.getByRole('button', { name: /back to stock/i })).toBeInTheDocument()
 })
 
 it('searching with Enter shows results', async () => {
-  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: mockVariants.results.slice(0, 2), count: 2, next: null, previous: null } } as never)
+  const mutateAsync = vi.fn().mockResolvedValue({ results: mockVariants.results.slice(0, 2), count: 2, next: null, previous: null })
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(mutateAsync))
   renderPage()
 
   const input = screen.getByPlaceholderText('Search by product name or SKU...')
@@ -70,9 +70,10 @@ it('searching with Enter shows results', async () => {
 })
 
 it('clicking "Add" on a result adds a row to the table', async () => {
-  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: mockVariants } as never)
+  const mutateAsync = vi.fn().mockResolvedValue(mockVariants)
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(mutateAsync))
   renderPage()
 
   const input = screen.getByPlaceholderText('Search by product name or SKU...')
@@ -86,10 +87,11 @@ it('clicking "Add" on a result adds a row to the table', async () => {
 })
 
 it('submit calls bulkMutation with correct data for a valid row', async () => {
-  const mutateAsync = vi.fn().mockResolvedValue({ summary: { successful: 1, failed: 0 } })
-  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: mockVariants } as never)
+  const bulkMutateAsync = vi.fn().mockResolvedValue({ summary: { successful: 1, failed: 0 } })
+  const searchMutateAsync = vi.fn().mockResolvedValue(mockVariants)
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
-  vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync, isPending: false } as never)
+  vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: bulkMutateAsync, isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(searchMutateAsync))
   renderPage()
 
   const input = screen.getByPlaceholderText('Search by product name or SKU...')
@@ -106,15 +108,16 @@ it('submit calls bulkMutation with correct data for a valid row', async () => {
 
   await userEvent.click(screen.getByRole('button', { name: /update/i }))
 
-  expect(mutateAsync).toHaveBeenCalledWith([
+  expect(bulkMutateAsync).toHaveBeenCalledWith([
     { variant_id: 'v1', warehouse_id: 'w1', qty: 10, type: 'add' },
   ])
 })
 
 it('shows current stock column after adding a variant', async () => {
-  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[0]], count: 1, next: null, previous: null } } as never)
+  const mutateAsync = vi.fn().mockResolvedValue({ results: [mockVariants.results[0]], count: 1, next: null, previous: null })
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(mutateAsync))
   renderPage()
 
   const input = screen.getByPlaceholderText('Search by product name or SKU...')
@@ -128,9 +131,10 @@ it('shows current stock column after adding a variant', async () => {
 })
 
 it('shows correct After value for Add type', async () => {
-  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[0]], count: 1, next: null, previous: null } } as never)
+  const mutateAsync = vi.fn().mockResolvedValue({ results: [mockVariants.results[0]], count: 1, next: null, previous: null })
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(mutateAsync))
   renderPage()
 
   const input = screen.getByPlaceholderText('Search by product name or SKU...')
@@ -149,9 +153,10 @@ it('shows correct After value for Add type', async () => {
 })
 
 it('shows correct After value for Set type', async () => {
-  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[0]], count: 1, next: null, previous: null } } as never)
+  const mutateAsync = vi.fn().mockResolvedValue({ results: [mockVariants.results[0]], count: 1, next: null, previous: null })
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(mutateAsync))
   renderPage()
 
   const input = screen.getByPlaceholderText('Search by product name or SKU...')
@@ -173,9 +178,10 @@ it('shows correct After value for Set type', async () => {
 })
 
 it('shows correct After value for Remove type and highlights red when negative', async () => {
-  vi.mocked(getProductVariantStocks).mockResolvedValue({ data: { results: [mockVariants.results[2]], count: 1, next: null, previous: null } } as never)
+  const mutateAsync = vi.fn().mockResolvedValue({ results: [mockVariants.results[2]], count: 1, next: null, previous: null })
   vi.mocked(useWarehouses).mockReturnValue(hookResult(mockWarehouses))
   vi.mocked(useBulkUpdateInventory).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useSearchVariantStocks).mockReturnValue(searchMutationResult(mutateAsync))
   renderPage()
 
   const input = screen.getByPlaceholderText('Search by product name or SKU...')

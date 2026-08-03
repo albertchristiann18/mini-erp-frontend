@@ -4,17 +4,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
 import SalesDashboardPage from '../SalesDashboardPage'
 
-vi.mock('../../../hooks/useSales', () => ({
+vi.mock('../../../hooks/api/useSales', () => ({
   useSalesOrdersFiltered: vi.fn(),
 }))
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useAvgSales: vi.fn(),
   useAllVariants: vi.fn(),
 }))
 
-import { useSalesOrdersFiltered } from '../../../hooks/useSales'
-import { useAvgSales, useAllVariants } from '../../../hooks/useInventory'
+import { useSalesOrdersFiltered } from '../../../hooks/api/useSales'
+import { useAvgSales, useAllVariants } from '../../../hooks/api/inventory'
 
 const mockOrders = [
   {

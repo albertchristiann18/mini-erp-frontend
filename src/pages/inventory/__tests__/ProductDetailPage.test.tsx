@@ -16,7 +16,7 @@ const mockUseAuth = vi.fn()
 const mockUseUpdateProductSupplier = vi.fn()
 const mockMutateAsync = vi.fn()
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useProduct: (...args: unknown[]) => mockUseProduct(...args),
   useSaveVariants: (...args: unknown[]) => mockUseSaveVariants(...args),
   useProductSuppliers: (...args: unknown[]) => mockUseProductSuppliers(...args),
@@ -272,4 +272,26 @@ it('renders without crashing when variant_options has non-array values', () => {
   renderPage()
 
   expect(screen.getByText('Test Product')).toBeInTheDocument()
+})
+
+it('shows ErrorState when useProduct fetch fails', () => {
+  mockUseAuth.mockReturnValue({ user: { is_staff: false } })
+  mockUseProduct.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    error: { status: 404, message: 'Product not found.' },
+    refetch: vi.fn(),
+  })
+  mockUseSaveVariants.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  mockUseProductSuppliers.mockReturnValue({ data: undefined })
+  mockUseProductBusinessEntities.mockReturnValue({ data: undefined })
+  mockUseAttachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseDetachBusinessEntity.mockReturnValue({ mutate: vi.fn() })
+  mockUseBusinessEntities.mockReturnValue({ data: undefined })
+
+  renderPage()
+
+  expect(screen.getByRole('alert')).toBeInTheDocument()
+  expect(screen.getByText('Product not found.')).toBeInTheDocument()
 })

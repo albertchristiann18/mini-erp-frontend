@@ -3,12 +3,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
 import StockClosingPage from '../StockClosingPage'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useStockClosingReport: vi.fn(),
   useWarehouses: vi.fn(),
 }))
 
-import { useStockClosingReport, useWarehouses } from '../../../hooks/useInventory'
+import { useStockClosingReport, useWarehouses } from '../../../hooks/api/inventory'
 
 const mockWarehouses = {
   results: [

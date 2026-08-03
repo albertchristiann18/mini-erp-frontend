@@ -2,13 +2,14 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect } from 'vitest'
 import InventoryDashboardPage from '../InventoryDashboardPage'
+import type { ApiError } from '../../../lib/errors'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useInventorySummary: vi.fn(),
   useAvgSales: vi.fn(),
 }))
 
-import { useInventorySummary, useAvgSales } from '../../../hooks/useInventory'
+import { useInventorySummary, useAvgSales } from '../../../hooks/api/inventory'
 
 const mockWarehouses = [
   { id: 'w1', name: 'Gudang A' },
@@ -142,7 +143,7 @@ function submitSearch(term: string) {
   fireEvent.keyDown(input, { key: 'Enter' })
 }
 
-const hookResult = (data: unknown) => ({ data, isLoading: false }) as never
+const hookResult = (data: unknown) => ({ data, isLoading: false, isError: false, error: null, refetch: vi.fn() }) as never
 
 it('shows summary cards on mount without any search', () => {
   vi.mocked(useInventorySummary).mockReturnValue(hookResult(mockSummaryData))
@@ -260,4 +261,21 @@ it('paginates to page 2 and shows remaining products', () => {
   expect(screen.getByText(/Page 2 of 2/)).toBeInTheDocument()
   expect(screen.queryByText('Product 1')).not.toBeInTheDocument()
   expect(screen.getByText('Product 6')).toBeInTheDocument()
+})
+
+it('shows error state with message and retry button when inventory summary fetch fails', () => {
+  const mockRefetch = vi.fn()
+  const apiError: ApiError = { status: 500, message: 'Server error' }
+  vi.mocked(useInventorySummary).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    error: apiError,
+    refetch: mockRefetch,
+  } as never)
+  vi.mocked(useAvgSales).mockReturnValue(hookResult(undefined))
+  renderPage()
+  expect(screen.getByRole('alert')).toBeInTheDocument()
+  expect(screen.getByText('Server error')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument()
 })

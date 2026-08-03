@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
-import { useIncomeStatement, useBalanceSheet, useCashFlow } from '../../hooks/useFinance'
+import { useIncomeStatement, useBalanceSheet, useCashFlow } from '../../hooks/api/useFinance'
+import { Loading, ErrorState } from '../../components/ui/queryPrimitives'
 import { formatIDR } from '../../lib/utils'
+import type { ApiError } from '../../lib/errors'
 
 const today = new Date().toISOString().split('T')[0]
 const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
@@ -13,9 +15,9 @@ export default function ReportsPage() {
   const [endDate, setEndDate] = useState(today)
   const [asOfDate, setAsOfDate] = useState(today)
 
-  const { data: income } = useIncomeStatement(startDate, endDate)
-  const { data: balance } = useBalanceSheet(asOfDate)
-  const { data: cashflow } = useCashFlow(startDate, endDate)
+  const incomeQ = useIncomeStatement(startDate, endDate)
+  const balanceQ = useBalanceSheet(asOfDate)
+  const cashflowQ = useCashFlow(startDate, endDate)
 
   return (
     <Tabs defaultValue="income">
@@ -36,13 +38,15 @@ export default function ReportsPage() {
             <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-40" />
           </div>
         </div>
-        {income && (
+        {incomeQ.isLoading && <Loading />}
+        {incomeQ.isError && <ErrorState error={incomeQ.error as unknown as ApiError} onRetry={incomeQ.refetch} />}
+        {incomeQ.data && (
           <div className="grid gap-4 md:grid-cols-2">
-            <Card><CardHeader><CardTitle>Revenue</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatIDR(income.revenue)}</p></CardContent></Card>
-            <Card><CardHeader><CardTitle>COGS</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatIDR(income.cogs)}</p></CardContent></Card>
-            <Card><CardHeader><CardTitle>Gross Profit</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-emerald-600">{formatIDR(income.gross_profit)}</p></CardContent></Card>
-            <Card><CardHeader><CardTitle>Total Expenses</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-red-500">{formatIDR(income.total_expenses)}</p></CardContent></Card>
-            <Card className="md:col-span-2"><CardHeader><CardTitle>Net Profit</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{formatIDR(income.net_profit)}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle>Revenue</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatIDR(incomeQ.data.revenue)}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle>COGS</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatIDR(incomeQ.data.cogs)}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle>Gross Profit</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-emerald-600">{formatIDR(incomeQ.data.gross_profit)}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle>Total Expenses</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-red-500">{formatIDR(incomeQ.data.total_expenses)}</p></CardContent></Card>
+            <Card className="md:col-span-2"><CardHeader><CardTitle>Net Profit</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{formatIDR(incomeQ.data.net_profit)}</p></CardContent></Card>
           </div>
         )}
       </TabsContent>
@@ -54,25 +58,27 @@ export default function ReportsPage() {
             <Input type="date" value={asOfDate} onChange={e => setAsOfDate(e.target.value)} className="w-40" />
           </div>
         </div>
-        {balance && (
+        {balanceQ.isLoading && <Loading />}
+        {balanceQ.isError && <ErrorState error={balanceQ.error as unknown as ApiError} onRetry={balanceQ.refetch} />}
+        {balanceQ.data && (
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardHeader><CardTitle>Total Assets</CardTitle></CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatIDR(balance.assets.total)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Cash: {formatIDR(balance.assets.cash)} · AR: {formatIDR(balance.assets.receivables)}</p>
+                <p className="text-2xl font-bold">{formatIDR(balanceQ.data.assets.total)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Cash: {formatIDR(balanceQ.data.assets.cash)} · AR: {formatIDR(balanceQ.data.assets.receivables)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle>Total Liabilities</CardTitle></CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-red-500">{formatIDR(balance.liabilities.total)}</p>
-                <p className="text-xs text-muted-foreground mt-1">AP: {formatIDR(balance.liabilities.payables)}</p>
+                <p className="text-2xl font-bold text-red-500">{formatIDR(balanceQ.data.liabilities.total)}</p>
+                <p className="text-xs text-muted-foreground mt-1">AP: {formatIDR(balanceQ.data.liabilities.payables)}</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle>Equity</CardTitle></CardHeader>
-              <CardContent><p className="text-2xl font-bold text-emerald-600">{formatIDR(balance.equity)}</p></CardContent>
+              <CardContent><p className="text-2xl font-bold text-emerald-600">{formatIDR(balanceQ.data.equity)}</p></CardContent>
             </Card>
           </div>
         )}
@@ -89,11 +95,13 @@ export default function ReportsPage() {
             <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-40" />
           </div>
         </div>
-        {cashflow && (
+        {cashflowQ.isLoading && <Loading />}
+        {cashflowQ.isError && <ErrorState error={cashflowQ.error as unknown as ApiError} onRetry={cashflowQ.refetch} />}
+        {cashflowQ.data && (
           <div className="grid gap-4 md:grid-cols-2">
-            <Card><CardHeader><CardTitle>Collections</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-emerald-600">{formatIDR(cashflow.operating.collections)}</p></CardContent></Card>
-            <Card><CardHeader><CardTitle>Payments</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-red-500">{formatIDR(cashflow.operating.payments)}</p></CardContent></Card>
-            <Card className="md:col-span-2"><CardHeader><CardTitle>Net Cash Flow</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{formatIDR(cashflow.net_cash_flow)}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle>Collections</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-emerald-600">{formatIDR(cashflowQ.data.operating.collections)}</p></CardContent></Card>
+            <Card><CardHeader><CardTitle>Payments</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold text-red-500">{formatIDR(cashflowQ.data.operating.payments)}</p></CardContent></Card>
+            <Card className="md:col-span-2"><CardHeader><CardTitle>Net Cash Flow</CardTitle></CardHeader><CardContent><p className="text-3xl font-bold">{formatIDR(cashflowQ.data.net_cash_flow)}</p></CardContent></Card>
           </div>
         )}
       </TabsContent>

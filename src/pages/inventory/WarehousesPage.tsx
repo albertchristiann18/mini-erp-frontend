@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useWarehouses } from '../../hooks/useInventory'
+import { useWarehouses } from '../../hooks/api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Pagination } from '../../components/Pagination'
-import { WarehouseFormModal } from '../../components/modals/WarehouseFormModal'
+import { WarehouseFormModal } from './WarehouseFormModal'
+import { Loading } from '../../components/ui/queryPrimitives'
 import { Plus, Pencil } from 'lucide-react'
 import type { Warehouse } from '../../types/inventory'
 
@@ -39,7 +40,7 @@ export default function WarehousesPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4}><Loading /></TableCell></TableRow>
             ) : data?.results.map(w => (
               <TableRow key={w.id}>
                 <TableCell className="font-medium">{w.name}</TableCell>

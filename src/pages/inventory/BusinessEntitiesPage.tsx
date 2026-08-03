@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Search, Plus, Pencil } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useBusinessEntities, useCompanyMarketplaces, useCreateBusinessEntity, useUpdateBusinessEntity } from '../../hooks/useInventory'
+import { useBusinessEntities, useCompanyMarketplaces, useCreateBusinessEntity, useUpdateBusinessEntity } from '../../hooks/api/inventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Pagination } from '../../components/Pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
+import { Loading } from '../../components/ui/queryPrimitives'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { toast } from '../../lib/toast'
 import type { BusinessEntity } from '../../types/inventory'
@@ -105,7 +106,7 @@ export default function BusinessEntitiesPage() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4}><Loading /></TableCell></TableRow>
             ) : data?.results.length === 0 ? (
               <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No business entities yet</TableCell></TableRow>
             ) : data?.results.map(be => (

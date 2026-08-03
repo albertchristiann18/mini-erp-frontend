@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePurchaseOrdersFiltered, usePurchaseOrderSummary } from '../../hooks/usePurchasing'
+import { usePurchaseOrdersFiltered, usePurchaseOrderSummary } from '../../hooks/api/usePurchasing'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
@@ -8,10 +8,12 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
 import { Pagination } from '../../components/Pagination'
+import { Loading, ErrorState } from '../../components/ui/queryPrimitives'
 import { cn, formatIDR, formatDate } from '../../lib/utils'
 import { Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import type { POStatus } from '../../types/purchasing'
 import type { BadgeProps } from '../../components/ui/badge'
+import type { ApiError } from '../../lib/errors'
 
 const statusVariant: Record<POStatus, BadgeProps['variant']> = {
   DRAFT: 'secondary',
@@ -81,7 +83,7 @@ export default function PurchaseOrdersPage() {
   if (appliedDateTo) queryParams.date_to = appliedDateTo
   if (appliedSearch) queryParams.search = appliedSearch
 
-  const { data, isLoading } = usePurchaseOrdersFiltered(queryParams, { enabled: hasSearched })
+  const { data, isLoading, isError, error, refetch } = usePurchaseOrdersFiltered(queryParams, { enabled: hasSearched })
   const totalPages = data ? Math.ceil(data.count / pageSize) : 1
 
   const summaryParams: Record<string, string> = {}
@@ -185,7 +187,9 @@ export default function PurchaseOrdersPage() {
                 </TableCell>
               </TableRow>
             ) : isLoading ? (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground">Loading...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11}><Loading /></TableCell></TableRow>
+            ) : isError ? (
+              <TableRow><TableCell colSpan={11}><ErrorState error={error as unknown as ApiError} onRetry={refetch} /></TableCell></TableRow>
             ) : !data?.results.length ? (
               <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No purchase orders found</TableCell></TableRow>
             ) : data.results.map(po => (

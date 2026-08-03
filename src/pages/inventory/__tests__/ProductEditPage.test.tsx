@@ -5,12 +5,14 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect, beforeEach } from 'vitest'
 import ProductEditPage from '../ProductEditPage'
 
-vi.mock('../../../hooks/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useProduct: vi.fn(),
   useCategories: vi.fn(),
   useCreateProduct: vi.fn(),
   useUpdateProduct: vi.fn(),
   useSaveVariants: vi.fn(),
+  useSaveAnyVariants: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })),
+  useUploadAnyVariantPhoto: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false })),
   useProductSuppliers: vi.fn(),
   useCreateProductSupplier: vi.fn(),
   useDeleteProductSupplier: vi.fn(),
@@ -23,6 +25,9 @@ vi.mock('../../../hooks/useInventory', () => ({
   useDeleteVariantPhoto: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useUploadDimensionImage: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
   useDeleteDimensionImage: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useUploadProductPhoto: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useDeleteProductPhoto: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useReorderProductPhotos: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
 }))
 
 vi.mock('react-router-dom', async () => {
@@ -33,10 +38,6 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-vi.mock('../../../api/inventory', () => ({
-  saveVariants: vi.fn().mockResolvedValue({ data: {} }),
-}))
-
 vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -44,11 +45,11 @@ vi.mock('../../../lib/toast', () => ({
 import {
   useProduct, useCategories, useCreateProduct, useUpdateProduct, useSaveVariants,
   useProductSuppliers, useCreateProductSupplier, useDeleteProductSupplier, useSuppliers,
-} from '../../../hooks/useInventory'
+  useSaveAnyVariants,
+} from '../../../hooks/api/inventory'
 import { useParams } from 'react-router-dom'
-import { saveVariants } from '../../../api/inventory'
 import { toast } from '../../../lib/toast'
-import { initializeRows } from '../ProductEditPage'
+import { initializeRows } from '../../../hooks/inventory/productEditHelpers'
 
 const baseProduct = {
   id: '123',
@@ -195,14 +196,16 @@ it('removing a chip with stock shows error toast and keeps the row', async () =>
   expect(screen.getByText('Daftar Variasi (1)')).toBeInTheDocument()
 })
 
-it('submit calls createMutation then saveVariants on create flow', async () => {
+it('submit calls createMutation then useSaveAnyVariants on create flow', async () => {
   const createMutateAsync = vi.fn().mockResolvedValue({ id: 'new-id' })
+  const saveAnyMutateAsync = vi.fn().mockResolvedValue({})
   vi.mocked(useParams).mockReturnValue({})
   vi.mocked(useProduct).mockReturnValue(hookResult(undefined))
   vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
   vi.mocked(useCreateProduct).mockReturnValue(mutationMock({ mutateAsync: createMutateAsync }))
   vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
   vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+  vi.mocked(useSaveAnyVariants).mockReturnValue(mutationMock({ mutateAsync: saveAnyMutateAsync }))
 
   renderPage()
 
@@ -228,7 +231,9 @@ it('submit calls createMutation then saveVariants on create flow', async () => {
   await waitFor(() => {
     expect(createMutateAsync).toHaveBeenCalled()
   })
-  expect(saveVariants).toHaveBeenCalled()
+  await waitFor(() => {
+    expect(saveAnyMutateAsync).toHaveBeenCalled()
+  })
 })
 
 it('does NOT render old Supplier Link form row in the basic info card', () => {
@@ -357,6 +362,31 @@ it('variant photo cell shows ImagePlus placeholder when no photo', () => {
   renderPage()
 
   expect(screen.getByDisplayValue('SKU-RED')).toBeInTheDocument()
+})
+
+it('shows error state with message and retry button when product fetch fails in edit mode', async () => {
+  const refetchMock = vi.fn()
+  vi.mocked(useParams).mockReturnValue({ id: '123' })
+  vi.mocked(useProduct).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    isError: true,
+    error: { status: 500, message: 'Failed to load product' },
+    refetch: refetchMock,
+  } as never)
+  vi.mocked(useCategories).mockReturnValue(hookResult(mockCategories))
+  vi.mocked(useCreateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useUpdateProduct).mockReturnValue(mutationMock())
+  vi.mocked(useSaveVariants).mockReturnValue(mutationMock())
+
+  renderPage()
+
+  expect(screen.getByRole('alert')).toBeInTheDocument()
+  expect(screen.getByText('Failed to load product')).toBeInTheDocument()
+  const retryBtn = screen.getByRole('button', { name: /retry/i })
+  expect(retryBtn).toBeInTheDocument()
+  await userEvent.click(retryBtn)
+  expect(refetchMock).toHaveBeenCalled()
 })
 
 it('onSubmit sends dim1_key and dim1_options in product PATCH', async () => {
