@@ -449,4 +449,52 @@ export default defineConfig([
       'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
     },
   },
+  // ── Purchasing domain sealed (ticket #20) ─────────────────────────────────
+  // pages↛api and max-lines sealed for purchasing production files.
+  // hooks/purchasing/** is included for max-lines only; hooks are shared-tier so the
+  // pages↛api policy does not fire for them (from.type === 'domain' guard).
+  // __tests__ excluded via ignores.
+  // purchaseOrderPDFUtils.ts carved out via ignores: calls api/client directly, a
+  // pre-existing pages↛api violation masked until now (dead duplicate rule since #9).
+  // Conceptually similar to how #9 deferred hooks/api/useInventory.ts (ticket #22) by
+  // leaving it out of inventory's file scope — here the file must stay in-scope for
+  // max-lines, so it's excluded explicitly via ignores instead. Follow-up ticket will
+  // fix the underlying violation.
+  {
+    files: [
+      'src/pages/purchasing/**/*.{ts,tsx}',
+      'src/hooks/purchasing/**/*.{ts,tsx}',
+      'src/api/purchasing.ts',
+      'src/types/purchasing.ts',
+      'src/lib/purchasingKeys.ts',
+    ],
+    ignores: ['**/__tests__/**', 'src/pages/purchasing/purchaseOrderPDFUtils.ts'],
+    plugins: { boundaries },
+    settings: {
+      'boundaries/elements': BOUNDARY_ELEMENTS,
+      'boundaries/ignore': ['**/__tests__/**'],
+      'import/resolver': {
+        node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
+      },
+    },
+    rules: {
+      // pages↛api sealed for purchasing: domain must access api/ through hooks only
+      'boundaries/element-types': [
+        'error',
+        {
+          default: 'allow',
+          policies: [
+            {
+              from: { element: { type: 'domain' } },
+              disallow: {
+                to: { element: { type: 'api' } },
+              },
+            },
+          ],
+        },
+      ],
+      // max-lines sealed at 300 for purchasing
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+    },
+  },
 ])
