@@ -8,13 +8,13 @@ vi.mock('../../../hooks/api/useSales', () => ({
   useSalesOrdersFiltered: vi.fn(),
 }))
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useAvgSales: vi.fn(),
   useAllVariants: vi.fn(),
 }))
 
 import { useSalesOrdersFiltered } from '../../../hooks/api/useSales'
-import { useAvgSales, useAllVariants } from '../../../hooks/api/useInventory'
+import { useAvgSales, useAllVariants } from '../../../hooks/api/inventory'
 
 const mockOrders = [
   {

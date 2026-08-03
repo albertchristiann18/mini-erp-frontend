@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search, Plus, Pencil } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useBusinessEntities, useCompanyMarketplaces, useCreateBusinessEntity, useUpdateBusinessEntity } from '../../hooks/api/useInventory'
+import { useBusinessEntities, useCompanyMarketplaces, useCreateBusinessEntity, useUpdateBusinessEntity } from '../../hooks/api/inventory'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'
 import { Button } from '../../components/ui/button'

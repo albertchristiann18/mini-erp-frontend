@@ -4,12 +4,12 @@ import { vi, it, expect } from 'vitest'
 import InventoryDashboardPage from '../InventoryDashboardPage'
 import type { ApiError } from '../../../lib/errors'
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useInventorySummary: vi.fn(),
   useAvgSales: vi.fn(),
 }))
 
-import { useInventorySummary, useAvgSales } from '../../../hooks/api/useInventory'
+import { useInventorySummary, useAvgSales } from '../../../hooks/api/inventory'
 
 const mockWarehouses = [
   { id: 'w1', name: 'Gudang A' },

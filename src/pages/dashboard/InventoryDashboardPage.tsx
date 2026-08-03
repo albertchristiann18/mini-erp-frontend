@@ -3,7 +3,7 @@ import { Input } from '../../components/ui/input'
 import { Card } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Loading, ErrorState, Empty } from '../../components/ui/queryPrimitives'
-import { useInventorySummary, useAvgSales } from '../../hooks/api/useInventory'
+import { useInventorySummary, useAvgSales } from '../../hooks/api/inventory'
 import { Pagination } from '../../components/Pagination'
 
 const formatIDR = (val: number) =>

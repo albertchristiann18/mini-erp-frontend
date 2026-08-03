@@ -11,7 +11,7 @@ const mockUseUpdateCompanyMarketplace = vi.fn()
 const mockUseDeleteCompanyMarketplace = vi.fn()
 const mockUseAuth = vi.fn()
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useCompanyMarketplaces: (...args: unknown[]) => mockUseCompanyMarketplaces(...args),
   useCreateCompanyMarketplace: (...args: unknown[]) => mockUseCreateCompanyMarketplace(...args),
   useUpdateCompanyMarketplace: (...args: unknown[]) => mockUseUpdateCompanyMarketplace(...args),

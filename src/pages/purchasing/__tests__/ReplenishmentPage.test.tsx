@@ -37,7 +37,7 @@ mockUseReplenishmentImpl.mockReturnValue({
   refetch: vi.fn(),
 })
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useWarehouses: () => ({
     data: { results: [{ id: 'w1', name: 'Warehouse A' }] },
     isLoading: false,

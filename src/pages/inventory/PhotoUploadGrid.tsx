@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { X, ImagePlus } from 'lucide-react'
 import type { ProductPhoto } from '../../types/inventory'
-import { useUploadProductPhoto, useDeleteProductPhoto, useReorderProductPhotos } from '../../hooks/api/useInventory'
+import { useUploadProductPhoto, useDeleteProductPhoto, useReorderProductPhotos } from '../../hooks/api/inventory'
 import { toast } from '../../lib/toast'
 
 interface Props {

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { Textarea } from '../../components/ui/textarea'
 import { Button } from '../../components/ui/button'
-import { useBulkCreateProducts } from '../../hooks/api/useInventory'
+import { useBulkCreateProducts } from '../../hooks/api/inventory'
 import { toast } from '../../lib/toast'
 
 interface Props {

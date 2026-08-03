@@ -10,7 +10,7 @@ import React from 'react'
 import { useProductEdit } from '../../../hooks/inventory/useProductEdit'
 import { toast } from '../../../lib/toast'
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useProduct: vi.fn(() => ({ data: undefined, isLoading: false })),
   useCategories: vi.fn(() => ({ data: undefined, isLoading: false })),
   useCreateProduct: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({ id: 'new-id' }), isPending: false })),
@@ -44,7 +44,7 @@ import {
   useProduct, useCategories, useCreateProduct, useUpdateProduct,
   useSaveVariants, useSaveAnyVariants, useProductSuppliers,
   useCreateProductSupplier, useDeleteProductSupplier, useSuppliers,
-} from '../../../hooks/api/useInventory'
+} from '../../../hooks/api/inventory'
 
 function makeQc() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } })

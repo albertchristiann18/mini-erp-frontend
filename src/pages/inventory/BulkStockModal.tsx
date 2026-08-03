@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { useAllVariants, useWarehouses, useBulkUpdateInventory } from '../../hooks/api/useInventory'
+import { useAllVariants, useWarehouses, useBulkUpdateInventory } from '../../hooks/api/inventory'
 import { toast } from '../../lib/toast'
 
 interface VariantComboboxProps {

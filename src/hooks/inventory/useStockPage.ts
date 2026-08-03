@@ -9,7 +9,7 @@
  * Components receive a view-model slice + callbacks; they never call api/ directly.
  */
 import { useState, useEffect } from 'react'
-import { useProductVariantStocks, useWarehouses, useAdjustStock } from '../api/useInventory'
+import { useProductVariantStocks, useWarehouses, useAdjustStock } from '../api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { toast } from '../../lib/toast'
 import type { ProductVariantStock, Warehouse, PaginatedResponse } from '../../types/inventory'

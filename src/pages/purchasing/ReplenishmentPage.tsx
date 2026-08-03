@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useReplenishment, useCreatePurchaseOrder } from '../../hooks/api/usePurchasing'
-import { useWarehouses } from '../../hooks/api/useInventory'
+import { useWarehouses } from '../../hooks/api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'

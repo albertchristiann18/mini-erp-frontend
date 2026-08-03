@@ -24,7 +24,7 @@ vi.mock('../../../hooks/api/usePurchasing', () => ({
   useReplenishment: () => ({ data: { results: [] } }),
 }))
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useWarehouses: () => ({ data: [] }),
   useProductVariants: () => ({ data: [] }),
 }))

@@ -21,7 +21,7 @@ import {
   useDetachBusinessEntity,
   useBusinessEntities,
   useUpdateProductSupplier,
-} from '../api/useInventory'
+} from '../api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { toast } from '../../lib/toast'
 import { productKeys } from '../../lib/inventoryKeys'

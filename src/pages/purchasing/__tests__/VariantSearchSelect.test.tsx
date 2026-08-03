@@ -6,7 +6,7 @@ import { VariantSearchSelect } from '../VariantSearchSelect'
 
 const mockUseVariantSearch = vi.fn()
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useVariantSearch: (...args: unknown[]) => mockUseVariantSearch(...args),
 }))
 

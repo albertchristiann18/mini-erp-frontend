@@ -18,7 +18,7 @@ import { toast } from '../../../lib/toast'
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useProduct: vi.fn(),
   useSaveVariants: vi.fn(),
   useProductSuppliers: vi.fn(),
@@ -56,7 +56,7 @@ import {
   useDetachBusinessEntity,
   useBusinessEntities,
   useUpdateProductSupplier,
-} from '../../../hooks/api/useInventory'
+} from '../../../hooks/api/inventory'
 import { useQueryClient } from '@tanstack/react-query'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

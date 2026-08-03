@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { Button } from '../../components/ui/button'
-import { useWarehouses, useCompanyMarketplaces } from '../../hooks/api/useInventory'
+import { useWarehouses, useCompanyMarketplaces } from '../../hooks/api/inventory'
 import { usePreviewSalesOrderImport, useConfirmSalesOrderImport } from '../../hooks/sales/useSales'
 import { useSalesOrderImport } from '../../hooks/sales/useSalesOrderImport'
 import { toast } from '../../lib/toast'

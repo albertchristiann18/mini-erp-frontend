@@ -14,7 +14,7 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({ user: null })),
 }))
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useWarehouses: vi.fn(() => ({ data: { results: [] } })),
   useProductVariants: vi.fn(() => ({ data: { results: [] } })),
 }))

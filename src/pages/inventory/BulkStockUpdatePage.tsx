@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useWarehouses, useBulkUpdateInventory, useSearchVariantStocks } from '../../hooks/api/useInventory'
+import { useWarehouses, useBulkUpdateInventory, useSearchVariantStocks } from '../../hooks/api/inventory'
 import type { ProductVariantStock } from '../../types/inventory'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'

@@ -9,7 +9,7 @@ import { useQuickCreateProduct } from '../../../hooks/purchasing/useQuickCreateP
 const mockCreateProduct = vi.fn()
 const mockUploadPhoto = vi.fn()
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useCreateProduct: () => ({ mutateAsync: mockCreateProduct, isPending: false }),
   useSuppliers: () => ({ data: { results: [] } }),
   useUploadAnyProductPhoto: () => ({ mutateAsync: mockUploadPhoto }),

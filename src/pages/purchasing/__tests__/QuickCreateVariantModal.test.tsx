@@ -4,7 +4,7 @@ import { QuickCreateVariantModal } from '../QuickCreateVariantModal'
 
 const mockCreateProduct = vi.fn()
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useCreateProduct: () => ({ mutateAsync: mockCreateProduct, isPending: false }),
   useCategories: () => ({
     data: {

@@ -4,13 +4,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi, it, expect, beforeAll } from 'vitest'
 import { BulkStockModal } from '../BulkStockModal'
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useAllVariants: vi.fn(),
   useWarehouses: vi.fn(),
   useBulkUpdateInventory: vi.fn(),
 }))
 
-import { useAllVariants, useWarehouses, useBulkUpdateInventory } from '../../../hooks/api/useInventory'
+import { useAllVariants, useWarehouses, useBulkUpdateInventory } from '../../../hooks/api/inventory'
 
 beforeAll(() => {
   if (!Element.prototype.hasPointerCapture) {

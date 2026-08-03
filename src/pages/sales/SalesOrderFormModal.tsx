@@ -7,7 +7,7 @@ import { FormField } from '../../components/ui/form'
 import { Input } from '../../components/ui/input'
 import { Button } from '../../components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select'
-import { useWarehouses, useProductVariants } from '../../hooks/api/useInventory'
+import { useWarehouses, useProductVariants } from '../../hooks/api/inventory'
 import { useCreateSalesOrder } from '../../hooks/api/useSales'
 import { toast } from '../../lib/toast'
 

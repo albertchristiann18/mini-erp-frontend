@@ -183,6 +183,7 @@ export default defineConfig([
     files: [
       'src/pages/inventory/**/*.{ts,tsx}',
       'src/hooks/inventory/**/*.{ts,tsx}',
+      'src/hooks/api/inventory/**/*.{ts,tsx}',
       'src/api/inventory.ts',
       'src/types/inventory.ts',
     ],

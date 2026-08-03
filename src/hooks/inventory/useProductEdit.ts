@@ -27,7 +27,7 @@ import {
   useUploadAnyVariantPhoto,
   useUploadDimensionImage,
   useDeleteDimensionImage,
-} from '../api/useInventory'
+} from '../api/inventory'
 import { toast } from '../../lib/toast'
 import type { ProductPhoto, DimensionImage } from '../../types/inventory'
 import type { SaveVariantsPayload, SaveVariantItem } from '../../api/inventory'

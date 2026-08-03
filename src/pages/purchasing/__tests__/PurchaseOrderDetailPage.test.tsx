@@ -23,7 +23,7 @@ vi.mock('../../../hooks/api/usePurchasing', () => ({
 
 const mockVariantSearchData: unknown = { results: [], count: 0, next: null, previous: null }
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useWarehouses: vi.fn(() => ({ data: { results: [] } })),
   useSuppliers: vi.fn(() => ({ data: { results: [] } })),
   useVariantSearch: vi.fn(() => ({ data: mockVariantSearchData, isLoading: false })),

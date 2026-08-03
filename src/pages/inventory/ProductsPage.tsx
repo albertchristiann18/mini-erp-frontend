@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useProducts, useCategories } from '../../hooks/api/useInventory'
+import { useProducts, useCategories } from '../../hooks/api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table'
 import { Badge } from '../../components/ui/badge'

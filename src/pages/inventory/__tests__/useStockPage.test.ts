@@ -10,7 +10,7 @@ import React from 'react'
 import { useStockPage } from '../../../hooks/inventory/useStockPage'
 import { toast } from '../../../lib/toast'
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useProductVariantStocks: vi.fn(),
   useWarehouses: vi.fn(),
   useAdjustStock: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('../../../lib/toast', () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
-import { useProductVariantStocks, useWarehouses, useAdjustStock } from '../../../hooks/api/useInventory'
+import { useProductVariantStocks, useWarehouses, useAdjustStock } from '../../../hooks/api/inventory'
 import { useAuth } from '../../../contexts/AuthContext'
 
 function makeQc() {

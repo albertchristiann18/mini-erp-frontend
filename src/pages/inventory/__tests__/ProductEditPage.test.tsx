@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi, it, expect, beforeEach } from 'vitest'
 import ProductEditPage from '../ProductEditPage'
 
-vi.mock('../../../hooks/api/useInventory', () => ({
+vi.mock('../../../hooks/api/inventory', () => ({
   useProduct: vi.fn(),
   useCategories: vi.fn(),
   useCreateProduct: vi.fn(),
@@ -46,7 +46,7 @@ import {
   useProduct, useCategories, useCreateProduct, useUpdateProduct, useSaveVariants,
   useProductSuppliers, useCreateProductSupplier, useDeleteProductSupplier, useSuppliers,
   useSaveAnyVariants,
-} from '../../../hooks/api/useInventory'
+} from '../../../hooks/api/inventory'
 import { useParams } from 'react-router-dom'
 import { toast } from '../../../lib/toast'
 import { initializeRows } from '../../../hooks/inventory/productEditHelpers'

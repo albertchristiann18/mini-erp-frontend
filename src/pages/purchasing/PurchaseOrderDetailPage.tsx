@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { usePurchaseOrder, useUpdatePurchaseOrder, useCreatePurchaseOrder, useReplenishment } from '../../hooks/api/usePurchasing'
-import { useWarehouses, useSuppliers, useUploadAnyVariantPhoto } from '../../hooks/api/useInventory'
+import { useWarehouses, useSuppliers, useUploadAnyVariantPhoto } from '../../hooks/api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { usePurchaseOrderDetail } from '../../hooks/purchasing/usePurchaseOrderDetail'
 import { getCurrencySymbol, formatForeignAmount } from '../../hooks/purchasing/purchaseOrderDetailHelpers'

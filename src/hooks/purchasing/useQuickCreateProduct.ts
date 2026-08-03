@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useCreateProduct, useSuppliers, useUploadAnyProductPhoto } from '../api/useInventory'
+import { useCreateProduct, useSuppliers, useUploadAnyProductPhoto } from '../api/inventory'
 import { useAuth } from '../../contexts/AuthContext'
 import { toast } from '../../lib/toast'
 import { isSkuConflictError, buildVariantsPayload, validateQuickCreateForm } from './quickCreateProductHelpers'
