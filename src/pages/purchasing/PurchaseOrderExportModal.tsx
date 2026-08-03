@@ -2,8 +2,9 @@ import { Suspense, lazy, useState, useEffect, useMemo, useCallback } from 'react
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog'
 import { Button } from '../../components/ui/button'
 import type { PurchaseOrder } from '../../types/purchasing'
-import { groupBySubGroup, fetchPhotoViaProxy } from './purchaseOrderPDFUtils'
+import { groupBySubGroup } from './purchaseOrderPDFUtils'
 import type { SubGroup } from './purchaseOrderPDFUtils'
+import { useFetchPhotoViaProxy } from '../../hooks/api/usePurchasing'
 
 const PDFContent = lazy(() => import('./PurchaseOrderExportPDF'))
 
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export function PurchaseOrderExportModal({ open, onClose, po }: Props) {
+  const fetchPhotoViaProxy = useFetchPhotoViaProxy()
+
   const dimensionKeys = useMemo(() => {
     const seen = new Set<string>()
     const result: string[] = []

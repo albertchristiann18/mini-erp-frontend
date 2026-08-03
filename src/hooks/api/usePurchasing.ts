@@ -1,7 +1,9 @@
+import { useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getPurchaseOrders, getPurchaseOrder,
   createPurchaseOrder, updatePurchaseOrder, advancePOStatus, checkPOTransition, getReplenishment, getPurchaseOrderSummary,
+  fetchPhotoViaProxy,
 } from '../../api/purchasing'
 import {
   purchaseOrderKeys,
@@ -81,4 +83,23 @@ export const usePurchaseOrderSummary = (params?: Record<string, string>) =>
     queryKey: purchaseOrderSummaryKeys.list(params),
     queryFn: () => getPurchaseOrderSummary(params),
   })
+
+/**
+ * Hand-written callback hook (not useQuery/useMutation): batch-fetched imperatively
+ * inside a useEffect (one call per subgroup via Promise.all), with no per-photo
+ * loading/error UI — failures already resolve to null.
+ */
+export const useFetchPhotoViaProxy = () =>
+  useCallback(async (productId: string, dimKey?: string, dimValue?: string): Promise<string | null> => {
+    try {
+      const blob = await fetchPhotoViaProxy(productId, dimKey, dimValue)
+      return new Promise<string>(resolve => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+    } catch {
+      return null
+    }
+  }, [])
 

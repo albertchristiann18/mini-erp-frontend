@@ -455,12 +455,6 @@ export default defineConfig([
   // hooks/purchasing/** is included for max-lines only; hooks are shared-tier so the
   // pages↛api policy does not fire for them (from.type === 'domain' guard).
   // __tests__ excluded via ignores.
-  // purchaseOrderPDFUtils.ts carved out via ignores: calls api/client directly, a
-  // pre-existing pages↛api violation masked until now (dead duplicate rule since #9).
-  // Conceptually similar to how #9 deferred hooks/api/useInventory.ts (ticket #22) by
-  // leaving it out of inventory's file scope — here the file must stay in-scope for
-  // max-lines, so it's excluded explicitly via ignores instead. Follow-up ticket will
-  // fix the underlying violation.
   {
     files: [
       'src/pages/purchasing/**/*.{ts,tsx}',
@@ -469,7 +463,7 @@ export default defineConfig([
       'src/types/purchasing.ts',
       'src/lib/purchasingKeys.ts',
     ],
-    ignores: ['**/__tests__/**', 'src/pages/purchasing/purchaseOrderPDFUtils.ts'],
+    ignores: ['**/__tests__/**'],
     plugins: { boundaries },
     settings: {
       'boundaries/elements': BOUNDARY_ELEMENTS,

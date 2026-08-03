@@ -1,5 +1,4 @@
 import type { PurchaseOrderDetail } from '../../types/purchasing'
-import client from '../../api/client'
 
 export interface SubGroup {
   key: string
@@ -9,30 +8,6 @@ export interface SubGroup {
   product_photo_url: string | null
   first_dim_value: string
   items: PurchaseOrderDetail[]
-}
-
-export async function fetchPhotoViaProxy(
-  productId: string,
-  dimKey?: string,
-  dimValue?: string,
-): Promise<string | null> {
-  try {
-    const params = new URLSearchParams()
-    if (dimKey) params.set('dim_key', dimKey)
-    if (dimValue) params.set('dim_value', dimValue)
-    const query = params.toString() ? `?${params.toString()}` : ''
-    const response = await client.get<Blob>(`/product/${productId}/photo-proxy/${query}`, {
-      responseType: 'blob',
-    })
-    const blob = response.data
-    return new Promise<string>(resolve => {
-      const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
-      reader.readAsDataURL(blob)
-    })
-  } catch {
-    return null
-  }
 }
 
 export function groupBySubGroup(details: PurchaseOrderDetail[], groupByKey?: string | null): SubGroup[] {

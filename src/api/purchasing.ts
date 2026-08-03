@@ -67,3 +67,11 @@ export const importAndAdd = (poId: string, data: ImportAndAddRequest) =>
 
 export const resolveSourcingConflicts = (poId: string, data: ResolveSourcingConflictsRequest) =>
   http.post<ResolveSourcingConflictsResult>(`/purchase-order/${poId}/resolve-sourcing-conflicts/`, data)
+
+export const fetchPhotoViaProxy = (productId: string, dimKey?: string, dimValue?: string) => {
+  const params = new URLSearchParams()
+  if (dimKey) params.set('dim_key', dimKey)
+  if (dimValue) params.set('dim_value', dimValue)
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return http.get<Blob>(`/product/${productId}/photo-proxy/${query}`, { responseType: 'blob' })
+}

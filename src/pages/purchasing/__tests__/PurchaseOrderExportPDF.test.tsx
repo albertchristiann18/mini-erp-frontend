@@ -6,14 +6,6 @@ vi.mock('../../../api/client', () => ({
   default: { get: vi.fn().mockResolvedValue({ data: new Blob() }) },
 }))
 
-vi.mock('../purchaseOrderPDFUtils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../purchaseOrderPDFUtils')>()
-  return {
-    ...actual,
-    fetchPhotoViaProxy: vi.fn().mockResolvedValue(null),
-  }
-})
-
 vi.mock('@react-pdf/renderer', () => ({
   Document: ({ children }: { children: React.ReactNode }) => <div data-testid="pdf-document">{children}</div>,
   Page: ({ children }: { children: React.ReactNode }) => <div data-testid="pdf-page">{children}</div>,
@@ -487,7 +479,7 @@ it('fetchPhotoViaProxy passes dim_key and dim_value query params when provided',
   const clientMock = (await import('../../../api/client')).default
   const getMock = vi.mocked(clientMock.get)
   getMock.mockResolvedValueOnce({ data: new Blob(['x'], { type: 'image/png' }) })
-  const { fetchPhotoViaProxy: realFetch } = await vi.importActual<typeof import('../purchaseOrderPDFUtils')>('../purchaseOrderPDFUtils')
+  const { fetchPhotoViaProxy: realFetch } = await import('../../../api/purchasing')
   await realFetch('p1', 'Warna', 'Putih')
   expect(getMock).toHaveBeenCalledWith(
     '/product/p1/photo-proxy/?dim_key=Warna&dim_value=Putih',
@@ -499,7 +491,7 @@ it('fetchPhotoViaProxy omits query params when dimKey is not provided', async ()
   const clientMock = (await import('../../../api/client')).default
   const getMock = vi.mocked(clientMock.get)
   getMock.mockResolvedValueOnce({ data: new Blob(['x'], { type: 'image/png' }) })
-  const { fetchPhotoViaProxy: realFetch } = await vi.importActual<typeof import('../purchaseOrderPDFUtils')>('../purchaseOrderPDFUtils')
+  const { fetchPhotoViaProxy: realFetch } = await import('../../../api/purchasing')
   await realFetch('p1')
   expect(getMock).toHaveBeenCalledWith(
     '/product/p1/photo-proxy/',

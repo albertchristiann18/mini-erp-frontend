@@ -10,11 +10,13 @@ vi.mock('../PurchaseOrderExportPDF', () => ({
   ),
 }))
 
-vi.mock('../purchaseOrderPDFUtils', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../purchaseOrderPDFUtils')>()
+const mockFetchPhotoViaProxy = vi.fn().mockResolvedValue(null)
+
+vi.mock('../../../hooks/api/usePurchasing', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../hooks/api/usePurchasing')>()
   return {
     ...actual,
-    fetchPhotoViaProxy: vi.fn().mockResolvedValue(null),
+    useFetchPhotoViaProxy: () => mockFetchPhotoViaProxy,
   }
 })
 
@@ -314,7 +316,7 @@ it('Group by selector defaults to product_dim1_key when all details share the sa
 })
 
 it('image fetch calls fetchPhotoViaProxy with groupByKey and dim value for each subgroup', async () => {
-  const { fetchPhotoViaProxy: mockFetch } = await import('../purchaseOrderPDFUtils')
+  const mockFetch = mockFetchPhotoViaProxy
   const colorPo: PurchaseOrder = {
     ...basePo,
     order_details: [
