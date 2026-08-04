@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { vi, it, expect, describe } from "vitest"
 import { StatusAdvanceModal } from "../StatusAdvanceModal"
+import { toast } from "../../../lib/toast"
 import type { PurchaseOrder, PurchaseOrderDetail, POStatus } from "../../../types/purchasing"
 
 const mockCheckMutate = vi.fn()
@@ -19,6 +20,10 @@ vi.mock("../../../hooks/api/usePurchasing", () => ({
     mutateAsync: mockUpdateMutateAsync,
     isPending: false,
   }),
+}))
+
+vi.mock("../../../lib/toast", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
 }))
 
 const mockPO: PurchaseOrder = {
@@ -345,5 +350,46 @@ describe("COMPLETED transition — editable received qty", () => {
         order_details: [{ id: "d1", received_qty: 10 }],
       }),
     })
+  })
+})
+
+describe("Confirm error handling — surfaces normalized ApiError", () => {
+  it("toasts the order_details field error over the generic message when fieldErrors is present", async () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    mockUpdateMutateAsync.mockRejectedValue({
+      status: 400,
+      message: "Validation failed.",
+      fieldErrors: {
+        order_details:
+          "Remarks is required for Black/M when moving to COMPLETED status with partial delivery (received_qty: 4, ordered_qty: 20).",
+      },
+    })
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 20, received_qty: 4 })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    await userEvent.click(confirmBtn)
+
+    expect(vi.mocked(toast).error).toHaveBeenCalledWith(
+      "Remarks is required for Black/M when moving to COMPLETED status with partial delivery (received_qty: 4, ordered_qty: 20).",
+    )
+  })
+
+  it("falls back to err.message when there are no fieldErrors", async () => {
+    mockCheckResult = { can_transition: true, target_status: "SHIPPED", missing_fields: [] }
+    mockUpdateMutateAsync.mockRejectedValue({
+      status: 0,
+      message: "Network error. Please check your connection.",
+    })
+    renderModal(true, "SHIPPED")
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    await userEvent.click(confirmBtn)
+
+    expect(vi.mocked(toast).error).toHaveBeenCalledWith("Network error. Please check your connection.")
   })
 })
