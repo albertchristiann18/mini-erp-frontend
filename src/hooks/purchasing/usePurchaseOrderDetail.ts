@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from '../../lib/toast'
 import type { PurchaseOrderDetail } from '../../types/purchasing'
-import { HEADER_FIELD_LABELS, computeItemStockData } from './purchaseOrderDetailHelpers'
+import { HEADER_FIELD_LABELS, computeItemStockData, isCompleteNewItem, describeMissingNewItemFields } from './purchaseOrderDetailHelpers'
 import type {
   ModalDraftItem,
   NewItem,
@@ -195,8 +195,12 @@ export function usePurchaseOrderDetail({
   const handleCreate = async () => {
     const errors: string[] = []
     if (!headerValues.warehouse_id) errors.push('Warehouse is required')
-    const validItems = newItems.filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign !== '')
-    if (validItems.length === 0) errors.push('At least one order item is required')
+    const validItems = newItems.filter(isCompleteNewItem)
+    if (newItems.length === 0) {
+      errors.push('At least one order item is required')
+    } else if (validItems.length === 0) {
+      errors.push(`Every order item needs ${describeMissingNewItemFields(newItems)}`)
+    }
     if (errors.length > 0) { setValidationErrors(errors); return }
     const payload: Record<string, unknown> = { warehouse_id: headerValues.warehouse_id }
     const OPTIONAL = ['currency', 'exchange_rate', 'supplier_id', 'supplier_name', 'forwarder_name',
@@ -228,6 +232,11 @@ export function usePurchaseOrderDetail({
 
   const handleSave = async () => {
     if (!po) return
+    const incompleteNew = newItems.filter(n => !isCompleteNewItem(n))
+    if (incompleteNew.length > 0) {
+      setValidationErrors([`Every new order item needs ${describeMissingNewItemFields(incompleteNew)}`])
+      return
+    }
     const payload: Record<string, unknown> = { has_discount: hasDiscount }
     for (const [key, value] of Object.entries(headerValues)) {
       if (value !== '' && value !== null && value !== undefined) payload[key] = value
@@ -241,13 +250,11 @@ export function usePurchaseOrderDetail({
           if (!hasDiscount) delete changes.discounted_unit_price_foreign
           return { id: item.id, ...changes }
         })
-      const newPayload = newItems
-        .filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign)
-        .map(n => ({
-          product_variant_id: n.product_variant_id, ordered_qty: Number(n.ordered_qty),
-          unit_price_foreign: Number(n.unit_price_foreign),
-          ...(hasDiscount && n.discounted_unit_price_foreign ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) } : {}),
-        }))
+      const newPayload = newItems.map(n => ({
+        product_variant_id: n.product_variant_id, ordered_qty: Number(n.ordered_qty),
+        unit_price_foreign: Number(n.unit_price_foreign),
+        ...(hasDiscount && n.discounted_unit_price_foreign ? { discounted_unit_price_foreign: Number(n.discounted_unit_price_foreign) } : {}),
+      }))
       payload.order_details = [...keptExisting, ...newPayload]
     } else {
       const changed = Object.entries(detailValues).map(([id, c]) => ({ id, ...c })).filter(item => Object.keys(item).length > 1)

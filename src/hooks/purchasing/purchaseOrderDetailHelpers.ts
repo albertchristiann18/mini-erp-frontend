@@ -20,6 +20,23 @@ export type ModalDraftItem = {
 
 export type NewItem = ModalDraftItem & { _tempId: string }
 
+// ─── New-item completeness (shared by create + save validation) ──────────────
+
+export function isCompleteNewItem(n: ModalDraftItem): boolean {
+  return Boolean(n.product_variant_id) && Boolean(n.ordered_qty) && n.unit_price_foreign !== ''
+}
+
+/** Names the fields missing across a set of incomplete new items, for a validation message. */
+export function describeMissingNewItemFields(items: ModalDraftItem[]): string {
+  const missing = new Set<string>()
+  for (const n of items) {
+    if (!n.product_variant_id) missing.add('a variant')
+    if (!n.ordered_qty) missing.add('an order quantity')
+    if (n.unit_price_foreign === '') missing.add('a unit price')
+  }
+  return Array.from(missing).join(', ')
+}
+
 // ─── Hook props / result (declared here to keep usePurchaseOrderDetail.ts small) ──
 
 export interface UsePurchaseOrderDetailProps {
