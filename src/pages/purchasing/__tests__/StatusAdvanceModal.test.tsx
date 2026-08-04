@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { vi, it, expect } from "vitest"
 import { StatusAdvanceModal } from "../StatusAdvanceModal"
@@ -76,15 +77,15 @@ const mockPO: PurchaseOrder = {
   udate: "2026-05-01T00:00:00Z",
 }
 
-function renderModal(open = true) {
+function renderModal(open = true, targetStatus: POStatus = "SHIPPED", po: PurchaseOrder = mockPO) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={qc}>
       <StatusAdvanceModal
         open={open}
         onClose={vi.fn()}
-        po={mockPO}
-        targetStatus="SHIPPED"
+        po={po}
+        targetStatus={targetStatus}
       />
     </QueryClientProvider>,
   )
@@ -157,5 +158,53 @@ it("Confirm button enabled after filling missing fields", () => {
   expect(confirmBtn).toBeDisabled()
   const input = screen.getByPlaceholderText("Delivery Order No.")
   fireEvent.change(input, { target: { value: "DO-001" } })
+  expect(confirmBtn).not.toBeDisabled()
+})
+
+const poWithoutCurrency: PurchaseOrder = { ...mockPO, currency: null }
+
+it("renders currency select for ORDERED target status", () => {
+  mockCheckResult = { can_transition: true, target_status: "ORDERED", missing_fields: [] }
+  renderModal(true, "ORDERED")
+  expect(screen.getByTestId("currency-select-trigger")).toBeInTheDocument()
+})
+
+it("shows red indicator for missing currency reported by check_transition", () => {
+  mockCheckResult = {
+    can_transition: false,
+    target_status: "ORDERED",
+    missing_fields: [{ field: "currency", label: "Currency", section: "Financial Setup", message: "Currency is required when moving to ORDERED." }],
+  }
+  renderModal(true, "ORDERED", poWithoutCurrency)
+  expect(screen.getByText("Currency")).toBeInTheDocument()
+  expect(screen.getAllByTestId("x-icon").length).toBeGreaterThan(0)
+})
+
+it("Confirm button disabled until a currency is chosen for ORDERED", () => {
+  mockCheckResult = {
+    can_transition: false,
+    target_status: "ORDERED",
+    missing_fields: [{ field: "currency", label: "Currency", section: "Financial Setup", message: "Currency is required when moving to ORDERED." }],
+  }
+  renderModal(true, "ORDERED", poWithoutCurrency)
+  const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+  expect(confirmBtn).toBeDisabled()
+})
+
+it("Confirm button enabled after selecting a currency for ORDERED", async () => {
+  mockCheckResult = {
+    can_transition: false,
+    target_status: "ORDERED",
+    missing_fields: [{ field: "currency", label: "Currency", section: "Financial Setup", message: "Currency is required when moving to ORDERED." }],
+  }
+  renderModal(true, "ORDERED", poWithoutCurrency)
+  const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+  expect(confirmBtn).toBeDisabled()
+
+  const currencyTrigger = screen.getByTestId("currency-select-trigger")
+  await userEvent.click(currencyTrigger)
+  const cnyOption = await screen.findByText("CNY (¥ Yuan)")
+  await userEvent.click(cnyOption)
+
   expect(confirmBtn).not.toBeDisabled()
 })

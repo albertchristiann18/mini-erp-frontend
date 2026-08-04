@@ -3,10 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "../../components/ui/button"
 import { Badge } from "../../components/ui/badge"
 import { Input } from "../../components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { useCheckPOTransition, useUpdatePurchaseOrder } from "../../hooks/api/usePurchasing"
 import { Check, X } from "lucide-react"
 import { cn, formatIDR, formatDate } from "../../lib/utils"
 import { toast } from "../../lib/toast"
+import { HEADER_FIELD_CONFIG } from "./PurchaseOrderDetail/headerFieldConfig"
 import type { PurchaseOrder, POStatus } from "../../types/purchasing"
 
 const statusVariant: Record<POStatus, "secondary" | "info" | "warning" | "success" | "destructive"> = {
@@ -18,9 +20,10 @@ type FieldConfig = {
   field: string
   label: string
   section: string
-  inputType: "text" | "number" | "date" | "file"
+  inputType: "text" | "number" | "date" | "file" | "select"
   suffix?: string
   step?: string
+  options?: { value: string; label: string }[]
 }
 
 const REQUIRED_FIELDS: Record<string, FieldConfig[]> = {
@@ -28,6 +31,7 @@ const REQUIRED_FIELDS: Record<string, FieldConfig[]> = {
     { field: "supplier_name",               label: "Supplier",            section: "General",          inputType: "text" },
     { field: "forwarder_name",              label: "Forwarder",           section: "General",          inputType: "text" },
     { field: "shop_services",               label: "Jasa Belanja",        section: "General",          inputType: "text" },
+    { field: "currency",                    label: "Currency",            section: "Financial Setup",  inputType: "select", options: HEADER_FIELD_CONFIG.currency.options },
     { field: "exchange_rate",               label: "Exchange Rate",       section: "Financial Setup",  inputType: "number", step: "0.001" },
     { field: "commission_fee_pct",          label: "Commission %",        section: "Financial Setup",  inputType: "number" },
     { field: "delivery_fee",               label: "Delivery Fee (RMB)",  section: "Financial Setup",  inputType: "number", step: "0.001" },
@@ -174,7 +178,27 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
                             {cfg.label}
                           </span>
                         </div>
-                        {cfg.inputType !== "file" && cfg.field !== "order_details" && (
+                        {cfg.inputType === "select" && cfg.options && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Select
+                              value={String(formValues[cfg.field] ?? "")}
+                              onValueChange={val => setField(cfg.field, val)}
+                            >
+                              <SelectTrigger
+                                className="h-7 text-xs"
+                                data-testid={cfg.field === "currency" ? "currency-select-trigger" : undefined}
+                              >
+                                <SelectValue placeholder="Select..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {cfg.options.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {cfg.inputType !== "file" && cfg.inputType !== "select" && cfg.field !== "order_details" && (
                           <div className="flex items-center gap-1.5 mt-1">
                             <Input
                               type={cfg.inputType}
