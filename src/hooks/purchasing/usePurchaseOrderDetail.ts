@@ -196,7 +196,17 @@ export function usePurchaseOrderDetail({
     const errors: string[] = []
     if (!headerValues.warehouse_id) errors.push('Warehouse is required')
     const validItems = newItems.filter(n => n.product_variant_id && n.ordered_qty && n.unit_price_foreign !== '')
-    if (validItems.length === 0) errors.push('At least one order item is required')
+    if (newItems.length === 0) {
+      errors.push('At least one order item is required')
+    } else if (validItems.length === 0) {
+      const missing = new Set<string>()
+      for (const n of newItems) {
+        if (!n.product_variant_id) missing.add('a variant')
+        if (!n.ordered_qty) missing.add('an order quantity')
+        if (n.unit_price_foreign === '') missing.add('a unit price')
+      }
+      errors.push(`Every order item needs ${Array.from(missing).join(', ')}`)
+    }
     if (errors.length > 0) { setValidationErrors(errors); return }
     const payload: Record<string, unknown> = { warehouse_id: headerValues.warehouse_id }
     const OPTIONAL = ['currency', 'exchange_rate', 'supplier_id', 'supplier_name', 'forwarder_name',
