@@ -1,9 +1,9 @@
 import { render, screen, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { vi, it, expect } from "vitest"
+import { vi, it, expect, describe } from "vitest"
 import { StatusAdvanceModal } from "../StatusAdvanceModal"
-import type { PurchaseOrder, POStatus } from "../../../types/purchasing"
+import type { PurchaseOrder, PurchaseOrderDetail, POStatus } from "../../../types/purchasing"
 
 const mockCheckMutate = vi.fn()
 const mockUpdateMutateAsync = vi.fn()
@@ -75,6 +75,44 @@ const mockPO: PurchaseOrder = {
   status_history: [],
   cdate: "2026-05-01T00:00:00Z",
   udate: "2026-05-01T00:00:00Z",
+}
+
+function makeDetail(overrides: Partial<PurchaseOrderDetail> & { id: string }): PurchaseOrderDetail {
+  return {
+    variant_id: overrides.id,
+    product_variant_name: `Variant ${overrides.id}`,
+    sku_variant_code: undefined,
+    product_id: "p1",
+    product_name: "Product",
+    product_supplier_link: null,
+    product_photo_url: null,
+    ordered_qty: 10,
+    received_qty: 10,
+    unit_price_foreign: null,
+    unit_price_base: null,
+    discounted_unit_price_foreign: null,
+    discounted_unit_price_base: null,
+    total_price_foreign: null,
+    total_price_base: null,
+    discounted_total_price_foreign: null,
+    discounted_total_price_base: null,
+    remarks: "",
+    avg_sales: null,
+    avg_sales_7d: null,
+    stock_on_hand: 0,
+    incoming_qty: 0,
+    variant_values: {},
+    last_unit_price_foreign: null,
+    last_currency: null,
+    last_discounted_unit_price_foreign: null,
+    shipping_per_unit_idr: null,
+    delivery_per_unit_idr: null,
+    commission_per_unit_idr: null,
+    cogs_per_unit_idr: null,
+    product_has_dimensions: null,
+    product_dim1_key: null,
+    ...overrides,
+  }
 }
 
 function renderModal(open = true, targetStatus: POStatus = "SHIPPED", po: PurchaseOrder = mockPO) {
@@ -207,4 +245,105 @@ it("Confirm button enabled after selecting a currency for ORDERED", async () => 
   await userEvent.click(cnyOption)
 
   expect(confirmBtn).not.toBeDisabled()
+})
+
+describe("COMPLETED transition — editable received qty", () => {
+  it("defaults to showing only rows where received qty differs from ordered qty, with a Show all control", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [
+        makeDetail({ id: "d1", ordered_qty: 10, received_qty: 8 }),
+        makeDetail({ id: "d2", ordered_qty: 5, received_qty: 5 }),
+      ],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    expect(screen.getByText("Variant d1")).toBeInTheDocument()
+    expect(screen.queryByText("Variant d2")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText("Show all 2 items"))
+    expect(screen.getByText("Variant d2")).toBeInTheDocument()
+  })
+
+  it("renders every row directly, with no Show all toggle, once flagged rows exceed 20", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const flagged = Array.from({ length: 21 }, (_, i) =>
+      makeDetail({ id: `f${i}`, ordered_qty: 10, received_qty: 5 }),
+    )
+    const matched = makeDetail({ id: "m1", ordered_qty: 3, received_qty: 3 })
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [...flagged, matched],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    expect(screen.getByText("Variant m1")).toBeInTheDocument()
+    expect(screen.queryByText(/Show all/)).not.toBeInTheDocument()
+  })
+
+  it("recomputes the discrepancy warning live as qty is edited", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 10 })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    expect(screen.queryByText(/Warning/)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByText("Show all 1 items"))
+    const input = screen.getByDisplayValue("10")
+    fireEvent.change(input, { target: { value: "7" } })
+
+    expect(screen.getByText(/Warning/)).toBeInTheDocument()
+    expect(screen.getByText(/Variant d1: received 7 of 10/)).toBeInTheDocument()
+  })
+
+  it("does not show the partial-receipt warning when an item is over-received", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [
+        makeDetail({ id: "d1", ordered_qty: 10, received_qty: 10 }),
+        makeDetail({ id: "d2", ordered_qty: 5, received_qty: 5 }),
+      ],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    fireEvent.click(screen.getByText("Show all 2 items"))
+    const input = screen.getByDisplayValue("10")
+    fireEvent.change(input, { target: { value: "12" } })
+
+    expect(screen.queryByText(/Warning/)).not.toBeInTheDocument()
+  })
+
+  it("sends the edited received_qty via useUpdatePurchaseOrder alongside the status change on confirm", async () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    mockUpdateMutateAsync.mockResolvedValue({})
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 8 })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    const input = screen.getByDisplayValue("8")
+    fireEvent.change(input, { target: { value: "10" } })
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    await userEvent.click(confirmBtn)
+
+    expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
+      id: po.id,
+      data: expect.objectContaining({
+        status: "COMPLETED",
+        order_details: [{ id: "d1", received_qty: 10 }],
+      }),
+    })
+  })
 })

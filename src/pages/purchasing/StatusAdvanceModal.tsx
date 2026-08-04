@@ -2,55 +2,19 @@ import { useEffect, useMemo, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog"
 import { Button } from "../../components/ui/button"
 import { Badge } from "../../components/ui/badge"
-import { Input } from "../../components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select"
 import { useCheckPOTransition, useUpdatePurchaseOrder } from "../../hooks/api/usePurchasing"
-import { Check, X } from "lucide-react"
-import { cn, formatIDR, formatDate } from "../../lib/utils"
+import { useCompletedItemsEdit } from "../../hooks/purchasing/useCompletedItemsEdit"
+import { formatIDR, formatDate } from "../../lib/utils"
 import { toast } from "../../lib/toast"
-import { HEADER_FIELD_CONFIG } from "./PurchaseOrderDetail/headerFieldConfig"
+import { REQUIRED_FIELDS } from "./StatusAdvanceModal/fieldConfig"
+import { RequiredFieldsList } from "./StatusAdvanceModal/RequiredFieldsList"
+import { CompletedItemsTable } from "./StatusAdvanceModal/CompletedItemsTable"
+import { TransitionWarningsPanel } from "./StatusAdvanceModal/TransitionWarningsPanel"
 import type { PurchaseOrder, POStatus } from "../../types/purchasing"
 
 const statusVariant: Record<POStatus, "secondary" | "info" | "warning" | "success" | "destructive"> = {
   DRAFT: "secondary", ORDERED: "info", SHIPPED: "warning",
   DELIVERED: "success", COMPLETED: "success", CANCELLED: "destructive",
-}
-
-type FieldConfig = {
-  field: string
-  label: string
-  section: string
-  inputType: "text" | "number" | "date" | "file" | "select"
-  suffix?: string
-  step?: string
-  options?: { value: string; label: string }[]
-}
-
-const REQUIRED_FIELDS: Record<string, FieldConfig[]> = {
-  ORDERED: [
-    { field: "supplier_name",               label: "Supplier",            section: "General",          inputType: "text" },
-    { field: "forwarder_name",              label: "Forwarder",           section: "General",          inputType: "text" },
-    { field: "shop_services",               label: "Jasa Belanja",        section: "General",          inputType: "text" },
-    { field: "currency",                    label: "Currency",            section: "Financial Setup",  inputType: "select", options: HEADER_FIELD_CONFIG.currency.options },
-    { field: "exchange_rate",               label: "Exchange Rate",       section: "Financial Setup",  inputType: "number", step: "0.001" },
-    { field: "commission_fee_pct",          label: "Commission %",        section: "Financial Setup",  inputType: "number" },
-    { field: "delivery_fee",               label: "Delivery Fee (RMB)",  section: "Financial Setup",  inputType: "number", step: "0.001" },
-    { field: "invoice_number",              label: "Invoice Number",      section: "Logistics & Dates", inputType: "text" },
-    { field: "invoice_date",                label: "Invoice Date",        section: "Logistics & Dates", inputType: "date" },
-    { field: "purchase_order_invoice_file", label: "PO Invoice File",    section: "Attachments",       inputType: "file" },
-    { field: "order_details",               label: "Order Items",         section: "Order Items",       inputType: "text" },
-  ],
-  SHIPPED: [
-    { field: "delivery_order_number", label: "Delivery Order No.",  section: "Logistics & Dates", inputType: "text" },
-    { field: "cbm",                   label: "CBM",                 section: "Logistics & Dates", inputType: "number", step: "0.001", suffix: "m\u00b3" },
-    { field: "weight",                label: "Weight",              section: "Logistics & Dates", inputType: "number", step: "0.01",  suffix: "kg" },
-    { field: "shipping_fee_per_cbm",  label: "Shipping Fee / CBM",  section: "Financial Setup",   inputType: "number" },
-    { field: "delivery_order_file",   label: "Delivery Order File", section: "Attachments",        inputType: "file" },
-  ],
-  DELIVERED: [
-    { field: "delivery_order_invoice_file", label: "DO Invoice File", section: "Attachments", inputType: "file" },
-  ],
-  COMPLETED: [],
 }
 
 interface Props {
@@ -64,6 +28,7 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
   const checkMutation = useCheckPOTransition()
   const updateMutation = useUpdatePurchaseOrder()
   const [formValues, setFormValues] = useState<Record<string, string | File>>({})
+  const completedItems = useCompletedItemsEdit(targetStatus === "COMPLETED" ? po.order_details : undefined)
 
   const setField = (field: string, value: string | File) =>
     setFormValues(prev => ({ ...prev, [field]: value }))
@@ -115,6 +80,12 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
         payload[key] = value
       }
     }
+    if (targetStatus === "COMPLETED") {
+      const changedOrderDetails = completedItems.getChangedOrderDetails()
+      if (changedOrderDetails.length > 0) {
+        payload.order_details = changedOrderDetails
+      }
+    }
     try {
       await updateMutation.mutateAsync({ id: po.id, data: payload })
       toast.success(`Status updated to ${targetStatus}`)
@@ -159,126 +130,42 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                {fieldsForTarget.map(cfg => {
-                  const originallyMissing = missingFieldSet.has(cfg.field)
-                  const showRed = originallyMissing && !formValues[cfg.field]
-                  return (
-                    <div key={cfg.field} className={cn(
-                      "flex items-start gap-2 text-sm px-2 py-1.5 rounded",
-                      showRed && "bg-red-50 dark:bg-red-950/20"
-                    )}>
-                      {showRed
-                        ? <X className="h-4 w-4 text-red-500 mt-0.5 shrink-0" data-testid="x-icon" />
-                        : <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" data-testid="check-icon" />
-                      }
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={cn("font-medium", showRed && "text-red-600 dark:text-red-400")}>
-                            {cfg.label}
-                          </span>
-                        </div>
-                        {cfg.inputType === "select" && cfg.options && (
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <Select
-                              value={String(formValues[cfg.field] ?? "")}
-                              onValueChange={val => setField(cfg.field, val)}
-                            >
-                              <SelectTrigger
-                                className="h-7 text-xs"
-                                data-testid={cfg.field === "currency" ? "currency-select-trigger" : undefined}
-                              >
-                                <SelectValue placeholder="Select..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {cfg.options.map(opt => (
-                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                        {cfg.inputType !== "file" && cfg.inputType !== "select" && cfg.field !== "order_details" && (
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <Input
-                              type={cfg.inputType}
-                              step={cfg.step}
-                              className="h-7 text-xs"
-                              placeholder={cfg.label}
-                              value={String(formValues[cfg.field] ?? "")}
-                              onChange={e => setField(cfg.field, e.target.value)}
-                            />
-                            {cfg.suffix && <span className="text-xs text-muted-foreground whitespace-nowrap">{cfg.suffix}</span>}
-                          </div>
-                        )}
-                        {cfg.inputType === "file" && originallyMissing && (
-                          <input
-                            type="file"
-                            accept="application/pdf,image/*"
-                            className="mt-1 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-muted file:text-foreground"
-                            onChange={e => {
-                              const file = e.target.files?.[0]
-                              if (file) setField(cfg.field, file)
-                            }}
-                          />
-                        )}
-                        {cfg.inputType === "file" && !originallyMissing && (() => {
-                          const url = String((po as unknown as Record<string, unknown>)[cfg.field] ?? "")
-                          return (
-                            <div className="flex items-center gap-2 mt-1">
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-600 underline"
-                              >
-                                View
-                              </a>
-                              <label className="text-xs text-muted-foreground cursor-pointer">
-                                Replace
-                                <input
-                                  type="file"
-                                  accept="application/pdf,image/*"
-                                  className="ml-1 text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-muted file:text-foreground"
-                                  onChange={e => {
-                                    const file = e.target.files?.[0]
-                                    if (file) setField(cfg.field, file)
-                                  }}
-                                />
-                              </label>
-                            </div>
-                          )
-                        })()}
-                        {cfg.field === "order_details" && originallyMissing && (
-                          <p className="text-xs text-muted-foreground mt-0.5">Add order items via Edit before advancing.</p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              <RequiredFieldsList
+                fields={fieldsForTarget}
+                missingFieldSet={missingFieldSet}
+                formValues={formValues}
+                po={po}
+                setField={setField}
+              />
+
+              {targetStatus === "COMPLETED" && (
+                <CompletedItemsTable
+                  visibleRows={completedItems.visibleRows}
+                  totalCount={completedItems.rows.length}
+                  flaggedCount={completedItems.flaggedRows.length}
+                  overThreshold={completedItems.overThreshold}
+                  showAll={completedItems.showAll}
+                  onShowAll={() => completedItems.setShowAll(true)}
+                  editedQty={completedItems.editedQty}
+                  onSetQty={completedItems.setQty}
+                />
+              )}
             </>
           )}
 
-          {checkMutation.data?.warnings && checkMutation.data.warnings.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 p-4">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">⚠ Warning</p>
-              {checkMutation.data.warnings.map((w, i) => (
-                <div key={i}>
-                  <p className="text-sm text-amber-700 dark:text-amber-400">{w.message}</p>
-                  {w.items && w.items.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {w.items.map(item => (
-                        <li key={item.name} className="text-xs text-amber-600 dark:text-amber-500">
-                          {item.name}: received {item.received_qty} of {item.ordered_qty}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ))}
-              <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">You can still confirm — this is a warning only.</p>
-            </div>
+          {targetStatus === "COMPLETED" ? (
+            <TransitionWarningsPanel
+              groups={
+                completedItems.liveDiscrepancies.length > 0
+                  ? [{
+                      message: `${completedItems.liveDiscrepancies.length} item(s) have received qty less than ordered qty.`,
+                      items: completedItems.liveDiscrepancies,
+                    }]
+                  : []
+              }
+            />
+          ) : (
+            <TransitionWarningsPanel groups={checkMutation.data?.warnings ?? []} />
           )}
         </div>
 
