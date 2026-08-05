@@ -11,6 +11,7 @@ import { RequiredFieldsList } from "./StatusAdvanceModal/RequiredFieldsList"
 import { CompletedItemsTable } from "./StatusAdvanceModal/CompletedItemsTable"
 import { TransitionWarningsPanel } from "./StatusAdvanceModal/TransitionWarningsPanel"
 import type { PurchaseOrder, POStatus } from "../../types/purchasing"
+import type { ApiError } from "../../lib/errors"
 
 const statusVariant: Record<POStatus, "secondary" | "info" | "warning" | "success" | "destructive"> = {
   DRAFT: "secondary", ORDERED: "info", SHIPPED: "warning",
@@ -71,7 +72,7 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
     })
   }, [checkMutation.data, formValues])
 
-  const canConfirm = checkMutation.data?.can_transition || allMissingFilled
+  const canConfirm = (checkMutation.data?.can_transition || allMissingFilled) && !completedItems.hasUnresolvedRemarks
 
   const handleConfirm = async () => {
     const payload: Record<string, unknown> = { status: targetStatus }
@@ -90,16 +91,9 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
       await updateMutation.mutateAsync({ id: po.id, data: payload })
       toast.success(`Status updated to ${targetStatus}`)
       onClose()
-    } catch (err: unknown) {
-      const data = (err as { response?: { data?: Record<string, unknown> } })?.response?.data
-      const msg =
-        (data?.error as string | undefined) ||
-        Object.values(data ?? {})
-          .flatMap(v => (Array.isArray(v) ? v : [v]))
-          .filter(v => typeof v === "string")
-          .join(" ") ||
-        "Failed to update status"
-      toast.error(msg)
+    } catch (err) {
+      const apiError = err as ApiError
+      toast.error(apiError.fieldErrors?.order_details ?? apiError.message)
     }
   }
 
@@ -148,6 +142,9 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
                   onShowAll={() => completedItems.setShowAll(true)}
                   editedQty={completedItems.editedQty}
                   onSetQty={completedItems.setQty}
+                  editedRemarks={completedItems.editedRemarks}
+                  onSetRemarks={completedItems.setRemarks}
+                  discrepantRowIds={completedItems.discrepantRowIds}
                 />
               )}
             </>
@@ -155,14 +152,21 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
 
           {targetStatus === "COMPLETED" ? (
             <TransitionWarningsPanel
-              groups={
-                completedItems.liveDiscrepancies.length > 0
+              groups={[
+                ...(completedItems.liveDiscrepancies.length > 0
                   ? [{
                       message: `${completedItems.liveDiscrepancies.length} item(s) have received qty less than ordered qty.`,
                       items: completedItems.liveDiscrepancies,
                     }]
-                  : []
-              }
+                  : []),
+                ...(completedItems.liveOverReceipts.length > 0
+                  ? [{
+                      message: `${completedItems.liveOverReceipts.length} item(s) have received qty greater than ordered qty.`,
+                      items: completedItems.liveOverReceipts,
+                    }]
+                  : []),
+              ]}
+              stillBlocked={completedItems.hasUnresolvedRemarks}
             />
           ) : (
             <TransitionWarningsPanel groups={checkMutation.data?.warnings ?? []} />

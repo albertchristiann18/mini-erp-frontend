@@ -17,9 +17,17 @@ interface WarningGroup {
 
 interface TransitionWarningsPanelProps {
   groups: WarningGroup[]
+  /**
+   * When true, confirming is still actually blocked (e.g. unresolved required
+   * remarks) — suppress the "you can still confirm" reassurance so it never
+   * lies about the Confirm button's disabled state. Defaults to false, which
+   * preserves the original always-reassure behavior for callers that don't
+   * link their warnings to a separate confirm-gate (e.g. server warnings).
+   */
+  stillBlocked?: boolean
 }
 
-export function TransitionWarningsPanel({ groups }: TransitionWarningsPanelProps) {
+export function TransitionWarningsPanel({ groups, stillBlocked = false }: TransitionWarningsPanelProps) {
   if (groups.length === 0) return null
 
   return (
@@ -39,7 +47,9 @@ export function TransitionWarningsPanel({ groups }: TransitionWarningsPanelProps
           )}
         </div>
       ))}
-      <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">You can still confirm — this is a warning only.</p>
+      {!stillBlocked && (
+        <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">You can still confirm — this is a warning only.</p>
+      )}
     </div>
   )
 }
