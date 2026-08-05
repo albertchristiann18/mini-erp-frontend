@@ -63,16 +63,28 @@ export function useCompletedItemsEdit(orderDetails: PurchaseOrderDetail[] | unde
 
   const visibleRows = overThreshold ? rows : (showAll ? rows : flaggedRows)
 
+  /** Shared filter->map shape for both discrepancy directions below — differ only by `cmp`. */
+  const buildDiscrepancyRows = (
+    cmp: (received: number, ordered: number) => boolean,
+  ): DiscrepancyRow[] =>
+    rows
+      .filter(item => cmp(effectiveReceivedQty(item), item.ordered_qty))
+      .map(item => ({
+        id: item.id,
+        name: item.product_variant_name,
+        ordered_qty: item.ordered_qty,
+        received_qty: effectiveReceivedQty(item),
+      }))
+
   const liveDiscrepancies: DiscrepancyRow[] = useMemo(
-    () =>
-      rows
-        .filter(item => effectiveReceivedQty(item) < item.ordered_qty)
-        .map(item => ({
-          id: item.id,
-          name: item.product_variant_name,
-          ordered_qty: item.ordered_qty,
-          received_qty: effectiveReceivedQty(item),
-        })),
+    () => buildDiscrepancyRows((received, ordered) => received < ordered),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, editedQty],
+  )
+
+  /** Over-receipt counterpart to liveDiscrepancies above — same row shape, opposite direction. */
+  const liveOverReceipts: DiscrepancyRow[] = useMemo(
+    () => buildDiscrepancyRows((received, ordered) => received > ordered),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, editedQty],
   )
@@ -122,6 +134,7 @@ export function useCompletedItemsEdit(orderDetails: PurchaseOrderDetail[] | unde
     discrepantRowIds,
     hasUnresolvedRemarks,
     liveDiscrepancies,
+    liveOverReceipts,
     getChangedOrderDetails,
   }
 }

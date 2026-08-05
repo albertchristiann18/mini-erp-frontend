@@ -308,13 +308,13 @@ describe("COMPLETED transition — editable received qty", () => {
     expect(screen.getByText(/Variant d1: received 7 of 10/)).toBeInTheDocument()
   })
 
-  it("does not show the partial-receipt warning when an item is over-received", () => {
+  it("shows a distinct over-receipt warning (not the under-receipt one) when an item is over-received", () => {
     mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
     const po: PurchaseOrder = {
       ...mockPO,
       status: "DELIVERED",
       order_details: [
-        makeDetail({ id: "d1", ordered_qty: 10, received_qty: 10 }),
+        makeDetail({ id: "d1", ordered_qty: 10, received_qty: 10, remarks: "" }),
         makeDetail({ id: "d2", ordered_qty: 5, received_qty: 5 }),
       ],
     }
@@ -323,6 +323,52 @@ describe("COMPLETED transition — editable received qty", () => {
     fireEvent.click(screen.getByText("Show all 2 items"))
     const input = screen.getByDisplayValue("10")
     fireEvent.change(input, { target: { value: "12" } })
+
+    expect(screen.getByText(/greater than ordered qty/)).toBeInTheDocument()
+    expect(screen.queryByText(/less than ordered qty/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Variant d1: received 12 of 10/)).toBeInTheDocument()
+  })
+
+  it("does not show a warning for an over-receipt row's remarks-satisfied confirm-anyway line while remarks is still unresolved", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 40, remarks: "" })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    expect(screen.getByText(/greater than ordered qty/)).toBeInTheDocument()
+    expect(screen.queryByText(/You can still confirm/)).not.toBeInTheDocument()
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    expect(confirmBtn).toBeDisabled()
+  })
+
+  it("shows the confirm-anyway reassurance for an over-receipt row once its remarks is filled", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 40, remarks: "" })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    fireEvent.change(screen.getByPlaceholderText("Remarks..."), { target: { value: "Extra units from supplier" } })
+
+    expect(screen.getByText(/You can still confirm/)).toBeInTheDocument()
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    expect(confirmBtn).not.toBeDisabled()
+  })
+
+  it("shows no warning at all for a row whose received qty matches ordered qty", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 10 })],
+    }
+    renderModal(true, "COMPLETED", po)
 
     expect(screen.queryByText(/Warning/)).not.toBeInTheDocument()
   })

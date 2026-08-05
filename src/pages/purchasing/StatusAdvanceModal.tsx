@@ -152,14 +152,21 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
 
           {targetStatus === "COMPLETED" ? (
             <TransitionWarningsPanel
-              groups={
-                completedItems.liveDiscrepancies.length > 0
+              groups={[
+                ...(completedItems.liveDiscrepancies.length > 0
                   ? [{
                       message: `${completedItems.liveDiscrepancies.length} item(s) have received qty less than ordered qty.`,
                       items: completedItems.liveDiscrepancies,
                     }]
-                  : []
-              }
+                  : []),
+                ...(completedItems.liveOverReceipts.length > 0
+                  ? [{
+                      message: `${completedItems.liveOverReceipts.length} item(s) have received qty greater than ordered qty.`,
+                      items: completedItems.liveOverReceipts,
+                    }]
+                  : []),
+              ]}
+              stillBlocked={completedItems.hasUnresolvedRemarks}
             />
           ) : (
             <TransitionWarningsPanel groups={checkMutation.data?.warnings ?? []} />
