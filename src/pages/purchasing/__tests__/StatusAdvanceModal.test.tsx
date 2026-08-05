@@ -400,7 +400,7 @@ describe("COMPLETED transition — editable received qty", () => {
 })
 
 describe("COMPLETED transition — remarks for qty discrepancy", () => {
-  it("renders a remarks input only for the discrepant row, not the row where received qty matches ordered qty", () => {
+  it("renders a remarks input for every row, including the row where received qty matches ordered qty", () => {
     mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
     const po: PurchaseOrder = {
       ...mockPO,
@@ -410,8 +410,23 @@ describe("COMPLETED transition — remarks for qty discrepancy", () => {
     renderModal(true, "COMPLETED", po)
     fireEvent.click(screen.getByText("Show all 2 items"))
 
-    expect(screen.queryByPlaceholderText("Remarks...")).toBeInTheDocument()
-    expect(screen.queryAllByPlaceholderText("Remarks...")).toHaveLength(1)
+    expect(screen.queryAllByPlaceholderText("Remarks...")).toHaveLength(2)
+  })
+
+  it("does not block Confirm when a non-discrepant row's remarks is left empty", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 5, received_qty: 5, remarks: "" })],
+    }
+    renderModal(true, "COMPLETED", po)
+    fireEvent.click(screen.getByText("Show all 1 items"))
+
+    expect(screen.getByPlaceholderText("Remarks...")).toBeInTheDocument()
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    expect(confirmBtn).not.toBeDisabled()
   })
 
   it("renders a remarks input for an under-receipt row and gates Confirm until it is filled", async () => {
@@ -433,7 +448,7 @@ describe("COMPLETED transition — remarks for qty discrepancy", () => {
     expect(confirmBtn).not.toBeDisabled()
   })
 
-  it("renders a remarks input for an over-receipt row (not just under-receipt)", () => {
+  it("gates Confirm on remarks for an over-receipt row (not just under-receipt)", () => {
     mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
     const po: PurchaseOrder = {
       ...mockPO,
@@ -443,13 +458,14 @@ describe("COMPLETED transition — remarks for qty discrepancy", () => {
     renderModal(true, "COMPLETED", po)
     fireEvent.click(screen.getByText("Show all 1 items"))
 
-    expect(screen.queryByPlaceholderText("Remarks...")).not.toBeInTheDocument()
+    const remarksInput = screen.getByPlaceholderText("Remarks...")
+    expect(remarksInput).toBeInTheDocument()
+
+    const confirmBtnBefore = screen.getByRole("button", { name: /confirm/i })
+    expect(confirmBtnBefore).not.toBeDisabled()
 
     const qtyInput = screen.getByDisplayValue("10")
     fireEvent.change(qtyInput, { target: { value: "12" } })
-
-    const remarksInput = screen.getByPlaceholderText("Remarks...")
-    expect(remarksInput).toBeInTheDocument()
 
     const confirmBtn = screen.getByRole("button", { name: /confirm/i })
     expect(confirmBtn).toBeDisabled()
