@@ -72,7 +72,7 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
     })
   }, [checkMutation.data, formValues])
 
-  const canConfirm = checkMutation.data?.can_transition || allMissingFilled
+  const canConfirm = (checkMutation.data?.can_transition || allMissingFilled) && !completedItems.hasUnresolvedRemarks
 
   const handleConfirm = async () => {
     const payload: Record<string, unknown> = { status: targetStatus }
@@ -142,6 +142,9 @@ export function StatusAdvanceModal({ open, onClose, po, targetStatus }: Props) {
                   onShowAll={() => completedItems.setShowAll(true)}
                   editedQty={completedItems.editedQty}
                   onSetQty={completedItems.setQty}
+                  editedRemarks={completedItems.editedRemarks}
+                  onSetRemarks={completedItems.setRemarks}
+                  discrepantRowIds={completedItems.discrepantRowIds}
                 />
               )}
             </>

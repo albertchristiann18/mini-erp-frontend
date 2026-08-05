@@ -353,6 +353,157 @@ describe("COMPLETED transition — editable received qty", () => {
   })
 })
 
+describe("COMPLETED transition — remarks for qty discrepancy", () => {
+  it("renders a remarks input only for the discrepant row, not the row where received qty matches ordered qty", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 8 }), makeDetail({ id: "d2", ordered_qty: 5, received_qty: 5 })],
+    }
+    renderModal(true, "COMPLETED", po)
+    fireEvent.click(screen.getByText("Show all 2 items"))
+
+    expect(screen.queryByPlaceholderText("Remarks...")).toBeInTheDocument()
+    expect(screen.queryAllByPlaceholderText("Remarks...")).toHaveLength(1)
+  })
+
+  it("renders a remarks input for an under-receipt row and gates Confirm until it is filled", async () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 8, remarks: "" })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    const remarksInput = screen.getByPlaceholderText("Remarks...")
+    expect(remarksInput).toBeInTheDocument()
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    expect(confirmBtn).toBeDisabled()
+
+    fireEvent.change(remarksInput, { target: { value: "Short shipped by supplier" } })
+    expect(confirmBtn).not.toBeDisabled()
+  })
+
+  it("renders a remarks input for an over-receipt row (not just under-receipt)", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 10, remarks: "" })],
+    }
+    renderModal(true, "COMPLETED", po)
+    fireEvent.click(screen.getByText("Show all 1 items"))
+
+    expect(screen.queryByPlaceholderText("Remarks...")).not.toBeInTheDocument()
+
+    const qtyInput = screen.getByDisplayValue("10")
+    fireEvent.change(qtyInput, { target: { value: "12" } })
+
+    const remarksInput = screen.getByPlaceholderText("Remarks...")
+    expect(remarksInput).toBeInTheDocument()
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    expect(confirmBtn).toBeDisabled()
+  })
+
+  it("does not require a fresh remarks entry when the row's already-stored remarks is non-empty", () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 8, remarks: "Already noted last week" })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    const remarksInput = screen.getByPlaceholderText("Remarks...") as HTMLInputElement
+    expect(remarksInput.value).toBe("Already noted last week")
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    expect(confirmBtn).not.toBeDisabled()
+  })
+
+  it("includes remarks in the order_details payload alongside received_qty on confirm", async () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    mockUpdateMutateAsync.mockResolvedValue({})
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 8, remarks: "" })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    const remarksInput = screen.getByPlaceholderText("Remarks...")
+    fireEvent.change(remarksInput, { target: { value: "Box damaged in transit" } })
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    await userEvent.click(confirmBtn)
+
+    expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
+      id: po.id,
+      data: expect.objectContaining({
+        status: "COMPLETED",
+        order_details: [{ id: "d1", remarks: "Box damaged in transit" }],
+      }),
+    })
+  })
+
+  it("sends both received_qty and remarks when both are edited for a discrepant row", async () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    mockUpdateMutateAsync.mockResolvedValue({})
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 10, remarks: "" })],
+    }
+    renderModal(true, "COMPLETED", po)
+    fireEvent.click(screen.getByText("Show all 1 items"))
+
+    const qtyInput = screen.getByDisplayValue("10")
+    fireEvent.change(qtyInput, { target: { value: "7" } })
+
+    const remarksInput = screen.getByPlaceholderText("Remarks...")
+    fireEvent.change(remarksInput, { target: { value: "Partial delivery" } })
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    await userEvent.click(confirmBtn)
+
+    expect(mockUpdateMutateAsync).toHaveBeenCalledWith({
+      id: po.id,
+      data: expect.objectContaining({
+        status: "COMPLETED",
+        order_details: [{ id: "d1", received_qty: 7, remarks: "Partial delivery" }],
+      }),
+    })
+  })
+
+  it("surfaces the real backend field error if a remarks-missing submission somehow reaches the server", async () => {
+    mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
+    mockUpdateMutateAsync.mockRejectedValue({
+      status: 400,
+      message: "Validation failed.",
+      fieldErrors: {
+        order_details: "Remarks is required for Variant d1 when moving to COMPLETED status with partial delivery (received_qty: 8, ordered_qty: 10).",
+      },
+    })
+    const po: PurchaseOrder = {
+      ...mockPO,
+      status: "DELIVERED",
+      order_details: [makeDetail({ id: "d1", ordered_qty: 10, received_qty: 8, remarks: "already there" })],
+    }
+    renderModal(true, "COMPLETED", po)
+
+    const confirmBtn = screen.getByRole("button", { name: /confirm/i })
+    await userEvent.click(confirmBtn)
+
+    expect(vi.mocked(toast).error).toHaveBeenCalledWith(
+      "Remarks is required for Variant d1 when moving to COMPLETED status with partial delivery (received_qty: 8, ordered_qty: 10).",
+    )
+  })
+})
+
 describe("Confirm error handling — surfaces normalized ApiError", () => {
   it("toasts the order_details field error over the generic message when fieldErrors is present", async () => {
     mockCheckResult = { can_transition: true, target_status: "COMPLETED", missing_fields: [] }
@@ -367,9 +518,13 @@ describe("Confirm error handling — surfaces normalized ApiError", () => {
     const po: PurchaseOrder = {
       ...mockPO,
       status: "DELIVERED",
-      order_details: [makeDetail({ id: "d1", ordered_qty: 20, received_qty: 4 })],
+      order_details: [makeDetail({ id: "d1", ordered_qty: 20, received_qty: 4, remarks: "" })],
     }
     renderModal(true, "COMPLETED", po)
+
+    // Fill remarks so the new client-side gate doesn't block the click before this
+    // fallback (real-backend-error) path can be exercised.
+    fireEvent.change(screen.getByPlaceholderText("Remarks..."), { target: { value: "Partial delivery" } })
 
     const confirmBtn = screen.getByRole("button", { name: /confirm/i })
     await userEvent.click(confirmBtn)

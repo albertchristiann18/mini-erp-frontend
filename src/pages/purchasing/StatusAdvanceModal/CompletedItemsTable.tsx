@@ -15,10 +15,14 @@ interface CompletedItemsTableProps {
   onShowAll: () => void
   editedQty: Record<string, string>
   onSetQty: (id: string, value: string) => void
+  editedRemarks: Record<string, string>
+  onSetRemarks: (id: string, value: string) => void
+  discrepantRowIds: Set<string>
 }
 
 export function CompletedItemsTable({
   visibleRows, totalCount, flaggedCount, overThreshold, showAll, onShowAll, editedQty, onSetQty,
+  editedRemarks, onSetRemarks, discrepantRowIds,
 }: CompletedItemsTableProps) {
   const canRevealMore = !overThreshold && !showAll && flaggedCount < totalCount
 
@@ -31,6 +35,7 @@ export function CompletedItemsTable({
               <th className="px-3 py-2 text-left font-medium">Variant</th>
               <th className="px-3 py-2 text-left font-medium">Ordered</th>
               <th className="px-3 py-2 text-left font-medium">Received</th>
+              <th className="px-3 py-2 text-left font-medium">Remarks</th>
             </tr>
           </thead>
           <tbody>
@@ -56,6 +61,22 @@ export function CompletedItemsTable({
                     value={editedQty[item.id] ?? String(item.received_qty ?? '')}
                     onChange={e => onSetQty(item.id, e.target.value)}
                   />
+                </td>
+                <td className="px-3 py-1.5">
+                  {discrepantRowIds.has(item.id) && (
+                    <>
+                      <label className="sr-only" htmlFor={`remarks-${item.id}`}>
+                        Remarks for {item.product_variant_name}
+                      </label>
+                      <Input
+                        id={`remarks-${item.id}`}
+                        className="h-7 w-32 text-xs"
+                        placeholder="Remarks..."
+                        value={editedRemarks[item.id] ?? item.remarks ?? ''}
+                        onChange={e => onSetRemarks(item.id, e.target.value)}
+                      />
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
